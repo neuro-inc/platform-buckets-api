@@ -97,7 +97,6 @@ class TestApi:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert resp.headers["Access-Control-Allow-Origin"] == "https://neu.ro"
             assert resp.headers["Access-Control-Allow-Credentials"] == "true"
-            assert resp.headers["Access-Control-Expose-Headers"] == ""
 
     async def test_ping_options_no_headers(
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession

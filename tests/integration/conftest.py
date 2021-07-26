@@ -40,13 +40,11 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
 @pytest.fixture
 def config_factory(
     auth_config: PlatformAuthConfig,
-    cluster_name: str,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = dict(
             server=ServerConfig(host="0.0.0.0", port=8080),
             platform_auth=auth_config,
-            cluster_name=cluster_name,
             cors=CORSConfig(allowed_origins=["https://neu.ro"]),
             sentry=None,
         )
