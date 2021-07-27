@@ -1,7 +1,5 @@
-from pathlib import Path
 from typing import Any, Dict
 
-import pytest
 from yarl import URL
 
 from platform_buckets_api.config import (
@@ -15,25 +13,7 @@ from platform_buckets_api.config import (
 from platform_buckets_api.config_factory import EnvironConfigFactory
 
 
-CA_DATA_PEM = "this-is-certificate-authority-public-key"
-TOKEN = "this-is-token"
-
-
-@pytest.fixture()
-def cert_authority_path(tmp_path: Path) -> str:
-    ca_path = tmp_path / "ca.crt"
-    ca_path.write_text(CA_DATA_PEM)
-    return str(ca_path)
-
-
-@pytest.fixture()
-def token_path(tmp_path: Path) -> str:
-    token_path = tmp_path / "token"
-    token_path.write_text(TOKEN)
-    return str(token_path)
-
-
-def test_create(cert_authority_path: str, token_path: str) -> None:
+def test_create() -> None:
     environ: Dict[str, Any] = {
         "NP_BUCKETS_API_HOST": "0.0.0.0",
         "NP_BUCKETS_API_PORT": 8080,

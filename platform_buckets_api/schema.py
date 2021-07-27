@@ -3,7 +3,9 @@ from typing import Any, Callable, TypeVar
 
 import aiohttp.web
 from aiohttp_apispec import querystring_schema
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
+
+from platform_buckets_api.storage import BucketsProviderType
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -31,9 +33,17 @@ def query_schema(**kwargs: fields.Field) -> Callable[[F], F]:
     return _decorator
 
 
-class ExampleSchema(Schema):
-    id = fields.String(required=True, dump_only=True)
+class Bucket(Schema):
     name = fields.String(required=True)
+    cluster_name = fields.String(required=True)
+    owner = fields.String(required=True)
+    provider = fields.String(
+        required=True,
+        validate=validate.OneOf(
+            choices=[provider_type for provider_type in BucketsProviderType]
+        ),
+    )
+    credentials = fields.Dict(required=True)
 
 
 class ClientErrorSchema(Schema):

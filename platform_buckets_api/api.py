@@ -1,6 +1,7 @@
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
+from typing import AsyncIterator, Awaitable, Callable, Mapping
 
 import aiohttp
 import aiohttp.web
@@ -23,11 +24,37 @@ from platform_logging import init_logging, notrace, setup_sentry, setup_zipkin_t
 
 from .config import Config, CORSConfig, PlatformAuthConfig
 from .config_factory import EnvironConfigFactory
-from .schema import ClientErrorSchema, ExampleSchema
+from .providers import EmptyBucketProviderFactory
+from .schema import Bucket, ClientErrorSchema
 from .service import Service
+from .storage import BucketsProviderType, InMemoryStorage, UserBucket, UserCredentials
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ResponseBucket:
+    name: str
+    cluster_name: str
+    owner: str
+    provider: BucketsProviderType
+    credentials: Mapping[str, str]
+
+    @classmethod
+    def from_user_bucket(
+        cls, user_bucket: UserBucket, credentials: UserCredentials
+    ) -> "ResponseBucket":
+        return cls(
+            name=user_bucket.name,
+            cluster_name=user_bucket.cluster_name,
+            owner=user_bucket.owner,
+            provider=user_bucket.provider_bucket.provider_type,
+            credentials={
+                "bucket_name": user_bucket.provider_bucket.name,
+                **credentials.role.credentials,
+            },
+        )
 
 
 class ApiHandler:
@@ -57,34 +84,44 @@ class BucketsApiHandler:
     def register(self, app: aiohttp.web.Application) -> None:
         app.add_routes(
             [
-                aiohttp.web.post("", self.sample_request),
+                aiohttp.web.post("", self.create_bucket),
             ]
         )
 
+    @property
+    def service(self) -> Service:
+        return self._app["service"]
+
     @docs(
-        tags=["api"],
-        summary="Example request",
+        tags=["buckets"],
+        summary="Create bucket",
         responses={
             HTTPCreated.status_code: {
-                "description": "Bake created",
-                "schema": ExampleSchema(),
+                "description": "Bucket created",
+                "schema": Bucket(),
             },
             HTTPConflict.status_code: {
-                "description": "bake with such id exists",
+                "description": "Bucket with such name exists",
                 "schema": ClientErrorSchema(),
             },
         },
     )
-    @request_schema(ExampleSchema())
-    async def sample_request(
+    @request_schema(Bucket(partial=["name", "cluster_name"]))
+    async def create_bucket(
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        await check_authorized(request)
-        schema = ExampleSchema()
+        username = await check_authorized(request)
+        schema = Bucket(partial=["name", "cluster_name"])
         data = schema.load(await request.json())
+        bucket, credentials = await self.service.create_bucket(
+            name=data["name"],
+            cluster_name=data["cluster_name"],
+            owner=username,
+        )
         return aiohttp.web.json_response(
-            data={"id": "id", "name": data["name"]}, status=HTTPCreated.status_code
+            data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
+            status=HTTPCreated.status_code,
         )
 
 
@@ -160,7 +197,11 @@ async def create_app(config: Config) -> aiohttp.web.Application:
             )
 
             logger.info("Initializing Service")
-            app["buckets_app"]["service"] = Service()
+            app["buckets_app"]["service"] = Service(
+                storage=InMemoryStorage(),
+                auth_client=auth_client,
+                bucket_provider_factory=EmptyBucketProviderFactory(),
+            )
 
             yield
 
