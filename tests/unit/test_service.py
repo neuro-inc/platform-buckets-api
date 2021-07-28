@@ -3,10 +3,10 @@ from typing import Optional
 import pytest
 from neuro_auth_client import AuthClient, ClientAccessSubTreeView, ClientSubTreeViewRoot
 
-from platform_buckets_api.providers import BucketPermission, BucketProviderFactory
+from platform_buckets_api.providers import BucketPermission
 from platform_buckets_api.service import Service
 from platform_buckets_api.storage import Storage
-from tests.mocks import MockBucketProvider, MockBucketProviderFactory
+from tests.mocks import MockBucketProvider
 
 
 pytestmark = pytest.mark.asyncio
@@ -55,31 +55,26 @@ class TestService:
         return MockBucketProvider()
 
     @pytest.fixture
-    def mock_provider_factory(
-        self, cluster_name: str, mock_provider: MockBucketProvider
-    ) -> MockBucketProviderFactory:
-        return MockBucketProviderFactory({cluster_name: mock_provider})
-
-    @pytest.fixture
     def service(
         self,
         in_memory_storage: Storage,
         mock_auth_client: MockAuthClient,
-        mock_provider_factory: BucketProviderFactory,
+        mock_provider: MockBucketProvider,
+        cluster_name: str,
     ) -> Service:
         return Service(
             storage=in_memory_storage,
             auth_client=mock_auth_client,
-            bucket_provider_factory=mock_provider_factory,
+            bucket_provider=mock_provider,
+            cluster_name=cluster_name,
         )
 
     async def test_bucket_create(
-        self, service: Service, cluster_name: str, mock_provider: MockBucketProvider
+        self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
         bucket, credentials = await service.create_bucket(
             name="test-bucket",
             owner="test-user",
-            cluster_name=cluster_name,
         )
         assert mock_provider.created_buckets == [bucket.provider_bucket]
         assert bucket.provider_bucket.name == "test-bucket--test-user"
@@ -94,17 +89,15 @@ class TestService:
         }
 
     async def test_bucket_create_second_one(
-        self, service: Service, cluster_name: str, mock_provider: MockBucketProvider
+        self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
         bucket1, credentials1 = await service.create_bucket(
             name="test-bucket-1",
             owner="test-user",
-            cluster_name=cluster_name,
         )
         bucket2, credentials2 = await service.create_bucket(
             name="test-bucket-2",
             owner="test-user",
-            cluster_name=cluster_name,
         )
         assert credentials1 == credentials2
         assert mock_provider.created_buckets == [

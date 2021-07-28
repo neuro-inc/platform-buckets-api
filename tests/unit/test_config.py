@@ -24,6 +24,7 @@ def test_create() -> None:
         "NP_ZIPKIN_URL": "http://zipkin:9411",
         "NP_SENTRY_DSN": "https://test.com",
         "NP_SENTRY_CLUSTER_NAME": "test",
+        "NP_CLUSTER_NAME": "test-cluster",
     }
     config = EnvironConfigFactory(environ).create()
     assert config == Config(
@@ -35,4 +36,5 @@ def test_create() -> None:
         zipkin=ZipkinConfig(url=URL("http://zipkin:9411")),
         sentry=SentryConfig(dsn=URL("https://test.com"), cluster_name="test"),
         enable_docs=True,
+        cluster_name="test-cluster",
     )

@@ -48,7 +48,6 @@ class ProviderTypeField(fields.String):
 
 class Bucket(Schema):
     name = fields.String(required=True)
-    cluster_name = fields.String(required=True)
     owner = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,

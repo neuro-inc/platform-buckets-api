@@ -41,6 +41,7 @@ class Config:
     server: ServerConfig
     platform_auth: PlatformAuthConfig
     cors: CORSConfig
+    cluster_name: str
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

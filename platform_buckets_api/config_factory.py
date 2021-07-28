@@ -22,6 +22,8 @@ class EnvironConfigFactory:
         self._environ = environ or os.environ
 
     def create(self) -> Config:
+
+        cluster_name = self._environ.get("NP_CLUSTER_NAME", "")
         enable_docs = self._environ.get("NP_BUCKETS_API_ENABLE_DOCS", "false") == "true"
         return Config(
             server=self._create_server(),
@@ -30,6 +32,7 @@ class EnvironConfigFactory:
             zipkin=self.create_zipkin(),
             sentry=self.create_sentry(),
             enable_docs=enable_docs,
+            cluster_name=cluster_name,
         )
 
     def _create_server(self) -> ServerConfig:

@@ -40,6 +40,7 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
 @pytest.fixture
 def config_factory(
     auth_config: PlatformAuthConfig,
+    cluster_name: str,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = dict(
@@ -47,6 +48,7 @@ def config_factory(
             platform_auth=auth_config,
             cors=CORSConfig(allowed_origins=["https://neu.ro"]),
             sentry=None,
+            cluster_name=cluster_name,
         )
         kwargs = {**defaults, **kwargs}
         return Config(**kwargs)

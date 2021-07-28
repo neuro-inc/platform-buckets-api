@@ -24,7 +24,7 @@ from platform_logging import init_logging, notrace, setup_sentry, setup_zipkin_t
 
 from .config import Config, CORSConfig, PlatformAuthConfig
 from .config_factory import EnvironConfigFactory
-from .providers import BucketProviderFactory, EmptyBucketProviderFactory
+from .providers import BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
 from .storage import BucketsProviderType, InMemoryStorage, UserBucket, UserCredentials
@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ResponseBucket:
     name: str
-    cluster_name: str
     owner: str
     provider: BucketsProviderType
     credentials: Mapping[str, str]
@@ -47,7 +46,6 @@ class ResponseBucket:
     ) -> "ResponseBucket":
         return cls(
             name=user_bucket.name,
-            cluster_name=user_bucket.cluster_name,
             owner=user_bucket.owner,
             provider=user_bucket.provider_bucket.provider_type,
             credentials={
@@ -116,7 +114,6 @@ class BucketsApiHandler:
         data = schema.load(await request.json())
         bucket, credentials = await self.service.create_bucket(
             name=data["name"],
-            cluster_name=data["cluster_name"],
             owner=username,
         )
         return aiohttp.web.json_response(
@@ -182,7 +179,7 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
 
 
 async def create_app(
-    config: Config, bucket_provider_factory: BucketProviderFactory
+    config: Config, bucket_provider: BucketProvider
 ) -> aiohttp.web.Application:
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app["config"] = config
@@ -202,7 +199,8 @@ async def create_app(
             app["buckets_app"]["service"] = Service(
                 storage=InMemoryStorage(),
                 auth_client=auth_client,
-                bucket_provider_factory=bucket_provider_factory,
+                bucket_provider=bucket_provider,
+                cluster_name=config.cluster_name,
             )
 
             yield
@@ -261,7 +259,7 @@ def main() -> None:  # pragma: no coverage
     logging.info("Loaded config: %r", config)
     setup_tracing(config)
     aiohttp.web.run_app(
-        create_app(config, EmptyBucketProviderFactory()),
+        create_app(config, None),  # type: ignore
         host=config.server.host,
         port=config.server.port,
     )

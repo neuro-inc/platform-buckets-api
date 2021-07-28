@@ -9,7 +9,7 @@ from aiohttp.web_exceptions import HTTPCreated, HTTPForbidden, HTTPUnauthorized
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
 
-from ..mocks import MockBucketProvider, MockBucketProviderFactory
+from ..mocks import MockBucketProvider
 from .auth import _User
 from .conftest import ApiAddress, create_local_app_server
 
@@ -44,17 +44,10 @@ def mock_provider() -> MockBucketProvider:
 
 
 @pytest.fixture
-def mock_provider_factory(
-    cluster_name: str, mock_provider: MockBucketProvider
-) -> MockBucketProviderFactory:
-    return MockBucketProviderFactory({cluster_name: mock_provider})
-
-
-@pytest.fixture
 async def buckets_api(
-    config: Config, mock_provider_factory: MockBucketProviderFactory
+    config: Config, mock_provider: MockBucketProvider
 ) -> AsyncIterator[BucketsApiEndpoints]:
-    app = await create_app(config, mock_provider_factory)
+    app = await create_app(config, mock_provider)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
 
@@ -161,7 +154,6 @@ class TestApi:
 
     async def test_create_bucket(
         self,
-        cluster_name: str,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
@@ -171,13 +163,11 @@ class TestApi:
             headers=regular_user.headers,
             json={
                 "name": "test_bucket",
-                "cluster_name": cluster_name,
             },
         ) as resp:
             assert resp.status == HTTPCreated.status_code, await resp.text()
             payload = await resp.json()
             assert payload["name"] == "test_bucket"
-            assert payload["cluster_name"] == cluster_name
             assert "test_bucket" in payload["credentials"]["bucket_name"]
             assert payload["provider"] == "aws"
             assert payload["owner"] == regular_user.name

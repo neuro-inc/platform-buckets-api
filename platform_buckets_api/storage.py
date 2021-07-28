@@ -47,7 +47,6 @@ class ProviderBucket:
 @dataclass(frozen=True)
 class UserCredentials:
     owner: str
-    cluster_name: str
     role: ProviderRole
 
 
@@ -55,7 +54,6 @@ class UserCredentials:
 class UserBucket:
     name: str
     owner: str
-    cluster_name: str
     provider_bucket: ProviderBucket
 
 
@@ -65,7 +63,7 @@ class Storage(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def get_credentials(self, owner: str, cluster_name: str) -> UserCredentials:
+    async def get_credentials(self, owner: str) -> UserCredentials:
         pass
 
     @abc.abstractmethod
@@ -84,22 +82,17 @@ class InMemoryStorage(Storage):
 
     async def create_credentials(self, credentials: UserCredentials) -> None:
         try:
-            await self.get_credentials(credentials.owner, credentials.cluster_name)
-            raise ExistsError(
-                f"UserCredentials for {credentials.owner} in "
-                f"cluster {credentials.cluster_name} already exists"
-            )
+            await self.get_credentials(credentials.owner)
+            raise ExistsError(f"UserCredentials for {credentials.owner} already exists")
         except NotExistsError:
             pass
         self._credentials.append(credentials)
 
-    async def get_credentials(self, owner: str, cluster_name: str) -> UserCredentials:
+    async def get_credentials(self, owner: str) -> UserCredentials:
         for cred in self._credentials:
-            if cred.owner == owner and cred.cluster_name == cluster_name:
+            if cred.owner == owner:
                 return cred
-        raise NotExistsError(
-            f"UserCredentials for {owner} in cluster {cluster_name} doesn't exists"
-        )
+        raise NotExistsError(f"UserCredentials for {owner} doesn't exists")
 
     @asyncgeneratorcontextmanager
     async def list_buckets(self) -> AsyncIterator[UserBucket]:
@@ -108,26 +101,16 @@ class InMemoryStorage(Storage):
 
     async def create_bucket(self, bucket: UserBucket) -> None:
         try:
-            await self._get_bucket(
-                owner=bucket.owner, cluster_name=bucket.cluster_name, name=bucket.name
-            )
+            await self._get_bucket(owner=bucket.owner, name=bucket.name)
             raise ExistsError(
-                f"UserBucket for {bucket.owner} in cluster "
-                f"{bucket.cluster_name} with name {bucket.name} already exists"
+                f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
             )
         except NotExistsError:
             pass
         self._buckets.append(bucket)
 
-    async def _get_bucket(self, owner: str, cluster_name: str, name: str) -> UserBucket:
+    async def _get_bucket(self, owner: str, name: str) -> UserBucket:
         for bucket in self._buckets:
-            if (
-                bucket.owner == owner
-                and bucket.cluster_name == cluster_name
-                and bucket.name == name
-            ):
+            if bucket.owner == owner and bucket.name == name:
                 return bucket
-        raise NotExistsError(
-            f"UserBucket for {owner} in cluster {cluster_name} with name"
-            f" {name} doesn't exists"
-        )
+        raise NotExistsError(f"UserBucket for {owner} with name {name} doesn't exists")

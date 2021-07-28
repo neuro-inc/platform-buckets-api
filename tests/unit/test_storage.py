@@ -16,7 +16,7 @@ from platform_buckets_api.storage import (
 pytestmark = pytest.mark.asyncio
 
 
-class TestProjectStorage:
+class TestStorage:
     @pytest.fixture()
     def storage(self, in_memory_storage: InMemoryStorage) -> Storage:
         return in_memory_storage
@@ -24,7 +24,6 @@ class TestProjectStorage:
     def _make_credentials(self, username: str) -> UserCredentials:
         return UserCredentials(
             owner=username,
-            cluster_name="test-cluster",
             role=ProviderRole(
                 id="test-id",
                 provider_type=BucketsProviderType.AWS,
@@ -38,7 +37,6 @@ class TestProjectStorage:
     def _make_bucket(self, username: str, name: str) -> UserBucket:
         return UserBucket(
             owner=username,
-            cluster_name="test-cluster",
             name=name,
             provider_bucket=ProviderBucket(
                 id="test-id",
@@ -50,14 +48,12 @@ class TestProjectStorage:
     async def test_credentials_create_get(self, storage: Storage) -> None:
         credentials = self._make_credentials("test")
         await storage.create_credentials(credentials)
-        res = await storage.get_credentials(
-            owner=credentials.owner, cluster_name=credentials.cluster_name
-        )
+        res = await storage.get_credentials(owner=credentials.owner)
         assert res == credentials
 
     async def test_credentials_not_exists(self, storage: Storage) -> None:
         with pytest.raises(NotExistsError):
-            await storage.get_credentials(owner="anything", cluster_name="anything")
+            await storage.get_credentials(owner="anything")
 
     async def test_credentials_duplicate_not_allowed(self, storage: Storage) -> None:
         credentials = self._make_credentials("test")

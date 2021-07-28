@@ -38,14 +38,3 @@ class BucketProvider(abc.ABC):
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
     ) -> None:
         pass
-
-
-class BucketProviderFactory(abc.ABC):
-    @abc.abstractmethod
-    async def get_provider(self, cluster_name: str) -> BucketProvider:
-        pass
-
-
-class EmptyBucketProviderFactory(BucketProviderFactory):
-    async def get_provider(self, cluster_name: str) -> BucketProvider:
-        raise ClusterNotFoundError
