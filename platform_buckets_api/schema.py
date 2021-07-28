@@ -1,5 +1,5 @@
 import functools
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 import aiohttp.web
 from aiohttp_apispec import querystring_schema
@@ -33,11 +33,24 @@ def query_schema(**kwargs: fields.Field) -> Callable[[F], F]:
     return _decorator
 
 
+class ProviderTypeField(fields.String):
+    def _deserialize(self, *args: Any, **kwargs: Any) -> BucketsProviderType:
+        res: str = super()._deserialize(*args, **kwargs)
+        return BucketsProviderType(res)
+
+    def _serialize(
+        self, value: Optional[BucketsProviderType], *args: Any, **kwargs: Any
+    ) -> Optional[str]:
+        if value is None:
+            return None
+        return super()._serialize(value.value, *args, **kwargs)
+
+
 class Bucket(Schema):
     name = fields.String(required=True)
     cluster_name = fields.String(required=True)
     owner = fields.String(required=True)
-    provider = fields.String(
+    provider = ProviderTypeField(
         required=True,
         validate=validate.OneOf(
             choices=[provider_type for provider_type in BucketsProviderType]

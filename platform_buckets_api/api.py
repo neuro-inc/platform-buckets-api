@@ -24,7 +24,7 @@ from platform_logging import init_logging, notrace, setup_sentry, setup_zipkin_t
 
 from .config import Config, CORSConfig, PlatformAuthConfig
 from .config_factory import EnvironConfigFactory
-from .providers import EmptyBucketProviderFactory
+from .providers import BucketProviderFactory, EmptyBucketProviderFactory
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
 from .storage import BucketsProviderType, InMemoryStorage, UserBucket, UserCredentials
@@ -106,13 +106,13 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["name", "cluster_name"]))
+    @request_schema(Bucket(partial=["provider", "owner", "credentials"]))
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         username = await check_authorized(request)
-        schema = Bucket(partial=["name", "cluster_name"])
+        schema = Bucket(partial=["provider", "owner", "credentials"])
         data = schema.load(await request.json())
         bucket, credentials = await self.service.create_bucket(
             name=data["name"],
@@ -181,7 +181,9 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
         cors.add(route)
 
 
-async def create_app(config: Config) -> aiohttp.web.Application:
+async def create_app(
+    config: Config, bucket_provider_factory: BucketProviderFactory
+) -> aiohttp.web.Application:
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app["config"] = config
 
@@ -200,7 +202,7 @@ async def create_app(config: Config) -> aiohttp.web.Application:
             app["buckets_app"]["service"] = Service(
                 storage=InMemoryStorage(),
                 auth_client=auth_client,
-                bucket_provider_factory=EmptyBucketProviderFactory(),
+                bucket_provider_factory=bucket_provider_factory,
             )
 
             yield
@@ -259,5 +261,7 @@ def main() -> None:  # pragma: no coverage
     logging.info("Loaded config: %r", config)
     setup_tracing(config)
     aiohttp.web.run_app(
-        create_app(config), host=config.server.host, port=config.server.port
+        create_app(config, EmptyBucketProviderFactory()),
+        host=config.server.host,
+        port=config.server.port,
     )

@@ -1,61 +1,15 @@
-from typing import Dict, Iterable, List, Mapping, Optional, Set
+from typing import Optional
 
 import pytest
 from neuro_auth_client import AuthClient, ClientAccessSubTreeView, ClientSubTreeViewRoot
 
-from platform_buckets_api.providers import (
-    BucketPermission,
-    BucketProvider,
-    BucketProviderFactory,
-)
+from platform_buckets_api.providers import BucketPermission, BucketProviderFactory
 from platform_buckets_api.service import Service
-from platform_buckets_api.storage import (
-    BucketsProviderType,
-    ProviderBucket,
-    ProviderRole,
-    Storage,
-)
+from platform_buckets_api.storage import Storage
+from tests.mocks import MockBucketProvider, MockBucketProviderFactory
 
 
 pytestmark = pytest.mark.asyncio
-
-
-class MockBucketProvider(BucketProvider):
-    def __init__(self) -> None:
-        self.created_roles: List[ProviderRole] = []
-        self.created_buckets: List[ProviderBucket] = []
-        self.role_to_permissions: Dict[str, Set[BucketPermission]] = {}
-
-    async def create_role(self, username: str) -> ProviderRole:
-        role = ProviderRole(
-            id=f"role-{len(self.created_roles) + 1}",
-            provider_type=BucketsProviderType.AWS,
-            credentials={"token": "value"},
-        )
-        self.created_roles.append(role)
-        return role
-
-    async def create_bucket(self, name: str) -> ProviderBucket:
-        bucket = ProviderBucket(
-            id=f"role-{len(self.created_buckets) + 1}",
-            provider_type=BucketsProviderType.AWS,
-            name=name,
-        )
-        self.created_buckets.append(bucket)
-        return bucket
-
-    async def set_role_permissions(
-        self, role: ProviderRole, permissions: Iterable[BucketPermission]
-    ) -> None:
-        self.role_to_permissions[role.id] = set(permissions)
-
-
-class MockBucketProviderFactory(BucketProviderFactory):
-    def __init__(self, providers: Mapping[str, BucketProvider]) -> None:
-        self.providers = providers
-
-    async def get_provider(self, cluster_name: str) -> BucketProvider:
-        return self.providers[cluster_name]
 
 
 class MockAuthClient(AuthClient):

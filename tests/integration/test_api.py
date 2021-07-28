@@ -4,11 +4,13 @@ from typing import AsyncIterator, Callable
 import aiohttp
 import pytest
 from aiohttp.web import HTTPOk
-from aiohttp.web_exceptions import HTTPForbidden, HTTPUnauthorized
+from aiohttp.web_exceptions import HTTPCreated, HTTPForbidden, HTTPUnauthorized
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
 
+from ..mocks import MockBucketProvider, MockBucketProviderFactory
+from .auth import _User
 from .conftest import ApiAddress, create_local_app_server
 
 
@@ -31,10 +33,28 @@ class BucketsApiEndpoints:
     def secured_ping_url(self) -> str:
         return f"{self.api_v1_endpoint}/secured-ping"
 
+    @property
+    def buckets_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets"
+
 
 @pytest.fixture
-async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
-    app = await create_app(config)
+def mock_provider() -> MockBucketProvider:
+    return MockBucketProvider()
+
+
+@pytest.fixture
+def mock_provider_factory(
+    cluster_name: str, mock_provider: MockBucketProvider
+) -> MockBucketProviderFactory:
+    return MockBucketProviderFactory({cluster_name: mock_provider})
+
+
+@pytest.fixture
+async def buckets_api(
+    config: Config, mock_provider_factory: MockBucketProviderFactory
+) -> AsyncIterator[BucketsApiEndpoints]:
+    app = await create_app(config, mock_provider_factory)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
 
@@ -138,3 +158,26 @@ class TestApi:
             assert resp.headers["Access-Control-Allow-Origin"] == "https://neu.ro"
             assert resp.headers["Access-Control-Allow-Credentials"] == "true"
             assert resp.headers["Access-Control-Allow-Methods"] == "GET"
+
+    async def test_create_bucket(
+        self,
+        cluster_name: str,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+    ) -> None:
+        async with client.post(
+            buckets_api.buckets_url,
+            headers=regular_user.headers,
+            json={
+                "name": "test_bucket",
+                "cluster_name": cluster_name,
+            },
+        ) as resp:
+            assert resp.status == HTTPCreated.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["name"] == "test_bucket"
+            assert payload["cluster_name"] == cluster_name
+            assert "test_bucket" in payload["credentials"]["bucket_name"]
+            assert payload["provider"] == "aws"
+            assert payload["owner"] == regular_user.name

@@ -109,7 +109,7 @@ class Service:
 
         tree = await self._auth_client.get_permissions_tree(
             credentials.owner,
-            resource=f"buckets://{credentials.cluster_name}",
+            resource=f"blob://{credentials.cluster_name}",
         )
         permissions: List[BucketPermission] = []
         async with self._storage.list_buckets() as it:
