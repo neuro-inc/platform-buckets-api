@@ -35,7 +35,10 @@ class Service:
         self._cluster_name = cluster_name
 
     def _make_bucket_name(self, name: str, owner: str) -> str:
-        return f"{name}--{owner}"
+        return f"neuro--{name}--{owner}"
+
+    def _make_role_name(self, owner: str) -> str:
+        return f"neuro-bucketuser-{owner}"
 
     async def _get_user_credentials(
         self,
@@ -45,7 +48,8 @@ class Service:
             return await self._storage.get_credentials(owner)
         except NotExistsError:
             try:
-                role = await self._provider.create_role(owner)
+                role_name = self._make_role_name(owner)
+                role = await self._provider.create_role(role_name)
             except RoleExistsError:
                 await asyncio.sleep(1)  # Race condition, retry read from DB after delay
                 return await self._get_user_credentials(owner)
