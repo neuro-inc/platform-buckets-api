@@ -1,11 +1,8 @@
 from typing import Dict, Iterable, List, Set
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.providers import BucketPermission, BucketProvider
-from platform_buckets_api.storage import (
-    BucketsProviderType,
-    ProviderBucket,
-    ProviderRole,
-)
+from platform_buckets_api.storage import ProviderBucket, ProviderRole
 
 
 class MockBucketProvider(BucketProvider):

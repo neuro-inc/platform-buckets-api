@@ -5,7 +5,7 @@ import aiohttp.web
 from aiohttp_apispec import querystring_schema
 from marshmallow import Schema, fields, validate
 
-from platform_buckets_api.storage import BucketsProviderType
+from platform_buckets_api.config import BucketsProviderType
 
 
 F = TypeVar("F", bound=Callable[..., Any])

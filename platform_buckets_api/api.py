@@ -1,8 +1,9 @@
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, Mapping
+from typing import AsyncIterator, Awaitable, Callable, Mapping, Optional
 
+import aiobotocore
 import aiohttp
 import aiohttp.web
 import aiohttp_cors
@@ -22,12 +23,18 @@ from neuro_auth_client import AuthClient
 from neuro_auth_client.security import AuthScheme, setup_security
 from platform_logging import init_logging, notrace, setup_sentry, setup_zipkin_tracer
 
-from .config import Config, CORSConfig, PlatformAuthConfig
+from .config import (
+    AWSProviderConfig,
+    BucketsProviderType,
+    Config,
+    CORSConfig,
+    PlatformAuthConfig,
+)
 from .config_factory import EnvironConfigFactory
-from .providers import BucketProvider
+from .providers import AWSBucketProvider, BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
-from .storage import BucketsProviderType, InMemoryStorage, UserBucket, UserCredentials
+from .storage import InMemoryStorage, UserBucket, UserCredentials
 
 
 logger = logging.getLogger(__name__)
@@ -179,7 +186,7 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
 
 
 async def create_app(
-    config: Config, bucket_provider: BucketProvider
+    config: Config, _bucket_provider: Optional[BucketProvider] = None
 ) -> aiohttp.web.Application:
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
     app["config"] = config
@@ -194,6 +201,34 @@ async def create_app(
             await setup_security(
                 app=app, auth_client=auth_client, auth_scheme=AuthScheme.BEARER
             )
+            if _bucket_provider is not None:
+                bucket_provider = _bucket_provider
+            if _bucket_provider is None:
+                if isinstance(config.bucket_provider, AWSProviderConfig):
+                    session = aiobotocore.get_session()
+                    client_kwargs = dict(
+                        region_name=config.bucket_provider.region_name,
+                        aws_secret_access_key=config.bucket_provider.access_key_secret,
+                        aws_access_key_id=config.bucket_provider.access_key_id,
+                    )
+                    if config.bucket_provider.endpoint_url:
+                        client_kwargs[
+                            "endpoint_url"
+                        ] = config.bucket_provider.endpoint_url
+                    s3_client = await exit_stack.enter_async_context(
+                        session.create_client("s3", **client_kwargs)
+                    )
+                    iam_client = await exit_stack.enter_async_context(
+                        session.create_client("iam", **client_kwargs)
+                    )
+                    bucket_provider = AWSBucketProvider(
+                        s3_client=s3_client,
+                        iam_client=iam_client,
+                    )
+                else:
+                    raise Exception(
+                        f"Unknown bucket provider {type(config.bucket_provider)}"
+                    )
 
             logger.info("Initializing Service")
             app["buckets_app"]["service"] = Service(
@@ -259,7 +294,7 @@ def main() -> None:  # pragma: no coverage
     logging.info("Loaded config: %r", config)
     setup_tracing(config)
     aiohttp.web.run_app(
-        create_app(config, None),  # type: ignore
+        create_app(config),
         host=config.server.host,
         port=config.server.port,
     )

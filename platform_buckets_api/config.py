@@ -1,5 +1,6 @@
+import enum
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import ClassVar, Optional, Sequence, Union
 
 from yarl import URL
 
@@ -36,12 +37,26 @@ class SentryConfig:
     sample_rate: float = 0.0
 
 
+class BucketsProviderType(str, enum.Enum):
+    AWS = "aws"
+
+
+@dataclass(frozen=True)
+class AWSProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
+    access_key_id: str
+    access_key_secret: str
+    region_name: str = "us-east-1"
+    endpoint_url: Optional[str] = None
+
+
 @dataclass(frozen=True)
 class Config:
     server: ServerConfig
     platform_auth: PlatformAuthConfig
     cors: CORSConfig
     cluster_name: str
+    bucket_provider: Union[AWSProviderConfig]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

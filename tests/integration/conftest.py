@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 pytest_plugins = [
     "tests.integration.docker",
     "tests.integration.auth",
+    "tests.integration.moto_server",
 ]
 
 

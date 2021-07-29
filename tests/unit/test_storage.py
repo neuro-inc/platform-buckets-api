@@ -1,7 +1,7 @@
 import pytest
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.storage import (
-    BucketsProviderType,
     ExistsError,
     InMemoryStorage,
     NotExistsError,

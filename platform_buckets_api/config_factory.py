@@ -1,10 +1,12 @@
 import logging
 import os
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 from yarl import URL
 
 from .config import (
+    AWSProviderConfig,
+    BucketsProviderType,
     Config,
     CORSConfig,
     PlatformAuthConfig,
@@ -33,6 +35,7 @@ class EnvironConfigFactory:
             sentry=self.create_sentry(),
             enable_docs=enable_docs,
             cluster_name=cluster_name,
+            bucket_provider=self.create_bucket_provider(),
         )
 
     def _create_server(self) -> ServerConfig:
@@ -75,3 +78,16 @@ class EnvironConfigFactory:
                 self._environ.get("NP_SENTRY_SAMPLE_RATE", SentryConfig.sample_rate)
             ),
         )
+
+    def create_bucket_provider(self) -> Union[AWSProviderConfig]:
+        type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
+        if type == BucketsProviderType.AWS:
+            return AWSProviderConfig(
+                access_key_id=self._environ["NP_AWS_ACCESS_KEY_ID"],
+                access_key_secret=self._environ["NP_AWS_ACCESS_KEY_SECRET"],
+                region_name=self._environ.get(
+                    "NP_AWS_REGION_NAME", AWSProviderConfig.region_name
+                ),
+            )
+        else:
+            raise ValueError(f"Unknown bucket provider type {type}")

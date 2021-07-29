@@ -13,6 +13,7 @@ install_requires = (
     "sentry-sdk==1.3.0",
     "marshmallow==3.13.0",
     "aiohttp-apispec==2.2.1",
+    "aiobotocore==1.3.3",
 )
 
 setup(

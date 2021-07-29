@@ -3,6 +3,7 @@ from typing import Any, Dict
 from yarl import URL
 
 from platform_buckets_api.config import (
+    AWSProviderConfig,
     Config,
     CORSConfig,
     PlatformAuthConfig,
@@ -25,6 +26,10 @@ def test_create() -> None:
         "NP_SENTRY_DSN": "https://test.com",
         "NP_SENTRY_CLUSTER_NAME": "test",
         "NP_CLUSTER_NAME": "test-cluster",
+        "NP_BUCKET_PROVIDER_TYPE": "aws",
+        "NP_AWS_ACCESS_KEY_ID": "key-id",
+        "NP_AWS_ACCESS_KEY_SECRET": "key-secret",
+        "NP_AWS_REGION_NAME": "us-east-2",
     }
     config = EnvironConfigFactory(environ).create()
     assert config == Config(
@@ -37,4 +42,9 @@ def test_create() -> None:
         sentry=SentryConfig(dsn=URL("https://test.com"), cluster_name="test"),
         enable_docs=True,
         cluster_name="test-cluster",
+        bucket_provider=AWSProviderConfig(
+            access_key_id="key-id",
+            access_key_secret="key-secret",
+            region_name="us-east-2",
+        ),
     )

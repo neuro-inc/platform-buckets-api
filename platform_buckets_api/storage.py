@@ -1,8 +1,8 @@
 import abc
-import enum
 from dataclasses import dataclass
 from typing import AsyncContextManager, AsyncIterator, List, Mapping
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
 
@@ -24,10 +24,6 @@ class ExistsError(StorageError):
 
 class UniquenessError(StorageError):
     pass
-
-
-class BucketsProviderType(str, enum.Enum):
-    AWS = "aws"
 
 
 @dataclass(frozen=True)
