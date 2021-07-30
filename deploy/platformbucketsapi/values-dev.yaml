@@ -12,7 +12,7 @@ bucket_provider:
       valueFrom:
         secretKeyRef:
           name: buckets-admin-aws-token
-            key: secret_access_key
+          key: secret_access_key
 
 ingress:
   enabled: true
