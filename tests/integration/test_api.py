@@ -9,7 +9,6 @@ from aiohttp.web_exceptions import HTTPCreated, HTTPForbidden, HTTPUnauthorized
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
 
-from ..mocks import MockBucketProvider
 from .auth import _User
 from .conftest import ApiAddress, create_local_app_server
 
@@ -39,15 +38,8 @@ class BucketsApiEndpoints:
 
 
 @pytest.fixture
-def mock_provider() -> MockBucketProvider:
-    return MockBucketProvider()
-
-
-@pytest.fixture
-async def buckets_api(
-    config: Config, mock_provider: MockBucketProvider
-) -> AsyncIterator[BucketsApiEndpoints]:
-    app = await create_app(config, mock_provider)
+async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
+    app = await create_app(config)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
 

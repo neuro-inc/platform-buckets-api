@@ -25,7 +25,7 @@ class TestStorage:
         return UserCredentials(
             owner=username,
             role=ProviderRole(
-                id="test-id",
+                id=f"test-{username}-id",
                 provider_type=BucketsProviderType.AWS,
                 credentials={
                     "access_key_id": "test",
@@ -39,7 +39,7 @@ class TestStorage:
             owner=username,
             name=name,
             provider_bucket=ProviderBucket(
-                id="test-id",
+                id=f"{name}--{username}",
                 provider_type=BucketsProviderType.AWS,
                 name=f"{name}--{username}",
             ),

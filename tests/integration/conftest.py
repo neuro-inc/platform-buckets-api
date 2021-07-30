@@ -9,10 +9,13 @@ from typing import Any, AsyncIterator, Callable
 import aiohttp
 import aiohttp.web
 import pytest
+from yarl import URL
 
 from platform_buckets_api.config import (
+    AWSProviderConfig,
     Config,
     CORSConfig,
+    KubeConfig,
     PlatformAuthConfig,
     ServerConfig,
 )
@@ -25,6 +28,7 @@ pytest_plugins = [
     "tests.integration.docker",
     "tests.integration.auth",
     "tests.integration.moto_server",
+    "tests.integration.kube",
 ]
 
 
@@ -38,18 +42,34 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
         yield session
 
 
+@dataclass(frozen=True)
+class MotoConfig:
+    url: URL
+    admin_access_key_id: str
+    admin_secret_access_key: str
+
+
 @pytest.fixture
 def config_factory(
     auth_config: PlatformAuthConfig,
     cluster_name: str,
+    kube_config: KubeConfig,
+    moto_server: MotoConfig,
+    kube_client: None,  # Force cleanup
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = dict(
             server=ServerConfig(host="0.0.0.0", port=8080),
             platform_auth=auth_config,
+            kube=kube_config,
             cors=CORSConfig(allowed_origins=["https://neu.ro"]),
             sentry=None,
             cluster_name=cluster_name,
+            bucket_provider=AWSProviderConfig(
+                endpoint_url=str(moto_server.url),
+                access_key_id=moto_server.admin_access_key_id,
+                secret_access_key=moto_server.admin_secret_access_key,
+            ),
         )
         kwargs = {**defaults, **kwargs}
         return Config(**kwargs)

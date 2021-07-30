@@ -65,6 +65,12 @@ jobs:
           login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
           username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
           password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
+      - name: Setup minikube
+        run: |
+          make install_k8s
+          make start_k8s
+          make apply_configuration_k8s
+          make test_k8s
       - name: Run integration tests
         run: make test_integration
       - name: Upload coverage to Codecov

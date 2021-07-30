@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass
 from typing import AsyncIterator, Iterator
 
 import aiobotocore
@@ -13,6 +12,8 @@ from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
 from yarl import URL
+
+from tests.integration.conftest import MotoConfig
 
 
 logger = logging.getLogger(__name__)
@@ -101,13 +102,6 @@ async def wait_for_moto_server(
                 await asyncio.sleep(interval_s)
     except asyncio.TimeoutError:
         pytest.fail(f"failed to connect to {url}: {last_exc}")
-
-
-@dataclass(frozen=True)
-class MotoConfig:
-    url: URL
-    admin_access_key_id: str
-    admin_secret_access_key: str
 
 
 @pytest.fixture()

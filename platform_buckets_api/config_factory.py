@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Dict, Optional, Sequence, Union
 
 from yarl import URL
@@ -9,6 +10,8 @@ from .config import (
     BucketsProviderType,
     Config,
     CORSConfig,
+    KubeClientAuthType,
+    KubeConfig,
     PlatformAuthConfig,
     SentryConfig,
     ServerConfig,
@@ -30,6 +33,7 @@ class EnvironConfigFactory:
         return Config(
             server=self._create_server(),
             platform_auth=self._create_platform_auth(),
+            kube=self.create_kube(),
             cors=self.create_cors(),
             zipkin=self.create_zipkin(),
             sentry=self.create_sentry(),
@@ -84,10 +88,51 @@ class EnvironConfigFactory:
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
                 access_key_id=self._environ["NP_AWS_ACCESS_KEY_ID"],
-                access_key_secret=self._environ["NP_AWS_ACCESS_KEY_SECRET"],
+                secret_access_key=self._environ["NP_AWS_SECRET_ACCESS_KEY"],
                 region_name=self._environ.get(
                     "NP_AWS_REGION_NAME", AWSProviderConfig.region_name
                 ),
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")
+
+    def create_kube(self) -> KubeConfig:
+        endpoint_url = self._environ["NP_BUCKETS_API_K8S_API_URL"]
+        auth_type = KubeClientAuthType(
+            self._environ.get(
+                "NP_BUCKETS_API_K8S_AUTH_TYPE", KubeConfig.auth_type.value
+            )
+        )
+        ca_path = self._environ.get("NP_BUCKETS_API_K8S_CA_PATH")
+        ca_data = Path(ca_path).read_text() if ca_path else None
+
+        token_path = self._environ.get("NP_BUCKETS_API_K8S_TOKEN_PATH")
+        token = Path(token_path).read_text() if token_path else None
+
+        return KubeConfig(
+            endpoint_url=endpoint_url,
+            cert_authority_data_pem=ca_data,
+            auth_type=auth_type,
+            auth_cert_path=self._environ.get("NP_BUCKETS_API_K8S_AUTH_CERT_PATH"),
+            auth_cert_key_path=self._environ.get(
+                "NP_BUCKETS_API_K8S_AUTH_CERT_KEY_PATH"
+            ),
+            token=token,
+            namespace=self._environ.get("NP_BUCKETS_API_K8S_NS", KubeConfig.namespace),
+            client_conn_timeout_s=int(
+                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT")
+                or KubeConfig.client_conn_timeout_s
+            ),
+            client_read_timeout_s=int(
+                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT")
+                or KubeConfig.client_read_timeout_s
+            ),
+            client_watch_timeout_s=int(
+                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT")
+                or KubeConfig.client_watch_timeout_s
+            ),
+            client_conn_pool_size=int(
+                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE")
+                or KubeConfig.client_conn_pool_size
+            ),
+        )

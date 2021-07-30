@@ -1,7 +1,7 @@
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, Mapping, Optional
+from typing import AsyncIterator, Awaitable, Callable, List, Mapping, Optional
 
 import aiobotocore
 import aiohttp
@@ -21,20 +21,30 @@ from aiohttp_apispec import docs, request_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from neuro_auth_client import AuthClient
 from neuro_auth_client.security import AuthScheme, setup_security
-from platform_logging import init_logging, notrace, setup_sentry, setup_zipkin_tracer
+from platform_logging import (
+    init_logging,
+    make_sentry_trace_config,
+    make_zipkin_trace_config,
+    notrace,
+    setup_sentry,
+    setup_zipkin_tracer,
+)
 
 from .config import (
     AWSProviderConfig,
     BucketsProviderType,
     Config,
     CORSConfig,
+    KubeConfig,
     PlatformAuthConfig,
 )
 from .config_factory import EnvironConfigFactory
+from .kube_client import KubeClient
+from .kube_storage import K8SStorage
 from .providers import AWSBucketProvider, BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
-from .storage import InMemoryStorage, UserBucket, UserCredentials
+from .storage import UserBucket, UserCredentials
 
 
 logger = logging.getLogger(__name__)
@@ -167,6 +177,45 @@ async def create_auth_client(config: PlatformAuthConfig) -> AsyncIterator[AuthCl
         yield client
 
 
+@asynccontextmanager
+async def create_kube_client(
+    config: KubeConfig, trace_configs: Optional[List[aiohttp.TraceConfig]] = None
+) -> AsyncIterator[KubeClient]:
+    client = KubeClient(
+        base_url=config.endpoint_url,
+        namespace=config.namespace,
+        cert_authority_path=config.cert_authority_path,
+        cert_authority_data_pem=config.cert_authority_data_pem,
+        auth_type=config.auth_type,
+        auth_cert_path=config.auth_cert_path,
+        auth_cert_key_path=config.auth_cert_key_path,
+        token=config.token,
+        token_path=None,  # TODO (A Yushkovskiy) add support for token_path or drop
+        conn_timeout_s=config.client_conn_timeout_s,
+        read_timeout_s=config.client_read_timeout_s,
+        watch_timeout_s=config.client_watch_timeout_s,
+        conn_pool_size=config.client_conn_pool_size,
+        trace_configs=trace_configs,
+    )
+    try:
+        await client.init()
+        yield client
+    finally:
+        await client.close()
+
+
+def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
+    trace_configs = []
+
+    if config.zipkin:
+        trace_configs.append(make_zipkin_trace_config())
+
+    if config.sentry:
+        trace_configs.append(make_sentry_trace_config())
+
+    return trace_configs
+
+
 def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
     if not config.allowed_origins:
         return
@@ -208,7 +257,7 @@ async def create_app(
                     session = aiobotocore.get_session()
                     client_kwargs = dict(
                         region_name=config.bucket_provider.region_name,
-                        aws_secret_access_key=config.bucket_provider.access_key_secret,
+                        aws_secret_access_key=config.bucket_provider.secret_access_key,
                         aws_access_key_id=config.bucket_provider.access_key_id,
                     )
                     if config.bucket_provider.endpoint_url:
@@ -230,9 +279,14 @@ async def create_app(
                         f"Unknown bucket provider {type(config.bucket_provider)}"
                     )
 
+            logger.info("Initializing Kubernetes client")
+            kube_client = await exit_stack.enter_async_context(
+                create_kube_client(config.kube, make_tracing_trace_configs(config))
+            )
+
             logger.info("Initializing Service")
             app["buckets_app"]["service"] = Service(
-                storage=InMemoryStorage(),
+                storage=K8SStorage(kube_client),
                 auth_client=auth_client,
                 bucket_provider=bucket_provider,
                 cluster_name=config.cluster_name,

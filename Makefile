@@ -30,6 +30,8 @@ PYTEST_FLAGS=
 
 export PIP_EXTRA_INDEX_URL ?= $(shell python pip_extra_index_url.py)
 
+include k8s.mk
+
 setup:
 	pip install -U pip
 	pip install -r requirements/test.txt

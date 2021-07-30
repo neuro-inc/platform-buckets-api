@@ -13,7 +13,7 @@ from platform_buckets_api.providers import (
     RoleExistsError,
 )
 from platform_buckets_api.storage import ProviderBucket, ProviderRole
-from tests.integration.moto_server import MotoConfig
+from tests.integration.conftest import MotoConfig
 
 
 pytestmark = pytest.mark.asyncio
