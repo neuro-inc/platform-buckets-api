@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import secrets
 from typing import List, Tuple
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot
@@ -35,7 +36,7 @@ class Service:
         self._cluster_name = cluster_name
 
     def _make_bucket_name(self, name: str, owner: str) -> str:
-        return f"neuro--{name}--{owner}"
+        return f"neuro-pl-{name}-{owner}"[:45] + secrets.token_hex(6)
 
     def _make_role_name(self, owner: str) -> str:
         return f"neuro-bucketuser-{owner}"

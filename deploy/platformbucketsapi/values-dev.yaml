@@ -1,3 +1,19 @@
+NP_CLUSTER_NAME: "default"
+
+bucket_provider:
+  type: "aws"  # "aws" or <not-supported-yet>
+  aws:
+    access_key_id:
+      valueFrom:
+        secretKeyRef:
+          name: buckets-admin-aws-token
+          key: access_key_id
+    secret_access_key:
+      valueFrom:
+        secretKeyRef:
+          name: buckets-admin-aws-token
+            key: secret_access_key
+
 ingress:
   enabled: true
 
@@ -11,6 +27,7 @@ sentry:
   sampleRate: 0.01
 
 platform:
+  cluster_name: "default"
   token:
     valueFrom:
       secretKeyRef:

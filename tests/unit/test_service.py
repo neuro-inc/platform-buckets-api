@@ -77,7 +77,7 @@ class TestService:
             owner="test-user",
         )
         assert mock_provider.created_buckets == [bucket.provider_bucket]
-        assert bucket.provider_bucket.name == "neuro--test-bucket--test-user"
+        assert bucket.provider_bucket.name.startswith("neuro-pl-test-bucket-test-user")
 
         assert mock_provider.created_roles == [credentials.role]
         perms = mock_provider.role_to_permissions[credentials.role.id]
