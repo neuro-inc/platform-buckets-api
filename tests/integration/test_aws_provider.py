@@ -8,6 +8,7 @@ from aiobotocore.client import AioBaseClient
 
 from platform_buckets_api.providers import (
     AWSBucketProvider,
+    BucketDeleteError,
     BucketExistsError,
     BucketPermission,
     RoleExistsError,
@@ -65,6 +66,35 @@ async def test_bucket_duplicate_create(
     await aws_provider.create_bucket("integration_test_bucket")
     with pytest.raises(BucketExistsError):
         await aws_provider.create_bucket("integration_test_bucket")
+
+
+async def test_bucket_delete(
+    aws_provider: AWSBucketProvider, s3: AioBaseClient
+) -> None:
+    bucket = await aws_provider.create_bucket("integration_test_bucket")
+    await aws_provider.delete_bucket(bucket.name)
+    buckets = await s3.list_buckets()
+    assert buckets["Buckets"] == []
+
+
+async def test_bucket_delete_unknown(
+    aws_provider: AWSBucketProvider, s3: AioBaseClient
+) -> None:
+    with pytest.raises(BucketDeleteError):
+        await aws_provider.delete_bucket("integration_test_bucket")
+
+
+async def test_bucket_delete_not_empty(
+    aws_provider: AWSBucketProvider, s3: AioBaseClient
+) -> None:
+    bucket = await aws_provider.create_bucket("integration_test_bucket")
+    await s3.put_object(
+        Bucket=bucket.name,
+        Key="test",
+        Body=b"42",
+    )
+    with pytest.raises(BucketDeleteError):
+        await aws_provider.delete_bucket("integration_test_bucket")
 
 
 RoleClientFactory = Callable[[ProviderRole], AsyncContextManager[AioBaseClient]]

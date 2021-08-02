@@ -9,6 +9,7 @@ class MockBucketProvider(BucketProvider):
     def __init__(self) -> None:
         self.created_roles: List[ProviderRole] = []
         self.created_buckets: List[ProviderBucket] = []
+        self.deleted_buckets: List[str] = []
         self.role_to_permissions: Dict[str, Set[BucketPermission]] = {}
 
     async def create_role(self, username: str) -> ProviderRole:
@@ -28,6 +29,9 @@ class MockBucketProvider(BucketProvider):
         )
         self.created_buckets.append(bucket)
         return bucket
+
+    async def delete_bucket(self, name: str) -> None:
+        self.deleted_buckets.append(name)
 
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]

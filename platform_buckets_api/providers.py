@@ -22,6 +22,10 @@ class BucketExistsError(ProviderError):
     pass
 
 
+class BucketDeleteError(ProviderError):
+    pass
+
+
 class ClusterNotFoundError(Exception):
     pass
 
@@ -40,6 +44,10 @@ class BucketProvider(abc.ABC):
 
     @abc.abstractmethod
     async def create_bucket(self, name: str) -> ProviderBucket:
+        pass
+
+    @abc.abstractmethod
+    async def delete_bucket(self, name: str) -> None:
         pass
 
     @abc.abstractmethod
@@ -92,6 +100,14 @@ class AWSBucketProvider(BucketProvider):
             name=name,
             provider_type=BucketsProviderType.AWS,
         )
+
+    async def delete_bucket(self, name: str) -> None:
+        try:
+            await self._s3_client.delete_bucket(
+                Bucket=name,
+            )
+        except botocore.exceptions.ClientError as e:
+            raise BucketDeleteError(e.args[0])
 
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]

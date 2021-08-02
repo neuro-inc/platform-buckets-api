@@ -5,7 +5,7 @@ from neuro_auth_client import AuthClient, ClientAccessSubTreeView, ClientSubTree
 
 from platform_buckets_api.providers import BucketPermission
 from platform_buckets_api.service import Service
-from platform_buckets_api.storage import Storage
+from platform_buckets_api.storage import ExistsError, Storage
 from tests.mocks import MockBucketProvider
 
 
@@ -88,6 +88,22 @@ class TestService:
                 write=True,
             )
         }
+
+    async def test_bucket_create_duplicate(
+        self, service: Service, mock_provider: MockBucketProvider
+    ) -> None:
+        await service.create_bucket(
+            name="test-bucket",
+            owner="test-user",
+        )
+        with pytest.raises(ExistsError):
+            await service.create_bucket(
+                name="test-bucket",
+                owner="test-user",
+            )
+        if len(mock_provider.created_buckets) == 2:
+            second_bucket = mock_provider.created_buckets[1]
+            assert second_bucket.name in mock_provider.deleted_buckets
 
     async def test_bucket_create_multiple(
         self, service: Service, mock_provider: MockBucketProvider

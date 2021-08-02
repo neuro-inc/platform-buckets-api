@@ -70,7 +70,11 @@ class Service:
             owner=owner,
             provider_bucket=provider_bucket,
         )
-        await self._storage.create_bucket(bucket)
+        try:
+            await self._storage.create_bucket(bucket)
+        except Exception:
+            await self._provider.delete_bucket(provider_bucket.name)
+            raise
         return bucket
 
     async def get_bucket(self, name: str, owner: str) -> UserBucket:
