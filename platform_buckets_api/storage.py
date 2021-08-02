@@ -67,6 +67,10 @@ class Storage(abc.ABC):
         pass
 
     @abc.abstractmethod
+    async def get_bucket(self, name: str, owner: str) -> UserBucket:
+        pass
+
+    @abc.abstractmethod
     async def create_bucket(self, bucket: UserBucket) -> None:
         pass
 
@@ -97,7 +101,7 @@ class InMemoryStorage(Storage):
 
     async def create_bucket(self, bucket: UserBucket) -> None:
         try:
-            await self._get_bucket(owner=bucket.owner, name=bucket.name)
+            await self.get_bucket(owner=bucket.owner, name=bucket.name)
             raise ExistsError(
                 f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
             )
@@ -105,7 +109,11 @@ class InMemoryStorage(Storage):
             pass
         self._buckets.append(bucket)
 
-    async def _get_bucket(self, owner: str, name: str) -> UserBucket:
+    async def get_bucket(
+        self,
+        name: str,
+        owner: str,
+    ) -> UserBucket:
         for bucket in self._buckets:
             if bucket.owner == owner and bucket.name == name:
                 return bucket

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import AsyncIterator, Callable
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict
 
 import aiohttp
 import pytest
@@ -35,6 +35,9 @@ class BucketsApiEndpoints:
     @property
     def buckets_url(self) -> str:
         return f"{self.api_v1_endpoint}/buckets"
+
+    def bucket_url(self, name: str) -> str:
+        return f"{self.api_v1_endpoint}/buckets/{name}"
 
 
 @pytest.fixture
@@ -144,22 +147,71 @@ class TestApi:
             assert resp.headers["Access-Control-Allow-Credentials"] == "true"
             assert resp.headers["Access-Control-Allow-Methods"] == "GET"
 
+    BucketFactory = Callable[[str, _User], Awaitable[Dict[str, Any]]]
+
+    @pytest.fixture()
+    async def make_bucket(
+        self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
+    ) -> BucketFactory:
+        async def _factory(name: str, user: _User) -> Dict[str, Any]:
+            async with client.post(
+                buckets_api.buckets_url,
+                headers=user.headers,
+                json={
+                    "name": name,
+                },
+            ) as resp:
+                assert resp.status == HTTPCreated.status_code, await resp.text()
+                return await resp.json()
+
+        return _factory
+
     async def test_create_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
+        make_bucket: BucketFactory,
     ) -> None:
-        async with client.post(
+        payload = await make_bucket("test_bucket", regular_user)
+        assert payload["name"] == "test_bucket"
+        assert "test_bucket" in payload["credentials"]["bucket_name"]
+        assert payload["provider"] == "aws"
+        assert payload["owner"] == regular_user.name
+
+    async def test_get_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test_bucket", regular_user)
+        async with client.get(
+            buckets_api.bucket_url("test_bucket"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_list_buckets(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        buckets_data = []
+        for index in range(5):
+            bucket_data = await make_bucket(f"test_bucket_{index}", regular_user)
+            buckets_data.append(bucket_data)
+        async with client.get(
             buckets_api.buckets_url,
             headers=regular_user.headers,
-            json={
-                "name": "test_bucket",
-            },
         ) as resp:
-            assert resp.status == HTTPCreated.status_code, await resp.text()
+            assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
-            assert payload["name"] == "test_bucket"
-            assert "test_bucket" in payload["credentials"]["bucket_name"]
-            assert payload["provider"] == "aws"
-            assert payload["owner"] == regular_user.name
+            assert len(payload) == len(buckets_data)
+            for bucket_data in buckets_data:
+                assert bucket_data in payload

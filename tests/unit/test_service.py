@@ -72,13 +72,14 @@ class TestService:
     async def test_bucket_create(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket, credentials = await service.create_bucket(
+        bucket = await service.create_bucket(
             name="test-bucket",
             owner="test-user",
         )
         assert mock_provider.created_buckets == [bucket.provider_bucket]
         assert bucket.provider_bucket.name.startswith("neuro-pl-test-bucket-test-user")
 
+        credentials = await service.get_user_credentials("test-user")
         assert mock_provider.created_roles == [credentials.role]
         perms = mock_provider.role_to_permissions[credentials.role.id]
         assert perms == {
@@ -88,17 +89,19 @@ class TestService:
             )
         }
 
-    async def test_bucket_create_second_one(
+    async def test_bucket_create_multiple(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket1, credentials1 = await service.create_bucket(
+        bucket1 = await service.create_bucket(
             name="test-bucket-1",
             owner="test-user",
         )
-        bucket2, credentials2 = await service.create_bucket(
+        credentials1 = await service.get_user_credentials("test-user")
+        bucket2 = await service.create_bucket(
             name="test-bucket-2",
             owner="test-user",
         )
+        credentials2 = await service.get_user_credentials("test-user")
         assert credentials1 == credentials2
         assert mock_provider.created_buckets == [
             bucket1.provider_bucket,
@@ -116,3 +119,16 @@ class TestService:
                 write=True,
             ),
         }
+
+    async def test_get_bucket(
+        self, service: Service, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(
+            name="test-bucket",
+            owner="test-user",
+        )
+        bucket_get = await service.get_bucket(
+            name="test-bucket",
+            owner="test-user",
+        )
+        assert bucket == bucket_get

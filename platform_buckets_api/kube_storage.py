@@ -36,6 +36,21 @@ class K8SStorage(Storage):
                 f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
             )
 
+    async def get_bucket(
+        self,
+        name: str,
+        owner: str,
+    ) -> UserBucket:
+        res = await self._kube_client.list_user_buckets(owner=owner, name=name)
+        assert (
+            len(res) <= 1
+        ), f"Found multiple buckets for name = {name} and owner = {owner}"
+        if len(res) == 0:
+            raise NotExistsError(
+                f"UserBucket for {owner} with name {name} doesn't exists"
+            )
+        return res[0]
+
     @asyncgeneratorcontextmanager
     async def list_buckets(self) -> AsyncIterator[UserBucket]:
         for bucket in await self._kube_client.list_user_buckets():

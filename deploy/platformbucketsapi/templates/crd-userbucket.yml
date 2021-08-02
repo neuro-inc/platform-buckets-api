@@ -22,8 +22,6 @@ spec:
         spec:
           type: object
           properties:
-            name:
-              type: string
             provider_id:
               type: string
             provider_type:

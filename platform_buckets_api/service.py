@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import secrets
-from typing import List, Tuple
+from typing import List
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot
 from neuro_auth_client.client import check_action_allowed
@@ -61,9 +61,7 @@ class Service:
             await self._storage.create_credentials(credentials)
             return credentials
 
-    async def create_bucket(
-        self, name: str, owner: str
-    ) -> Tuple[UserBucket, UserCredentials]:
+    async def create_bucket(self, name: str, owner: str) -> UserBucket:
         real_name = self._make_bucket_name(name, owner)
         provider_bucket = await self._provider.create_bucket(real_name)
         bucket = UserBucket(
@@ -72,9 +70,10 @@ class Service:
             provider_bucket=provider_bucket,
         )
         await self._storage.create_bucket(bucket)
-        credentials = await self._get_user_credentials(owner)
-        await self._sync_permissions(credentials)
-        return bucket, credentials
+        return bucket
+
+    async def get_bucket(self, name: str, owner: str) -> UserBucket:
+        return await self._storage.get_bucket(name, owner)
 
     async def get_user_credentials(self, username: str) -> UserCredentials:
         credentials = await self._get_user_credentials(username)

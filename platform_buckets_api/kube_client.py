@@ -4,7 +4,7 @@ import logging
 import ssl
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -40,6 +40,7 @@ class ResourceGone(KubeClientException):
 
 
 OWNER_LABEL = "platform.neuromation.io/owner"
+BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 
 
 def _k8s_name_safe(**kwargs: str) -> str:
@@ -84,7 +85,7 @@ class UserBucketCRDMapper:
     @staticmethod
     def from_primitive(payload: Dict[str, Any]) -> UserBucket:
         return UserBucket(
-            name=payload["spec"]["name"],
+            name=payload["metadata"]["labels"][BUCKET_NAME_LABEL],
             owner=payload["metadata"]["labels"][OWNER_LABEL],
             provider_bucket=ProviderBucket(
                 id=payload["spec"]["provider_id"],
@@ -103,10 +104,10 @@ class UserBucketCRDMapper:
                 "name": name,
                 "labels": {
                     OWNER_LABEL: entry.owner,
+                    BUCKET_NAME_LABEL: entry.name,
                 },
             },
             "spec": {
-                "name": entry.name,
                 "provider_id": entry.provider_bucket.id,
                 "provider_type": entry.provider_bucket.provider_type.value,
                 "provider_name": entry.provider_bucket.name,
@@ -315,11 +316,15 @@ class KubeClient:
         )
         self._raise_for_status(payload)
 
-    async def list_user_buckets(self, owner: Optional[str] = None) -> List[UserBucket]:
+    async def list_user_buckets(
+        self, owner: Optional[str] = None, name: Optional[str] = None
+    ) -> List[UserBucket]:
         url = self._user_buckets_url
         params = []
         if owner:
-            params = [("labelSelector", quote_plus(f"{OWNER_LABEL}={owner}"))]
+            params += [("labelSelector", f"{OWNER_LABEL}={owner}")]
+        if name:
+            params += [("labelSelector", f"{BUCKET_NAME_LABEL}={name}")]
         payload = await self._request(method="GET", url=url, params=params)
         return [
             UserBucketCRDMapper.from_primitive(item)

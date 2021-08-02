@@ -16,7 +16,7 @@ from aiohttp.web import (
     json_response,
     middleware,
 )
-from aiohttp.web_exceptions import HTTPConflict, HTTPCreated
+from aiohttp.web_exceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from aiohttp_apispec import docs, request_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from neuro_auth_client import AuthClient
@@ -100,6 +100,7 @@ class BucketsApiHandler:
         app.add_routes(
             [
                 aiohttp.web.post("", self.create_bucket),
+                aiohttp.web.get("/{bucket_name}", self.get_bucket),
             ]
         )
 
@@ -129,13 +130,43 @@ class BucketsApiHandler:
         username = await check_authorized(request)
         schema = Bucket(partial=["provider", "owner", "credentials"])
         data = schema.load(await request.json())
-        bucket, credentials = await self.service.create_bucket(
+        bucket = await self.service.create_bucket(
             name=data["name"],
             owner=username,
         )
+        credentials = await self.service.get_user_credentials(username)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
             status=HTTPCreated.status_code,
+        )
+
+    @docs(
+        tags=["buckets"],
+        summary="Get bucket by name",
+        responses={
+            HTTPOk.status_code: {
+                "description": "Bucket found",
+                "schema": Bucket(),
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket with such name",
+            },
+        },
+    )
+    async def get_bucket(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        username = await check_authorized(request)
+        bucket_name = request.match_info["bucket_name"]
+        bucket = await self.service.get_bucket(
+            name=bucket_name,
+            owner=username,
+        )
+        credentials = await self.service.get_user_credentials(username)
+        return aiohttp.web.json_response(
+            data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
+            status=HTTPOk.status_code,
         )
 
 

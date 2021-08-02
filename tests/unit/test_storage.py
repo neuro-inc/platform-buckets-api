@@ -75,3 +75,13 @@ class TestStorage:
         await storage.create_bucket(bucket)
         with pytest.raises(ExistsError):
             await storage.create_bucket(bucket)
+
+    async def test_buckets_create_get(self, storage: Storage) -> None:
+        bucket = self._make_bucket("user1", "test")
+        await storage.create_bucket(bucket)
+        bucket_get = await storage.get_bucket(bucket.name, bucket.owner)
+        assert bucket == bucket_get
+
+    async def test_buckets_get_not_found(self, storage: Storage) -> None:
+        with pytest.raises(NotExistsError):
+            await storage.get_bucket("any", "thing")
