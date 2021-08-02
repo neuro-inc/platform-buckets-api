@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import secrets
-from typing import List
+from typing import AsyncIterator, List
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot
 from neuro_auth_client.client import check_action_allowed
@@ -17,6 +17,7 @@ from platform_buckets_api.storage import (
     UserBucket,
     UserCredentials,
 )
+from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
 
 logger = logging.getLogger()
@@ -80,23 +81,23 @@ class Service:
         await self._sync_permissions(credentials)
         return credentials
 
-    async def _sync_permissions(self, credentials: UserCredentials) -> None:
-        def _check_bucket_perm(
-            bucket: UserBucket, tree: ClientSubTreeViewRoot, action: str
-        ) -> bool:
-            node = tree.sub_tree
-            if check_action_allowed(node.action, action):
-                return True
-            parts = bucket.owner.split("/") + [bucket.name]
-            try:
-                for part in parts:
-                    if check_action_allowed(node.action, action):
-                        return True
-                    node = node.children[part]
-                return check_action_allowed(node.action, action)
-            except KeyError:
-                return False
+    def _check_bucket_perm(
+        self, bucket: UserBucket, tree: ClientSubTreeViewRoot, action: str
+    ) -> bool:
+        node = tree.sub_tree
+        if check_action_allowed(node.action, action):
+            return True
+        parts = bucket.owner.split("/") + [bucket.name]
+        try:
+            for part in parts:
+                if check_action_allowed(node.action, action):
+                    return True
+                node = node.children[part]
+            return check_action_allowed(node.action, action)
+        except KeyError:
+            return False
 
+    async def _sync_permissions(self, credentials: UserCredentials) -> None:
         tree = await self._auth_client.get_permissions_tree(
             credentials.owner,
             resource=f"blob://{self._cluster_name}",
@@ -104,11 +105,22 @@ class Service:
         permissions: List[BucketPermission] = []
         async with self._storage.list_buckets() as it:
             async for bucket in it:
-                if _check_bucket_perm(bucket, tree, "read"):
+                if self._check_bucket_perm(bucket, tree, "read"):
                     permissions.append(
                         BucketPermission(
                             bucket=bucket.provider_bucket,
-                            write=_check_bucket_perm(bucket, tree, "write"),
+                            write=self._check_bucket_perm(bucket, tree, "write"),
                         )
                     )
         await self._provider.set_role_permissions(credentials.role, permissions)
+
+    @asyncgeneratorcontextmanager
+    async def get_user_buckets(self, owner: str) -> AsyncIterator[UserBucket]:
+        tree = await self._auth_client.get_permissions_tree(
+            owner,
+            resource=f"blob://{self._cluster_name}",
+        )
+        async with self._storage.list_buckets() as it:
+            async for bucket in it:
+                if self._check_bucket_perm(bucket, tree, "read"):
+                    yield bucket

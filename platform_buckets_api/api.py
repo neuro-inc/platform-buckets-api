@@ -17,7 +17,7 @@ from aiohttp.web import (
     middleware,
 )
 from aiohttp.web_exceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
-from aiohttp_apispec import docs, request_schema, setup_aiohttp_apispec
+from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from neuro_auth_client import AuthClient
 from neuro_auth_client.security import AuthScheme, setup_security
@@ -45,9 +45,15 @@ from .providers import AWSBucketProvider, BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
 from .storage import UserBucket, UserCredentials
+from .utils import ndjson_error_handler
 
 
 logger = logging.getLogger(__name__)
+
+
+def accepts_ndjson(request: aiohttp.web.Request) -> bool:
+    accept = request.headers.get("Accept", "")
+    return "application/x-ndjson" in accept
 
 
 @dataclass(frozen=True)
@@ -100,6 +106,7 @@ class BucketsApiHandler:
         app.add_routes(
             [
                 aiohttp.web.post("", self.create_bucket),
+                aiohttp.web.get("", self.list_buckets),
                 aiohttp.web.get("/{bucket_name}", self.get_bucket),
             ]
         )
@@ -168,6 +175,39 @@ class BucketsApiHandler:
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
             status=HTTPOk.status_code,
         )
+
+    @docs(
+        tags=["buckets"],
+        summary="List all buckets available to current user",
+    )
+    @response_schema(Bucket(many=True), 200)
+    async def list_buckets(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.StreamResponse:
+        username = await check_authorized(request)
+        credentials = await self.service.get_user_credentials(username)
+        async with self.service.get_user_buckets(owner=username) as buckets_it:
+            if accepts_ndjson(request):
+                response = aiohttp.web.StreamResponse()
+                response.headers["Content-Type"] = "application/x-ndjson"
+                await response.prepare(request)
+                async with ndjson_error_handler(request, response):
+                    async for bucket in buckets_it:
+                        resp_bucket = ResponseBucket.from_user_bucket(
+                            bucket, credentials
+                        )
+                        payload_line = Bucket().dumps(resp_bucket)
+                        await response.write(payload_line.encode() + b"\n")
+                return response
+            else:
+                response_payload = [
+                    Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials))
+                    async for bucket in buckets_it
+                ]
+                return aiohttp.web.json_response(
+                    data=response_payload, status=HTTPOk.status_code
+                )
 
 
 @middleware

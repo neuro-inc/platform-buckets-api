@@ -132,3 +132,25 @@ class TestService:
             owner="test-user",
         )
         assert bucket == bucket_get
+
+    async def test_get_bucket_list(
+        self, service: Service, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket1 = await service.create_bucket(
+            name="test-bucket1",
+            owner="test-user",
+        )
+        bucket2 = await service.create_bucket(
+            name="test-bucket2",
+            owner="test-user",
+        )
+        bucket3 = await service.create_bucket(
+            name="test-bucket3",
+            owner="another-user",
+        )
+        async with service.get_user_buckets("test-user") as it:
+            buckets = [bucket async for bucket in it]
+        assert len(buckets) == 2
+        assert bucket1 in buckets
+        assert bucket2 in buckets
+        assert bucket3 not in buckets

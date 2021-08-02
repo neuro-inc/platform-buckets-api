@@ -12,7 +12,7 @@ from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
 from jose import jwt
-from neuro_auth_client import AuthClient, Cluster, User
+from neuro_auth_client import AuthClient, Cluster, Permission, User
 from neuro_auth_client.security import JWT_IDENTITY_CLAIM_OPTIONS
 from yarl import URL
 
@@ -178,6 +178,11 @@ async def regular_user_factory(
             name = f"user-{random_name()}"
         user = User(name=name, clusters=[Cluster(name=cluster_name)])
         await auth_client.add_user(user, token=admin_token)
+        permissions = [
+            Permission(uri=f"blob://{cluster_name}/{name}", action="write"),
+        ]
+        await auth_client.grant_user_permissions(name, permissions, token=admin_token)
+
         return _User(name=user.name, token=token_factory(user.name))  # type: ignore
 
     yield _factory
