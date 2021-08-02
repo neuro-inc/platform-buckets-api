@@ -88,7 +88,6 @@ class UserBucketCRDMapper:
             name=payload["metadata"]["labels"][BUCKET_NAME_LABEL],
             owner=payload["metadata"]["labels"][OWNER_LABEL],
             provider_bucket=ProviderBucket(
-                id=payload["spec"]["provider_id"],
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
             ),
@@ -108,7 +107,6 @@ class UserBucketCRDMapper:
                 },
             },
             "spec": {
-                "provider_id": entry.provider_bucket.id,
                 "provider_type": entry.provider_bucket.provider_type.value,
                 "provider_name": entry.provider_bucket.name,
             },

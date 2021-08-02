@@ -23,7 +23,6 @@ class MockBucketProvider(BucketProvider):
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         bucket = ProviderBucket(
-            id=f"role-{len(self.created_buckets) + 1}",
             provider_type=BucketsProviderType.AWS,
             name=name,
         )

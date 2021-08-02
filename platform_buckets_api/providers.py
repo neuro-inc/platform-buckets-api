@@ -96,7 +96,6 @@ class AWSBucketProvider(BucketProvider):
         except self._s3_client.exceptions.BucketAlreadyExists:
             raise BucketExistsError
         return ProviderBucket(
-            id=f"arn:aws:s3:::{name}",
             name=name,
             provider_type=BucketsProviderType.AWS,
         )
@@ -119,12 +118,12 @@ class AWSBucketProvider(BucketProvider):
                     {
                         "Effect": "Allow",
                         "Action": ["s3:ListBucket"],
-                        "Resource": perm.bucket.id,
+                        "Resource": f"arn:aws:s3:::{perm.bucket.name}",
                     },
                     {
                         "Effect": "Allow",
                         "Action": ["s3:GetObject"],
-                        "Resource": f"{perm.bucket.id}/*",
+                        "Resource": f"arn:aws:s3:::{perm.bucket.name}/*",
                     },
                 ]
             if perm.write:
@@ -136,7 +135,7 @@ class AWSBucketProvider(BucketProvider):
                             "s3:DeleteObject",
                             "s3:DeleteObjects",
                         ],
-                        "Resource": f"{perm.bucket.id}/*",
+                        "Resource": f"arn:aws:s3:::{perm.bucket.name}/*",
                     },
                 ]
 

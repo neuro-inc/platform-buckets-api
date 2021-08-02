@@ -39,7 +39,6 @@ class TestStorage:
             owner=username,
             name=name,
             provider_bucket=ProviderBucket(
-                id=f"{name}--{username}",
                 provider_type=BucketsProviderType.AWS,
                 name=f"{name}--{username}",
             ),

@@ -35,7 +35,6 @@ class ProviderRole:
 
 @dataclass(frozen=True)
 class ProviderBucket:
-    id: str
     provider_type: BucketsProviderType
     name: str
 
