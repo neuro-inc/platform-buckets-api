@@ -44,7 +44,7 @@ from .kube_storage import K8SStorage
 from .providers import AWSBucketProvider, BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
-from .storage import UserBucket, UserCredentials
+from .storage import ExistsError, NotExistsError, UserBucket, UserCredentials
 from .utils import ndjson_error_handler
 
 
@@ -137,10 +137,19 @@ class BucketsApiHandler:
         username = await check_authorized(request)
         schema = Bucket(partial=["provider", "owner", "credentials"])
         data = schema.load(await request.json())
-        bucket = await self.service.create_bucket(
-            name=data["name"],
-            owner=username,
-        )
+        try:
+            bucket = await self.service.create_bucket(
+                name=data["name"],
+                owner=username,
+            )
+        except ExistsError:
+            return json_response(
+                {
+                    "code": "unique",
+                    "description": "Bucket with given name exists",
+                },
+                status=HTTPConflict.status_code,
+            )
         credentials = await self.service.get_user_credentials(username)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
@@ -166,10 +175,13 @@ class BucketsApiHandler:
     ) -> aiohttp.web.Response:
         username = await check_authorized(request)
         bucket_name = request.match_info["bucket_name"]
-        bucket = await self.service.get_bucket(
-            name=bucket_name,
-            owner=username,
-        )
+        try:
+            bucket = await self.service.get_bucket(
+                name=bucket_name,
+                owner=username,
+            )
+        except NotExistsError:
+            raise HTTPNotFound
         credentials = await self.service.get_user_credentials(username)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),

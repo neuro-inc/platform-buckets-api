@@ -4,7 +4,13 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Dict
 import aiohttp
 import pytest
 from aiohttp.web import HTTPOk
-from aiohttp.web_exceptions import HTTPCreated, HTTPForbidden, HTTPUnauthorized
+from aiohttp.web_exceptions import (
+    HTTPConflict,
+    HTTPCreated,
+    HTTPForbidden,
+    HTTPNotFound,
+    HTTPUnauthorized,
+)
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
@@ -179,6 +185,25 @@ class TestApi:
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
 
+    async def test_create_bucket_duplicate(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        await make_bucket("test_bucket", regular_user)
+        async with client.post(
+            buckets_api.buckets_url,
+            headers=regular_user.headers,
+            json={
+                "name": "test_bucket",
+            },
+        ) as resp:
+            assert resp.status == HTTPConflict.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["code"] == "unique"
+
     async def test_get_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
@@ -194,6 +219,19 @@ class TestApi:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
             assert payload == create_resp
+
+    async def test_get_bucket_not_found(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        async with client.get(
+            buckets_api.bucket_url("test_bucket"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
 
     async def test_list_buckets(
         self,
