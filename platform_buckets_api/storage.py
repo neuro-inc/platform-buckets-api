@@ -78,6 +78,10 @@ class Storage(abc.ABC):
     async def create_bucket(self, bucket: UserBucket) -> None:
         pass
 
+    @abc.abstractmethod
+    async def delete_bucket(self, id: str) -> None:
+        pass
+
 
 class InMemoryStorage(Storage):
     def __init__(self) -> None:
@@ -131,3 +135,6 @@ class InMemoryStorage(Storage):
             if bucket.owner == owner and bucket.name == name:
                 return bucket
         raise NotExistsError(f"UserBucket for {owner} with name {name} doesn't exists")
+
+    async def delete_bucket(self, id: str) -> None:
+        self._buckets = [bucket for bucket in self._buckets if bucket.id != id]

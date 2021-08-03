@@ -16,7 +16,13 @@ from aiohttp.web import (
     json_response,
     middleware,
 )
-from aiohttp.web_exceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
+from aiohttp.web_exceptions import (
+    HTTPConflict,
+    HTTPCreated,
+    HTTPNoContent,
+    HTTPNotFound,
+    HTTPOk,
+)
 from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from neuro_auth_client import AuthClient, User
@@ -111,6 +117,7 @@ class BucketsApiHandler:
                 aiohttp.web.post("", self.create_bucket),
                 aiohttp.web.get("", self.list_buckets),
                 aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
+                aiohttp.web.delete("/{bucket_id_or_name}", self.delete_bucket),
             ]
         )
 
@@ -177,14 +184,14 @@ class BucketsApiHandler:
 
     @docs(
         tags=["buckets"],
-        summary="Get bucket by name",
+        summary="Get bucket by id or name",
         responses={
             HTTPOk.status_code: {
                 "description": "Bucket found",
                 "schema": Bucket(),
             },
             HTTPNotFound.status_code: {
-                "description": "Was unable to found bucket with such name",
+                "description": "Was unable to found bucket with such id or name",
             },
         },
     )
@@ -232,6 +239,26 @@ class BucketsApiHandler:
                 return aiohttp.web.json_response(
                     data=response_payload, status=HTTPOk.status_code
                 )
+
+    @docs(
+        tags=["buckets"],
+        summary="Delete bucket by id or name",
+        responses={
+            HTTPNoContent.status_code: {
+                "description": "Bucket deleted",
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket with such id or name",
+            },
+        },
+    )
+    async def delete_bucket(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        bucket = await self._resolve_bucket(request)
+        await self.service.delete_bucket(bucket.id)
+        raise HTTPNoContent
 
 
 @middleware

@@ -98,3 +98,13 @@ class TestStorage:
     async def test_buckets_get_by_name_not_found(self, storage: Storage) -> None:
         with pytest.raises(NotExistsError):
             await storage.get_bucket_by_name("any", "thing")
+
+    async def test_bucket_delete(self, storage: Storage) -> None:
+        bucket = self._make_bucket("user1", "test")
+        await storage.create_bucket(bucket)
+        await storage.delete_bucket(bucket.id)
+        with pytest.raises(NotExistsError):
+            await storage.get_bucket(bucket.id)
+        async with storage.list_buckets() as it:
+            buckets = {bucket async for bucket in it}
+        assert buckets == set()

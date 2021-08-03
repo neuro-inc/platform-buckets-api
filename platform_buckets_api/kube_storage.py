@@ -62,3 +62,10 @@ class K8SStorage(Storage):
     async def list_buckets(self) -> AsyncIterator[UserBucket]:
         for bucket in await self._kube_client.list_user_buckets():
             yield bucket
+
+    async def delete_bucket(self, id: str) -> None:
+        try:
+            bucket = await self.get_bucket(id)
+        except NotExistsError:
+            return
+        await self._kube_client.remove_user_bucket(bucket)

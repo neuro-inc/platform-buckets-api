@@ -133,3 +133,8 @@ class Service:
             async for bucket in it:
                 if self._check_bucket_perm(bucket, tree, "read"):
                     yield bucket
+
+    async def delete_bucket(self, bucket_id: str) -> None:
+        bucket = await self.get_bucket(bucket_id)
+        await self._provider.delete_bucket(bucket.provider_bucket.name)
+        await self._storage.delete_bucket(bucket_id)

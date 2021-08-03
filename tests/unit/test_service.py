@@ -5,7 +5,7 @@ from neuro_auth_client import AuthClient, ClientAccessSubTreeView, ClientSubTree
 
 from platform_buckets_api.providers import BucketPermission
 from platform_buckets_api.service import Service
-from platform_buckets_api.storage import ExistsError, Storage
+from platform_buckets_api.storage import ExistsError, NotExistsError, Storage
 from tests.mocks import MockBucketProvider
 
 
@@ -180,3 +180,14 @@ class TestService:
         assert bucket1 in buckets
         assert bucket2 in buckets
         assert bucket3 not in buckets
+
+    async def test_delete_bucket(
+        self, service: Service, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(
+            name="test-bucket",
+            owner="test-user",
+        )
+        await service.delete_bucket(bucket.id)
+        with pytest.raises(NotExistsError):
+            await service.get_bucket(bucket.id)

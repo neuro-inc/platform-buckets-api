@@ -8,6 +8,7 @@ from aiohttp.web_exceptions import (
     HTTPConflict,
     HTTPCreated,
     HTTPForbidden,
+    HTTPNoContent,
     HTTPNotFound,
     HTTPUnauthorized,
 )
@@ -270,3 +271,58 @@ class TestApi:
             assert len(payload) == len(buckets_data)
             for bucket_data in buckets_data:
                 assert bucket_data in payload
+
+    async def test_delete_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        data = await make_bucket("test_bucket", regular_user)
+        async with client.delete(
+            buckets_api.bucket_url(data["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_delete_bucket_by_name(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        await make_bucket("test_bucket", regular_user)
+        async with client.delete(
+            buckets_api.bucket_url("test_bucket"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_delete_bucket_not_existing(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        async with client.delete(
+            buckets_api.bucket_url("test_bucket"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
