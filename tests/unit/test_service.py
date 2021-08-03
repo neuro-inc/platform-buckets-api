@@ -1,54 +1,42 @@
-from typing import Optional
-
 import pytest
-from neuro_auth_client import AuthClient, ClientAccessSubTreeView, ClientSubTreeViewRoot
 
+from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.providers import BucketPermission
 from platform_buckets_api.service import Service
-from platform_buckets_api.storage import ExistsError, NotExistsError, Storage
+from platform_buckets_api.storage import (
+    ExistsError,
+    NotExistsError,
+    Storage,
+    UserBucket,
+)
 from tests.mocks import MockBucketProvider
 
 
 pytestmark = pytest.mark.asyncio
 
 
-class MockAuthClient(AuthClient):
+class MockPermissionsService(PermissionsService):
     def __init__(self) -> None:
-        self.perm_tree_to_return = ClientSubTreeViewRoot(
-            path="",
-            sub_tree=ClientAccessSubTreeView(
-                action="read",
-                children={},
-            ),
-        )
+        pass
 
-    async def get_permissions_tree(
-        self, name: str, resource: str, depth: Optional[int] = None
-    ) -> ClientSubTreeViewRoot:
-        return self.perm_tree_to_return
+    class Checker:
+        def __init__(self, owner: str):
+            self.owner = owner
+
+        def can_read(self, bucket: UserBucket) -> bool:
+            return bucket.owner == self.owner
+
+        def can_write(self, bucket: UserBucket) -> bool:
+            return bucket.owner == self.owner
+
+    async def get_perms_checker(self, owner: str) -> "PermissionsService.Checker":
+        return self.Checker(owner)  # type: ignore
 
 
 class TestService:
     @pytest.fixture
-    def cluster_name(self) -> str:
-        return "test-cluster"
-
-    @pytest.fixture
-    def mock_auth_client(self, cluster_name: str) -> MockAuthClient:
-        client = MockAuthClient()
-        client.perm_tree_to_return = ClientSubTreeViewRoot(
-            path=f"buckets://{cluster_name}",
-            sub_tree=ClientAccessSubTreeView(
-                action="list",
-                children={
-                    "test-user": ClientAccessSubTreeView(
-                        action="write",
-                        children={},
-                    )
-                },
-            ),
-        )
-        return client
+    def mock_permissions_service(self) -> MockPermissionsService:
+        return MockPermissionsService()
 
     @pytest.fixture
     def mock_provider(self) -> MockBucketProvider:
@@ -58,15 +46,13 @@ class TestService:
     def service(
         self,
         in_memory_storage: Storage,
-        mock_auth_client: MockAuthClient,
+        mock_permissions_service: MockPermissionsService,
         mock_provider: MockBucketProvider,
-        cluster_name: str,
     ) -> Service:
         return Service(
             storage=in_memory_storage,
-            auth_client=mock_auth_client,
             bucket_provider=mock_provider,
-            cluster_name=cluster_name,
+            permissions_service=mock_permissions_service,
         )
 
     async def test_bucket_create(

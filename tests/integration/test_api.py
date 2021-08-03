@@ -12,6 +12,7 @@ from aiohttp.web_exceptions import (
     HTTPNotFound,
     HTTPUnauthorized,
 )
+from neuro_auth_client import AuthClient, Permission
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
@@ -52,6 +53,22 @@ async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
     app = await create_app(config)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
+
+
+@pytest.fixture
+async def grant_bucket_permission(
+    auth_client: AuthClient,
+    token_factory: Callable[[str], str],
+    admin_token: str,
+    cluster_name: str,
+) -> AsyncIterator[Callable[[_User, str, str], Awaitable[None]]]:
+    async def _grant(user: _User, owner: str, id: str, action: str = "read") -> None:
+        permission = Permission(
+            uri=f"blob://{cluster_name}/{owner}/{id}", action=action
+        )
+        await auth_client.grant_user_permissions(user.name, [permission], admin_token)
+
+    yield _grant
 
 
 class TestApi:
@@ -326,3 +343,113 @@ class TestApi:
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+    async def test_cant_get_another_user_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test_bucket", regular_user)
+        async with client.get(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPForbidden.status_code, await resp.text()
+
+    async def test_cant_list_another_user_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        await make_bucket("test_bucket", regular_user)
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            assert await resp.json() == []
+
+    async def test_cant_delete_another_user_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test_bucket", regular_user)
+        async with client.delete(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPForbidden.status_code, await resp.text()
+
+    async def test_can_get_shared_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp1 = await make_bucket("test_bucket1", regular_user)
+        create_resp2 = await make_bucket("test_bucket2", regular_user)
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp1["id"]
+        )
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp2["name"]
+        )
+        async with client.get(
+            buckets_api.bucket_url(create_resp1["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+
+        async with client.get(
+            buckets_api.bucket_url(create_resp2["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            assert len(await resp.json()) == 2
+
+    async def test_can_delete_only_shared_for_write_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        grant_bucket_permission: Callable[[_User, str, str, str], Awaitable[None]],
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp1 = await make_bucket("test_bucket1", regular_user)
+        create_resp2 = await make_bucket("test_bucket2", regular_user)
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp1["id"], "read"
+        )
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp2["id"], "write"
+        )
+        async with client.delete(
+            buckets_api.bucket_url(create_resp1["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPForbidden.status_code, await resp.text()
+        async with client.delete(
+            buckets_api.bucket_url(create_resp2["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()

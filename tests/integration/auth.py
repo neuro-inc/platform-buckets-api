@@ -191,3 +191,8 @@ async def regular_user_factory(
 @pytest.fixture
 async def regular_user(regular_user_factory: Callable[[], Awaitable[_User]]) -> _User:
     return await regular_user_factory()
+
+
+@pytest.fixture
+async def regular_user2(regular_user_factory: Callable[[], Awaitable[_User]]) -> _User:
+    return await regular_user_factory()

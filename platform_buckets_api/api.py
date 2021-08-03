@@ -1,7 +1,8 @@
+import json
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, List, Mapping, Optional
+from typing import AsyncIterator, Awaitable, Callable, Dict, List, Mapping, Optional
 
 import aiobotocore
 import aiohttp
@@ -25,7 +26,8 @@ from aiohttp.web_exceptions import (
 )
 from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
-from neuro_auth_client import AuthClient, User
+from aiohttp_security.api import AUTZ_KEY
+from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
     init_logging,
@@ -48,6 +50,7 @@ from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
 from .kube_client import KubeClient
 from .kube_storage import K8SStorage
+from .permissions_service import PermissionsService
 from .providers import AWSBucketProvider, BucketProvider
 from .schema import Bucket, ClientErrorSchema
 from .service import Service
@@ -61,6 +64,31 @@ logger = logging.getLogger(__name__)
 def accepts_ndjson(request: aiohttp.web.Request) -> bool:
     accept = request.headers.get("Accept", "")
     return "application/x-ndjson" in accept
+
+
+def _permission_to_primitive(perm: Permission) -> Dict[str, str]:
+    return {"uri": perm.uri, "action": perm.action}
+
+
+async def check_any_permissions(
+    request: aiohttp.web.Request, permissions: List[Permission]
+) -> None:
+    user_name = await check_authorized(request)
+    auth_policy = request.config_dict.get(AUTZ_KEY)
+    if not auth_policy:
+        raise RuntimeError("Auth policy not configured")
+
+    try:
+        missing = await auth_policy.get_missing_permissions(user_name, permissions)
+    except aiohttp.ClientError as e:
+        # re-wrap in order not to expose the client
+        raise RuntimeError(e) from e
+
+    if len(missing) >= len(permissions):
+        payload = {"missing": [_permission_to_primitive(p) for p in missing]}
+        raise aiohttp.web.HTTPForbidden(
+            text=json.dumps(payload), content_type="application/json"
+        )
 
 
 @dataclass(frozen=True)
@@ -125,6 +153,10 @@ class BucketsApiHandler:
     def service(self) -> Service:
         return self._app["service"]
 
+    @property
+    def permissions_service(self) -> PermissionsService:
+        return self._app["permissions_service"]
+
     async def _get_untrusted_user(self, request: Request) -> User:
         identity = await untrusted_user(request)
         return User(name=identity.name)
@@ -160,13 +192,16 @@ class BucketsApiHandler:
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        username = await check_authorized(request)
+        user = await self._get_untrusted_user(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_create_bucket_perms(user)
+        )
         schema = Bucket(partial=["provider", "owner", "credentials"])
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
                 name=data["name"],
-                owner=username,
+                owner=user.name,
             )
         except ExistsError:
             return json_response(
@@ -176,7 +211,7 @@ class BucketsApiHandler:
                 },
                 status=HTTPConflict.status_code,
             )
-        credentials = await self.service.get_user_credentials(username)
+        credentials = await self.service.get_user_credentials(user.name)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
             status=HTTPCreated.status_code,
@@ -199,9 +234,12 @@ class BucketsApiHandler:
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        username = await check_authorized(request)
+        user = await self._get_untrusted_user(request)
         bucket = await self._resolve_bucket(request)
-        credentials = await self.service.get_user_credentials(username)
+        await check_any_permissions(
+            request, self.permissions_service.get_bucket_read_perms(bucket)
+        )
+        credentials = await self.service.get_user_credentials(user.name)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
             status=HTTPOk.status_code,
@@ -257,6 +295,9 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         bucket = await self._resolve_bucket(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_bucket_write_perms(bucket)
+        )
         await self.service.delete_bucket(bucket.id)
         raise HTTPNoContent
 
@@ -406,12 +447,18 @@ async def create_app(
                 create_kube_client(config.kube, make_tracing_trace_configs(config))
             )
 
+            logger.info("Initializing PermissionsService")
+            permissions_service = PermissionsService(
+                auth_client=auth_client,
+                cluster_name=config.cluster_name,
+            )
+            app["buckets_app"]["permissions_service"] = permissions_service
+
             logger.info("Initializing Service")
             app["buckets_app"]["service"] = Service(
                 storage=K8SStorage(kube_client),
-                auth_client=auth_client,
                 bucket_provider=bucket_provider,
-                cluster_name=config.cluster_name,
+                permissions_service=permissions_service,
             )
 
             yield
