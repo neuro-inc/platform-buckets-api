@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
 
@@ -288,6 +289,42 @@ class TestApi:
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
+            assert len(payload) == len(buckets_data)
+            for bucket_data in buckets_data:
+                assert bucket_data in payload
+
+    async def test_list_buckets_ndjson(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+
+        headers = {"Accept": "application/x-ndjson"}
+        async with client.get(
+            buckets_api.buckets_url,
+            headers={**regular_user.headers, **headers},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = []
+            async for line in resp.content:
+                payload.append(json.loads(line))
+            assert payload == []
+
+        buckets_data = []
+        for index in range(5):
+            bucket_data = await make_bucket(f"test_bucket_{index}", regular_user)
+            buckets_data.append(bucket_data)
+
+        async with client.get(
+            buckets_api.buckets_url,
+            headers={**regular_user.headers, **headers},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = []
+            async for line in resp.content:
+                payload.append(json.loads(line))
             assert len(payload) == len(buckets_data)
             for bucket_data in buckets_data:
                 assert bucket_data in payload

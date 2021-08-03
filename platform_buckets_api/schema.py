@@ -48,7 +48,14 @@ class ProviderTypeField(fields.String):
 
 class Bucket(Schema):
     id = fields.String(required=True, dump_only=True)
-    name = fields.String(required=True, allow_none=True)
+    name = fields.String(
+        required=False,
+        allow_none=True,
+        validate=[
+            validate.Regexp(r"^[a-z](?:-?[a-z0-9_-])*(?!\n)$"),
+            validate.Length(min=3, max=40),
+        ],
+    )
     owner = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,
