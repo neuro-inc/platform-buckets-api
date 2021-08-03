@@ -5,9 +5,9 @@ metadata:
 spec:
   group: neuromation.io
   additionalPrinterColumns:
-  - name: UserBucket
+  - name: ProviderName
     type: string
-    JSONPath: .metadata.name
+    JSONPath: .spec.provider_name
   version: v1
   versions:
   - name: v1
