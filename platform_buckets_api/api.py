@@ -21,7 +21,7 @@ from aiohttp_apispec import docs, request_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from neuro_auth_client import AuthClient
 from neuro_auth_client.security import AuthScheme, setup_security
-from platform_logging import (
+from neuro_logging import (
     init_logging,
     make_sentry_trace_config,
     make_zipkin_trace_config,
