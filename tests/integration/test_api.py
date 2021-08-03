@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
 
 import aiohttp
 import pytest
@@ -171,13 +171,13 @@ class TestApi:
             assert resp.headers["Access-Control-Allow-Credentials"] == "true"
             assert resp.headers["Access-Control-Allow-Methods"] == "GET"
 
-    BucketFactory = Callable[[str, _User], Awaitable[Dict[str, Any]]]
+    BucketFactory = Callable[[Optional[str], _User], Awaitable[Dict[str, Any]]]
 
     @pytest.fixture()
     async def make_bucket(
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
-        async def _factory(name: str, user: _User) -> Dict[str, Any]:
+        async def _factory(name: Optional[str], user: _User) -> Dict[str, Any]:
             async with client.post(
                 buckets_api.buckets_url,
                 headers=user.headers,
@@ -278,6 +278,9 @@ class TestApi:
         buckets_data = []
         for index in range(5):
             bucket_data = await make_bucket(f"test_bucket_{index}", regular_user)
+            buckets_data.append(bucket_data)
+        for index in range(5):
+            bucket_data = await make_bucket(None, regular_user)
             buckets_data.append(bucket_data)
         async with client.get(
             buckets_api.buckets_url,

@@ -58,10 +58,7 @@ class TestService:
     async def test_bucket_create(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket = await service.create_bucket(
-            name="test-bucket",
-            owner="test-user",
-        )
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
         assert mock_provider.created_buckets == [bucket.provider_bucket]
         assert bucket.provider_bucket.name.startswith("neuro-pl-test-bucket-test-user")
 
@@ -78,15 +75,9 @@ class TestService:
     async def test_bucket_create_duplicate(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        await service.create_bucket(
-            name="test-bucket",
-            owner="test-user",
-        )
+        await service.create_bucket(owner="test-user", name="test-bucket")
         with pytest.raises(ExistsError):
-            await service.create_bucket(
-                name="test-bucket",
-                owner="test-user",
-            )
+            await service.create_bucket(owner="test-user", name="test-bucket")
         if len(mock_provider.created_buckets) == 2:
             second_bucket = mock_provider.created_buckets[1]
             assert second_bucket.name in mock_provider.deleted_buckets
@@ -94,15 +85,9 @@ class TestService:
     async def test_bucket_create_multiple(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket1 = await service.create_bucket(
-            name="test-bucket-1",
-            owner="test-user",
-        )
+        bucket1 = await service.create_bucket(owner="test-user", name="test-bucket-1")
         credentials1 = await service.get_user_credentials("test-user")
-        bucket2 = await service.create_bucket(
-            name="test-bucket-2",
-            owner="test-user",
-        )
+        bucket2 = await service.create_bucket(owner="test-user", name="test-bucket-2")
         credentials2 = await service.get_user_credentials("test-user")
         assert credentials1 == credentials2
         assert mock_provider.created_buckets == [
@@ -125,20 +110,14 @@ class TestService:
     async def test_get_bucket(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket = await service.create_bucket(
-            name="test-bucket",
-            owner="test-user",
-        )
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
         bucket_get = await service.get_bucket(bucket.id)
         assert bucket == bucket_get
 
     async def test_get_bucket_by_name(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket = await service.create_bucket(
-            name="test-bucket",
-            owner="test-user",
-        )
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
         bucket_get = await service.get_bucket_by_name(
             name="test-bucket",
             owner="test-user",
@@ -148,18 +127,9 @@ class TestService:
     async def test_get_bucket_list(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket1 = await service.create_bucket(
-            name="test-bucket1",
-            owner="test-user",
-        )
-        bucket2 = await service.create_bucket(
-            name="test-bucket2",
-            owner="test-user",
-        )
-        bucket3 = await service.create_bucket(
-            name="test-bucket3",
-            owner="another-user",
-        )
+        bucket1 = await service.create_bucket(owner="test-user", name="test-bucket1")
+        bucket2 = await service.create_bucket(owner="test-user", name="test-bucket2")
+        bucket3 = await service.create_bucket(owner="another-user", name="test-bucket3")
         async with service.get_user_buckets("test-user") as it:
             buckets = [bucket async for bucket in it]
         assert len(buckets) == 2
@@ -170,10 +140,7 @@ class TestService:
     async def test_delete_bucket(
         self, service: Service, mock_provider: MockBucketProvider
     ) -> None:
-        bucket = await service.create_bucket(
-            name="test-bucket",
-            owner="test-user",
-        )
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
         await service.delete_bucket(bucket.id)
         with pytest.raises(NotExistsError):
             await service.get_bucket(bucket.id)

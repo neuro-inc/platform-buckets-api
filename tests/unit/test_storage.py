@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import uuid4
 
 import pytest
@@ -36,7 +37,7 @@ class TestStorage:
             ),
         )
 
-    def _make_bucket(self, username: str, name: str) -> UserBucket:
+    def _make_bucket(self, username: str, name: Optional[str]) -> UserBucket:
         return UserBucket(
             id=f"bucket-{uuid4()}",
             owner=username,
@@ -65,12 +66,14 @@ class TestStorage:
 
     async def test_buckets_create_list(self, storage: Storage) -> None:
         bucket1 = self._make_bucket("user1", "test")
-        bucket2 = self._make_bucket("user2", "test")
+        bucket2 = self._make_bucket("user2", None)
+        bucket3 = self._make_bucket("user2", None)
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
+        await storage.create_bucket(bucket3)
         async with storage.list_buckets() as it:
             buckets = {bucket async for bucket in it}
-        assert buckets == {bucket1, bucket2}
+        assert buckets == {bucket1, bucket2, bucket3}
 
     async def test_bucket_duplicate_not_allowed(self, storage: Storage) -> None:
         bucket1 = self._make_bucket("user", "test")
@@ -92,6 +95,7 @@ class TestStorage:
     async def test_buckets_create_get_by_name(self, storage: Storage) -> None:
         bucket = self._make_bucket("user1", "test")
         await storage.create_bucket(bucket)
+        assert bucket.name
         bucket_get = await storage.get_bucket_by_name(bucket.name, bucket.owner)
         assert bucket == bucket_get
 

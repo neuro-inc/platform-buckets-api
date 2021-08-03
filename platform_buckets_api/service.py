@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import secrets
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Optional
 from uuid import uuid4
 
 from platform_buckets_api.permissions_service import PermissionsService
@@ -33,7 +33,9 @@ class Service:
         self._permissions_service = permissions_service
         self._provider = bucket_provider
 
-    def _make_bucket_name(self, name: str, owner: str) -> str:
+    def _make_bucket_name(self, name: Optional[str], owner: str) -> str:
+        if name is None:
+            return f"neuro-pl-{owner}"[:45] + secrets.token_hex(6)
         return f"neuro-pl-{name}-{owner}"[:45] + secrets.token_hex(6)
 
     def _make_role_name(self, owner: str) -> str:
@@ -59,7 +61,7 @@ class Service:
             await self._storage.create_credentials(credentials)
             return credentials
 
-    async def create_bucket(self, name: str, owner: str) -> UserBucket:
+    async def create_bucket(self, owner: str, name: Optional[str] = None) -> UserBucket:
         real_name = self._make_bucket_name(name, owner)
         provider_bucket = await self._provider.create_bucket(real_name)
         bucket = UserBucket(

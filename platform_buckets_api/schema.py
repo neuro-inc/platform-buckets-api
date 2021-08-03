@@ -48,7 +48,7 @@ class ProviderTypeField(fields.String):
 
 class Bucket(Schema):
     id = fields.String(required=True, dump_only=True)
-    name = fields.String(required=True)
+    name = fields.String(required=True, allow_none=True)
     owner = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,

@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from typing import AsyncContextManager, AsyncIterator, List, Mapping
+from typing import AsyncContextManager, AsyncIterator, List, Mapping, Optional
 
 from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
@@ -48,7 +48,7 @@ class UserCredentials:
 @dataclass(frozen=True)
 class UserBucket:
     id: str
-    name: str
+    name: Optional[str]
     owner: str
     provider_bucket: ProviderBucket
 
@@ -108,13 +108,15 @@ class InMemoryStorage(Storage):
             yield bucket
 
     async def create_bucket(self, bucket: UserBucket) -> None:
-        try:
-            await self.get_bucket_by_name(owner=bucket.owner, name=bucket.name)
-            raise ExistsError(
-                f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
-            )
-        except NotExistsError:
-            pass
+        if bucket.name:
+            try:
+                await self.get_bucket_by_name(owner=bucket.owner, name=bucket.name)
+                raise ExistsError(
+                    f"UserBucket for {bucket.owner} with name "
+                    f"{bucket.name} already exists"
+                )
+            except NotExistsError:
+                pass
         self._buckets.append(bucket)
 
     async def get_bucket(

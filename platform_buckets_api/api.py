@@ -94,7 +94,7 @@ async def check_any_permissions(
 @dataclass(frozen=True)
 class ResponseBucket:
     id: str
-    name: str
+    name: Optional[str]
     owner: str
     provider: BucketsProviderType
     credentials: Mapping[str, str]
@@ -200,8 +200,7 @@ class BucketsApiHandler:
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
-                name=data["name"],
-                owner=user.name,
+                owner=user.name, name=data.get("name")
             )
         except ExistsError:
             return json_response(

@@ -87,7 +87,7 @@ class UserBucketCRDMapper:
     def from_primitive(payload: Dict[str, Any]) -> UserBucket:
         return UserBucket(
             id=payload["metadata"]["labels"][ID_LABEL],
-            name=payload["metadata"]["labels"][BUCKET_NAME_LABEL],
+            name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
             owner=payload["metadata"]["labels"][OWNER_LABEL],
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
@@ -98,17 +98,22 @@ class UserBucketCRDMapper:
     @staticmethod
     def to_primitive(entry: UserBucket) -> Dict[str, Any]:
         # Use this strange key as name to enable uniqueness of owner/name pair
-        name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, nmae=entry.name)}"
+        if entry.name:
+            name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, name=entry.name)}"
+        else:
+            name = f"user-bucket-{_k8s_name_safe(id=entry.id)}"
+        labels = {
+            ID_LABEL: entry.id,
+            OWNER_LABEL: entry.owner,
+        }
+        if entry.name:
+            labels[BUCKET_NAME_LABEL] = entry.name
         return {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
             "metadata": {
                 "name": name,
-                "labels": {
-                    ID_LABEL: entry.id,
-                    OWNER_LABEL: entry.owner,
-                    BUCKET_NAME_LABEL: entry.name,
-                },
+                "labels": labels,
             },
             "spec": {
                 "provider_type": entry.provider_bucket.provider_type.value,
