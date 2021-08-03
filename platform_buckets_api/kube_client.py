@@ -39,6 +39,7 @@ class ResourceGone(KubeClientException):
     pass
 
 
+ID_LABEL = "platform.neuromation.io/id"
 OWNER_LABEL = "platform.neuromation.io/owner"
 BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 
@@ -85,6 +86,7 @@ class UserBucketCRDMapper:
     @staticmethod
     def from_primitive(payload: Dict[str, Any]) -> UserBucket:
         return UserBucket(
+            id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"][BUCKET_NAME_LABEL],
             owner=payload["metadata"]["labels"][OWNER_LABEL],
             provider_bucket=ProviderBucket(
@@ -95,6 +97,7 @@ class UserBucketCRDMapper:
 
     @staticmethod
     def to_primitive(entry: UserBucket) -> Dict[str, Any]:
+        # Use this strange key as name to enable uniqueness of owner/name pair
         name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, nmae=entry.name)}"
         return {
             "kind": "UserBucket",
@@ -102,6 +105,7 @@ class UserBucketCRDMapper:
             "metadata": {
                 "name": name,
                 "labels": {
+                    ID_LABEL: entry.id,
                     OWNER_LABEL: entry.owner,
                     BUCKET_NAME_LABEL: entry.name,
                 },
@@ -315,10 +319,15 @@ class KubeClient:
         self._raise_for_status(payload)
 
     async def list_user_buckets(
-        self, owner: Optional[str] = None, name: Optional[str] = None
+        self,
+        id: Optional[str] = None,
+        owner: Optional[str] = None,
+        name: Optional[str] = None,
     ) -> List[UserBucket]:
         url = self._user_buckets_url
         params = []
+        if id:
+            params += [("labelSelector", f"{ID_LABEL}={id}")]
         if owner:
             params += [("labelSelector", f"{OWNER_LABEL}={owner}")]
         if name:

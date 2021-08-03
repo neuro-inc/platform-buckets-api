@@ -143,7 +143,17 @@ class TestService:
             name="test-bucket",
             owner="test-user",
         )
-        bucket_get = await service.get_bucket(
+        bucket_get = await service.get_bucket(bucket.id)
+        assert bucket == bucket_get
+
+    async def test_get_bucket_by_name(
+        self, service: Service, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(
+            name="test-bucket",
+            owner="test-user",
+        )
+        bucket_get = await service.get_bucket_by_name(
             name="test-bucket",
             owner="test-user",
         )

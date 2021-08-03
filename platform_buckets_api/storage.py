@@ -47,6 +47,7 @@ class UserCredentials:
 
 @dataclass(frozen=True)
 class UserBucket:
+    id: str
     name: str
     owner: str
     provider_bucket: ProviderBucket
@@ -66,7 +67,11 @@ class Storage(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def get_bucket(self, name: str, owner: str) -> UserBucket:
+    async def get_bucket(self, id: str) -> UserBucket:
+        pass
+
+    @abc.abstractmethod
+    async def get_bucket_by_name(self, name: str, owner: str) -> UserBucket:
         pass
 
     @abc.abstractmethod
@@ -100,7 +105,7 @@ class InMemoryStorage(Storage):
 
     async def create_bucket(self, bucket: UserBucket) -> None:
         try:
-            await self.get_bucket(owner=bucket.owner, name=bucket.name)
+            await self.get_bucket_by_name(owner=bucket.owner, name=bucket.name)
             raise ExistsError(
                 f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
             )
@@ -109,6 +114,15 @@ class InMemoryStorage(Storage):
         self._buckets.append(bucket)
 
     async def get_bucket(
+        self,
+        id: str,
+    ) -> UserBucket:
+        for bucket in self._buckets:
+            if bucket.id == id:
+                return bucket
+        raise NotExistsError(f"UserBucket with id {id} doesn't exists")
+
+    async def get_bucket_by_name(
         self,
         name: str,
         owner: str,

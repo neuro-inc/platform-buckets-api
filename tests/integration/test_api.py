@@ -180,6 +180,7 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         payload = await make_bucket("test_bucket", regular_user)
+        assert "id" in payload
         assert payload["name"] == "test_bucket"
         assert "test_bucket" in payload["credentials"]["bucket_name"]
         assert payload["provider"] == "aws"
@@ -205,6 +206,22 @@ class TestApi:
             assert payload["code"] == "unique"
 
     async def test_get_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test_bucket", regular_user)
+        async with client.get(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_get_bucket_by_name(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,

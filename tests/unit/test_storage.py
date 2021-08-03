@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from platform_buckets_api.config import BucketsProviderType
@@ -36,6 +38,7 @@ class TestStorage:
 
     def _make_bucket(self, username: str, name: str) -> UserBucket:
         return UserBucket(
+            id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
             provider_bucket=ProviderBucket(
@@ -70,17 +73,28 @@ class TestStorage:
         assert buckets == {bucket1, bucket2}
 
     async def test_bucket_duplicate_not_allowed(self, storage: Storage) -> None:
-        bucket = self._make_bucket("user", "test")
-        await storage.create_bucket(bucket)
+        bucket1 = self._make_bucket("user", "test")
+        bucket2 = self._make_bucket("user", "test")
+        await storage.create_bucket(bucket1)
         with pytest.raises(ExistsError):
-            await storage.create_bucket(bucket)
+            await storage.create_bucket(bucket2)
 
     async def test_buckets_create_get(self, storage: Storage) -> None:
         bucket = self._make_bucket("user1", "test")
         await storage.create_bucket(bucket)
-        bucket_get = await storage.get_bucket(bucket.name, bucket.owner)
+        bucket_get = await storage.get_bucket(bucket.id)
         assert bucket == bucket_get
 
     async def test_buckets_get_not_found(self, storage: Storage) -> None:
         with pytest.raises(NotExistsError):
-            await storage.get_bucket("any", "thing")
+            await storage.get_bucket("anything")
+
+    async def test_buckets_create_get_by_name(self, storage: Storage) -> None:
+        bucket = self._make_bucket("user1", "test")
+        await storage.create_bucket(bucket)
+        bucket_get = await storage.get_bucket_by_name(bucket.name, bucket.owner)
+        assert bucket == bucket_get
+
+    async def test_buckets_get_by_name_not_found(self, storage: Storage) -> None:
+        with pytest.raises(NotExistsError):
+            await storage.get_bucket_by_name("any", "thing")

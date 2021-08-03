@@ -2,6 +2,7 @@ import asyncio
 import logging
 import secrets
 from typing import AsyncIterator, List
+from uuid import uuid4
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot
 from neuro_auth_client.client import check_action_allowed
@@ -66,6 +67,7 @@ class Service:
         real_name = self._make_bucket_name(name, owner)
         provider_bucket = await self._provider.create_bucket(real_name)
         bucket = UserBucket(
+            id=f"bucket-{uuid4()}",
             name=name,
             owner=owner,
             provider_bucket=provider_bucket,
@@ -77,8 +79,11 @@ class Service:
             raise
         return bucket
 
-    async def get_bucket(self, name: str, owner: str) -> UserBucket:
-        return await self._storage.get_bucket(name, owner)
+    async def get_bucket(self, id: str) -> UserBucket:
+        return await self._storage.get_bucket(id)
+
+    async def get_bucket_by_name(self, name: str, owner: str) -> UserBucket:
+        return await self._storage.get_bucket_by_name(name, owner)
 
     async def get_user_credentials(self, username: str) -> UserCredentials:
         credentials = await self._get_user_credentials(username)

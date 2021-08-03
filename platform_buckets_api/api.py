@@ -19,7 +19,7 @@ from aiohttp.web import (
 from aiohttp.web_exceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
-from neuro_auth_client import AuthClient
+from neuro_auth_client import AuthClient, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
     init_logging,
@@ -39,6 +39,7 @@ from .config import (
     PlatformAuthConfig,
 )
 from .config_factory import EnvironConfigFactory
+from .identity import untrusted_user
 from .kube_client import KubeClient
 from .kube_storage import K8SStorage
 from .providers import AWSBucketProvider, BucketProvider
@@ -58,6 +59,7 @@ def accepts_ndjson(request: aiohttp.web.Request) -> bool:
 
 @dataclass(frozen=True)
 class ResponseBucket:
+    id: str
     name: str
     owner: str
     provider: BucketsProviderType
@@ -68,6 +70,7 @@ class ResponseBucket:
         cls, user_bucket: UserBucket, credentials: UserCredentials
     ) -> "ResponseBucket":
         return cls(
+            id=user_bucket.id,
             name=user_bucket.name,
             owner=user_bucket.owner,
             provider=user_bucket.provider_bucket.provider_type,
@@ -107,13 +110,29 @@ class BucketsApiHandler:
             [
                 aiohttp.web.post("", self.create_bucket),
                 aiohttp.web.get("", self.list_buckets),
-                aiohttp.web.get("/{bucket_name}", self.get_bucket),
+                aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
             ]
         )
 
     @property
     def service(self) -> Service:
         return self._app["service"]
+
+    async def _get_untrusted_user(self, request: Request) -> User:
+        identity = await untrusted_user(request)
+        return User(name=identity.name)
+
+    async def _resolve_bucket(self, request: Request) -> UserBucket:
+        id_or_name = request.match_info["bucket_id_or_name"]
+        try:
+            bucket = await self.service.get_bucket(id_or_name)
+        except NotExistsError:
+            user = await self._get_untrusted_user(request)
+            try:
+                bucket = await self.service.get_bucket_by_name(id_or_name, user.name)
+            except NotExistsError:
+                raise HTTPNotFound(text=f"Bucket {id_or_name} not found")
+        return bucket
 
     @docs(
         tags=["buckets"],
@@ -174,14 +193,7 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         username = await check_authorized(request)
-        bucket_name = request.match_info["bucket_name"]
-        try:
-            bucket = await self.service.get_bucket(
-                name=bucket_name,
-                owner=username,
-            )
-        except NotExistsError:
-            raise HTTPNotFound
+        bucket = await self._resolve_bucket(request)
         credentials = await self.service.get_user_credentials(username)
         return aiohttp.web.json_response(
             data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
