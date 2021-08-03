@@ -39,7 +39,7 @@ class Service:
         return f"neuro-pl-{name}-{owner}"[:45] + secrets.token_hex(6)
 
     def _make_role_name(self, owner: str) -> str:
-        return f"neuro-bucketuser-{owner}"
+        return f"neuro-bucketuser-{owner}-" + secrets.token_hex(5)
 
     async def _get_user_credentials(
         self,
