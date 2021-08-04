@@ -294,9 +294,12 @@ class KubeClient:
         self, owner: Optional[str] = None
     ) -> List[UserCredentials]:
         url = self._user_bucket_credentials_url
+        label_selectors = []
         params = []
         if owner:
-            params = [("labelSelector", f"{OWNER_LABEL}={owner}")]
+            label_selectors.append(f"{OWNER_LABEL}={owner}")
+        if label_selectors:
+            params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)
         return [
             UserCredentialsCRDMapper.from_primitive(item)
@@ -333,13 +336,16 @@ class KubeClient:
         name: Optional[str] = None,
     ) -> List[UserBucket]:
         url = self._user_buckets_url
+        label_selectors = []
         params = []
         if id:
-            params += [("labelSelector", f"{ID_LABEL}={id}")]
+            label_selectors.append(f"{ID_LABEL}={id}")
         if owner:
-            params += [("labelSelector", f"{OWNER_LABEL}={owner}")]
+            label_selectors.append(f"{OWNER_LABEL}={owner}")
         if name:
-            params += [("labelSelector", f"{BUCKET_NAME_LABEL}={name}")]
+            label_selectors.append(f"{BUCKET_NAME_LABEL}={name}")
+        if label_selectors:
+            params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)
         return [
             UserBucketCRDMapper.from_primitive(item)
