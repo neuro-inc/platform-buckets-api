@@ -26,6 +26,8 @@ spec:
               type: string
             provider_name:
               type: string
+            created_at:
+              type: string
   scope: Namespaced
   names:
     kind: UserBucket

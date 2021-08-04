@@ -16,6 +16,7 @@ from platform_buckets_api.storage import (
     UserBucket,
     UserCredentials,
 )
+from platform_buckets_api.utils import utc_now
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
 
@@ -69,6 +70,7 @@ class Service:
             name=name,
             owner=owner,
             provider_bucket=provider_bucket,
+            created_at=utc_now(),
         )
         try:
             await self._storage.create_bucket(bucket)

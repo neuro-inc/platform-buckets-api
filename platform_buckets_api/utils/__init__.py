@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 import aiohttp.web
@@ -24,3 +25,15 @@ async def ndjson_error_handler(
         logging.exception(msg_str)
         payload = {"error": msg_str}
         await response.write(json.dumps(payload).encode())
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def datetime_dump(dt: datetime) -> str:
+    return str(dt.timestamp())
+
+
+def datetime_load(raw: str) -> datetime:
+    return datetime.fromtimestamp(float(raw), timezone.utc)

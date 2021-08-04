@@ -2,6 +2,7 @@ import json
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import AsyncIterator, Awaitable, Callable, Dict, List, Mapping, Optional
 
 import aiobotocore
@@ -97,6 +98,7 @@ class ResponseBucket:
     name: Optional[str]
     owner: str
     provider: BucketsProviderType
+    created_at: datetime
     credentials: Mapping[str, str]
 
     @classmethod
@@ -108,6 +110,7 @@ class ResponseBucket:
             name=user_bucket.name,
             owner=user_bucket.owner,
             provider=user_bucket.provider_bucket.provider_type,
+            created_at=user_bucket.created_at,
             credentials={
                 "bucket_name": user_bucket.provider_bucket.name,
                 **credentials.role.credentials,
@@ -187,7 +190,7 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["provider", "owner", "credentials"]))
+    @request_schema(Bucket(partial=["provider", "owner", "credentials", "created_at"]))
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
@@ -196,7 +199,7 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
-        schema = Bucket(partial=["provider", "owner", "credentials"])
+        schema = Bucket(partial=["provider", "owner", "credentials", "created_at"])
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(

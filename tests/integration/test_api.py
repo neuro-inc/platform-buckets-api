@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
 
 import aiohttp
@@ -17,6 +18,7 @@ from neuro_auth_client import AuthClient, Permission
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
+from platform_buckets_api.utils import utc_now
 
 from .auth import _User
 from .conftest import ApiAddress, create_local_app_server
@@ -198,12 +200,15 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
+        before = utc_now()
         payload = await make_bucket("test_bucket", regular_user)
+        after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test_bucket"
         assert "test_bucket" in payload["credentials"]["bucket_name"]
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
+        assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
     async def test_create_bucket_duplicate(
         self,

@@ -63,6 +63,7 @@ class Bucket(Schema):
             choices=[provider_type for provider_type in BucketsProviderType]
         ),
     )
+    created_at = fields.DateTime(required=True)
     credentials = fields.Dict(required=True)
 
 

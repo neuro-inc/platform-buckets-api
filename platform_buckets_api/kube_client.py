@@ -10,6 +10,7 @@ import aiohttp
 
 from .config import BucketsProviderType, KubeClientAuthType
 from .storage import ProviderBucket, ProviderRole, UserBucket, UserCredentials
+from .utils import datetime_dump, datetime_load
 
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,7 @@ class UserBucketCRDMapper:
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
             owner=payload["metadata"]["labels"][OWNER_LABEL],
+            created_at=datetime_load(payload["spec"]["created_at"]),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
@@ -118,6 +120,7 @@ class UserBucketCRDMapper:
             "spec": {
                 "provider_type": entry.provider_bucket.provider_type.value,
                 "provider_name": entry.provider_bucket.name,
+                "created_at": datetime_dump(entry.created_at),
             },
         }
 

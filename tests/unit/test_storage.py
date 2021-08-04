@@ -14,6 +14,7 @@ from platform_buckets_api.storage import (
     UserBucket,
     UserCredentials,
 )
+from platform_buckets_api.utils import utc_now
 
 
 pytestmark = pytest.mark.asyncio
@@ -42,6 +43,7 @@ class TestStorage:
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
+            created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
                 name=f"{name}--{username}",

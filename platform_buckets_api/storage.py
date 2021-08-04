@@ -1,5 +1,6 @@
 import abc
 from dataclasses import dataclass
+from datetime import datetime
 from typing import AsyncContextManager, AsyncIterator, List, Mapping, Optional
 
 from platform_buckets_api.config import BucketsProviderType
@@ -50,6 +51,7 @@ class UserBucket:
     id: str
     name: Optional[str]
     owner: str
+    created_at: datetime
     provider_bucket: ProviderBucket
 
 
