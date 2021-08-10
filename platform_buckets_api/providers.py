@@ -154,7 +154,7 @@ class AWSBucketProvider(BucketProvider):
                     try:
                         await self._iam_client.delete_user_policy(
                             UserName=role.id,
-                            PolicyName=f"{role.id}-s3-policy",
+                            PolicyName=name,
                         )
                     except botocore.exceptions.ClientError:
                         pass  # Used doesn't have any policy
@@ -162,6 +162,6 @@ class AWSBucketProvider(BucketProvider):
         for policy_name, doc in policies.items():
             await self._iam_client.put_user_policy(
                 UserName=role.id,
-                PolicyName=f"{role.id}-s3-policy",
+                PolicyName=policy_name,
                 PolicyDocument=json.dumps(doc),
             )
