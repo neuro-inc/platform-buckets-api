@@ -250,7 +250,7 @@ async def test_role_grant_bucket_write_access(
         role,
         [
             BucketPermission(
-                bucket=bucket,
+                bucket_name=bucket.name,
                 write=True,
             )
         ],
@@ -269,9 +269,8 @@ async def test_role_grant_bucket_read_only_access(
         role,
         [
             BucketPermission(
-                bucket=bucket,
+                bucket_name=bucket.name,
                 write=False,
-                read=True,
             )
         ],
     )
@@ -287,7 +286,7 @@ async def test_role_grant_access_second_time(
         role,
         [
             BucketPermission(
-                bucket=bucket1,
+                bucket_name=bucket1.name,
                 write=True,
             )
         ],
@@ -298,11 +297,11 @@ async def test_role_grant_access_second_time(
         role,
         [
             BucketPermission(
-                bucket=bucket1,
+                bucket_name=bucket1.name,
                 write=True,
             ),
             BucketPermission(
-                bucket=bucket2,
+                bucket_name=bucket2.name,
                 write=True,
             ),
         ],
@@ -322,7 +321,7 @@ async def test_role_downgrade_access(
         role,
         [
             BucketPermission(
-                bucket=bucket,
+                bucket_name=bucket.name,
                 write=True,
             )
         ],
@@ -332,7 +331,7 @@ async def test_role_downgrade_access(
         role,
         [
             BucketPermission(
-                bucket=bucket,
+                bucket_name=bucket.name,
                 write=False,
             ),
         ],

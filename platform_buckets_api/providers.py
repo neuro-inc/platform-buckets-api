@@ -1,8 +1,7 @@
 import abc
 import json
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Iterable
 
 import botocore.exceptions
 from aiobotocore.client import AioBaseClient
@@ -33,9 +32,16 @@ class ClusterNotFoundError(Exception):
 
 @dataclass(frozen=True)
 class BucketPermission:
-    bucket: ProviderBucket
     write: bool
-    read: bool = True
+    bucket_name: str
+    is_prefix: bool = False
+
+    def is_more_general_then(self, perm: "BucketPermission") -> bool:
+        if not self.write and perm.write:
+            return False
+        if not self.is_prefix and perm.is_prefix:
+            return False
+        return perm.bucket_name.startswith(self.bucket_name)
 
 
 class BucketProvider(abc.ABC):
@@ -112,56 +118,52 @@ class AWSBucketProvider(BucketProvider):
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
     ) -> None:
-        bucket_to_statements: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
-        for perm in permissions:
-            if perm.read:
-                bucket_to_statements[perm.bucket.name] += [
-                    {
-                        "Effect": "Allow",
-                        "Action": ["s3:ListBucket"],
-                        "Resource": f"arn:aws:s3:::{perm.bucket.name}",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": ["s3:GetObject"],
-                        "Resource": f"arn:aws:s3:::{perm.bucket.name}/*",
-                    },
-                ]
-            if perm.write:
-                bucket_to_statements[perm.bucket.name] += [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:PutObject",
-                            "s3:DeleteObject",
-                            "s3:DeleteObjects",
-                        ],
-                        "Resource": f"arn:aws:s3:::{perm.bucket.name}/*",
-                    },
-                ]
+        def _bucket_arn(perm: BucketPermission) -> str:
+            return f"arn:aws:s3:::{perm.bucket_name}" + ("*" if perm.is_prefix else "")
 
-        policies = {
-            f"{bucket_name}-bucket-policy": {
-                "Version": "2012-10-17",
-                "Statement": statements,
-            }
-            for bucket_name, statements in bucket_to_statements.items()
+        statements = [
+            {
+                "Effect": "Allow",
+                "Action": ["s3:ListBucket"],
+                "Resource": [_bucket_arn(perm) for perm in permissions],
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["s3:GetObject"],
+                "Resource": [
+                    f"{_bucket_arn(perm)}/*" for perm in permissions if not perm.write
+                ],
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:DeleteObjects",
+                ],
+                "Resource": [
+                    f"{_bucket_arn(perm)}/*" for perm in permissions if perm.write
+                ],
+            },
+        ]
+        statements = [stat for stat in statements if stat["Resource"]]
+        policy_document = {
+            "Version": "2012-10-17",
+            "Statement": statements,
         }
-        paginator = self._iam_client.get_paginator("list_user_policies")
-        async for result in paginator.paginate(UserName=role.id):
-            for name in result["PolicyNames"]:
-                if name not in policies:
-                    try:
-                        await self._iam_client.delete_user_policy(
-                            UserName=role.id,
-                            PolicyName=name,
-                        )
-                    except botocore.exceptions.ClientError:
-                        pass  # Used doesn't have any policy
-
-        for policy_name, doc in policies.items():
+        print(policy_document)
+        if not statements:
+            try:
+                await self._iam_client.delete_user_policy(
+                    UserName=role.id,
+                    PolicyName=f"{role.id}-s3-policy",
+                )
+            except botocore.exceptions.ClientError:
+                pass  # Used doesn't have any policy
+        else:
             await self._iam_client.put_user_policy(
                 UserName=role.id,
-                PolicyName=policy_name,
-                PolicyDocument=json.dumps(doc),
+                PolicyName=f"{role.id}-s3-policy",
+                PolicyDocument=json.dumps(policy_document),
             )

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import secrets
 from typing import AsyncIterator, List, Optional
@@ -24,6 +25,8 @@ logger = logging.getLogger()
 
 
 class Service:
+    NEURO_BUCKET_PREFIX = "neuro-pl"
+
     def __init__(
         self,
         storage: Storage,
@@ -34,10 +37,16 @@ class Service:
         self._permissions_service = permissions_service
         self._provider = bucket_provider
 
+    def _make_owner_prefix(self, owner: str) -> str:
+        hasher = hashlib.new("sha256")
+        hasher.update(owner.encode("utf-8"))
+        return f"{self.NEURO_BUCKET_PREFIX}-{hasher.hexdigest()[:10]}"
+
     def _make_bucket_name(self, name: Optional[str], owner: str) -> str:
-        if name is None:
-            return f"neuro-pl-{owner}"[:45] + secrets.token_hex(6)
-        return f"neuro-pl-{name}-{owner}"[:45] + secrets.token_hex(6)
+        res = self._make_owner_prefix(owner) + f"-{owner}"
+        if name is not None:
+            res += f"-{name}"
+        return res[:45] + secrets.token_hex(6)
 
     def _make_role_name(self, owner: str) -> str:
         return f"neuro-bucketuser-{owner}-" + secrets.token_hex(5)
@@ -93,14 +102,49 @@ class Service:
     async def _sync_permissions(self, credentials: UserCredentials) -> None:
 
         checker = await self._permissions_service.get_perms_checker(credentials.owner)
-
         permissions: List[BucketPermission] = []
+
+        def _append(perm: BucketPermission) -> None:
+            if not any(
+                existing_perm.is_more_general_then(perm)
+                for existing_perm in permissions
+            ):
+                permissions.append(perm)
+
+        if checker.can_write_any():
+            _append(
+                BucketPermission(
+                    write=True, bucket_name=self.NEURO_BUCKET_PREFIX, is_prefix=True
+                )
+            )
+        if checker.can_read_any():
+            _append(
+                BucketPermission(
+                    write=False, bucket_name=self.NEURO_BUCKET_PREFIX, is_prefix=True
+                )
+            )
+        for username in checker.write_access_for_owner_by():
+            _append(
+                BucketPermission(
+                    write=True,
+                    bucket_name=self._make_owner_prefix(username),
+                    is_prefix=True,
+                )
+            )
+        for username in checker.read_access_for_owner_by():
+            _append(
+                BucketPermission(
+                    write=False,
+                    bucket_name=self._make_owner_prefix(username),
+                    is_prefix=True,
+                )
+            )
         async with self._storage.list_buckets() as it:
             async for bucket in it:
                 if checker.can_read(bucket):
-                    permissions.append(
+                    _append(
                         BucketPermission(
-                            bucket=bucket.provider_bucket,
+                            bucket_name=bucket.provider_bucket.name,
                             write=checker.can_write(bucket),
                         )
                     )

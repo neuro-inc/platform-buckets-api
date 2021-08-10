@@ -64,6 +64,26 @@ class PermissionsService:
             except KeyError:
                 return False
 
+        def can_read_any(self) -> bool:
+            return self._tree.sub_tree.can_read()
+
+        def can_write_any(self) -> bool:
+            return self._tree.sub_tree.can_write()
+
+        def read_access_for_owner_by(self) -> List[str]:
+            res = []
+            for key, subnode in self._tree.sub_tree.children.items():
+                if check_action_allowed(subnode.action, "read"):
+                    res.append(key)
+            return res
+
+        def write_access_for_owner_by(self) -> List[str]:
+            res = []
+            for key, subnode in self._tree.sub_tree.children.items():
+                if check_action_allowed(subnode.action, "write"):
+                    res.append(key)
+            return res
+
         def can_read(self, bucket: UserBucket) -> bool:
             return any(
                 self._has_perm(perm)
