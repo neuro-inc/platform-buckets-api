@@ -1,7 +1,8 @@
 import abc
 import json
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Dict, Iterable, List, Mapping
 
 import botocore.exceptions
 from aiobotocore.client import AioBaseClient
@@ -111,10 +112,10 @@ class AWSBucketProvider(BucketProvider):
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
     ) -> None:
-        statements = []
+        bucket_to_statements: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
         for perm in permissions:
             if perm.read:
-                statements += [
+                bucket_to_statements[perm.bucket.name] += [
                     {
                         "Effect": "Allow",
                         "Action": ["s3:ListBucket"],
@@ -127,7 +128,7 @@ class AWSBucketProvider(BucketProvider):
                     },
                 ]
             if perm.write:
-                statements += [
+                bucket_to_statements[perm.bucket.name] += [
                     {
                         "Effect": "Allow",
                         "Action": [
@@ -139,21 +140,28 @@ class AWSBucketProvider(BucketProvider):
                     },
                 ]
 
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": statements,
+        policies = {
+            f"{bucket_name}-bucket-policy": {
+                "Version": "2012-10-17",
+                "Statement": statements,
+            }
+            for bucket_name, statements in bucket_to_statements.items()
         }
-        if not statements:
-            try:
-                await self._iam_client.delete_user_policy(
-                    UserName=role.id,
-                    PolicyName=f"{role.id}-s3-policy",
-                )
-            except botocore.exceptions.ClientError:
-                pass  # Used doesn't have any policy
-        else:
+        paginator = self._iam_client.get_paginator("list_user_policies")
+        async for result in paginator.paginate(UserName=role.id):
+            for name in result["PolicyNames"]:
+                if name not in policies:
+                    try:
+                        await self._iam_client.delete_user_policy(
+                            UserName=role.id,
+                            PolicyName=f"{role.id}-s3-policy",
+                        )
+                    except botocore.exceptions.ClientError:
+                        pass  # Used doesn't have any policy
+
+        for policy_name, doc in policies.items():
             await self._iam_client.put_user_policy(
                 UserName=role.id,
                 PolicyName=f"{role.id}-s3-policy",
-                PolicyDocument=json.dumps(policy_document),
+                PolicyDocument=json.dumps(doc),
             )
