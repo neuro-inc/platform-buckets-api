@@ -71,7 +71,12 @@ class AWSBucketProvider(BucketProvider):
 
     async def create_role(self, username: str) -> ProviderRole:
         try:
-            user = (await self._iam_client.create_user(UserName=username))["User"]
+            user = (
+                await self._iam_client.create_user(
+                    UserName=username,
+                    PermissionsBoundary="arn:aws:iam::aws:policy/AmazonS3FullAccess",
+                )
+            )["User"]
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError
         keys = (await self._iam_client.create_access_key(UserName=username))[
