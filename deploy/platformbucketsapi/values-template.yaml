@@ -5,13 +5,12 @@ bucketProvider: {}
 #  aws:
 #    accessKeyId:
 #    secretAccessKey:
+#    region_name:
 
 image:
   repository: $IMAGE_REPO
   tag: $IMAGE_TAG
 imagePullSecrets: []
-command: []
-args: []
 port: 8080
 
 replicas: 2

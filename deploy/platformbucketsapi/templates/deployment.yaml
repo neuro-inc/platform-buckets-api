@@ -25,12 +25,6 @@ spec:
       - name: platformbucketsapi
 
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        {{- if .Values.command }}
-        command: {{ toYaml .Values.command | nindent 8 }}
-        {{- end }}
-        {{- if .Values.args }}
-        args: {{ toYaml .Values.args | nindent 8 }}
-        {{- end }}
 
         imagePullPolicy: Always
         livenessProbe:
@@ -88,6 +82,10 @@ spec:
         - name: NP_AWS_SECRET_ACCESS_KEY
 {{- if .Values.bucket_provider.aws.secretAccessKey }}
 {{ toYaml .Values.bucket_provider.aws.secretAccessKey | indent 10 }}
+{{- end }}
+        - name: NP_AWS_REGION_NAME
+{{- if .Values.bucket_provider.aws.region_name }}
+          value: {{ .Values.bucket_provider.region_name }}
 {{- end }}
         {{- end}}
         {{- if .Values.zipkin }}
