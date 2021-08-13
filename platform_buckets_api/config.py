@@ -44,8 +44,8 @@ class BucketsProviderType(str, enum.Enum):
 @dataclass(frozen=True)
 class AWSProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: Optional[str] = None
+    secret_access_key: Optional[str] = None
     region_name: str = "us-east-1"
     endpoint_url: Optional[str] = None
 

@@ -1,18 +1,8 @@
-NP_CLUSTER_NAME: "default"
-
-bucket_provider:
+bucketProvider:
   type: "aws"  # "aws" or <not-supported-yet>
-  aws:
-    access_key_id:
-      valueFrom:
-        secretKeyRef:
-          name: buckets-admin-aws-token
-          key: access_key_id
-    secret_access_key:
-      valueFrom:
-        secretKeyRef:
-          name: buckets-admin-aws-token
-          key: secret_access_key
+
+annotations:
+  iam.amazonaws.com/role: arn:aws:iam::771188043543:role/buckets-366c09e4841fcc83df56b8f070c34716
 
 ingress:
   enabled: true
@@ -33,38 +23,6 @@ platform:
       secretKeyRef:
         name: platformservices-secret
         key: compute_token
-
-postgres:
-  dsn:
-    valueFrom:
-      secretKeyRef:
-        name: platformbucketsapi-postgres
-        key: platformbucketsapi-service-dsn
-
-postgres-db-init:
-  adminDsn:
-    valueFrom:
-      secretKeyRef:
-        name: postgres
-        key: admin-dsn
-  migrationsRunnerDsn:
-    valueFrom:
-      secretKeyRef:
-        name: platformbucketsapi-postgres
-        key: platformbucketsapi-migrations-dsn
-  serviceDsn:
-    valueFrom:
-      secretKeyRef:
-        name: platformbucketsapi-postgres
-        key: platformbucketsapi-service-dsn
-
-  migrations:
-    env:
-      - name: NP_DB_POSTGRES_DSN
-        valueFrom:
-          secretKeyRef:
-            name: platformbucketsapi-postgres
-            key: platformbucketsapi-migrations-dsn
 
 corsOrigins: https://neu.ro,https://master--neuro-web.netlify.com,http://localhost:8000
 

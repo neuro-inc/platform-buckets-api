@@ -1,10 +1,10 @@
 NP_BUCKETS_API_K8S_NS: platform-jobs
 
-bucket_provider: {}
+bucketProvider: {}
 #  type: "aws"  # "aws" or <not-supported-yet>
 #  aws:
-#    access_key_id:
-#    secret_access_key:
+#    accessKeyId:
+#    secretAccessKey:
 
 image:
   repository: $IMAGE_REPO
@@ -26,37 +26,19 @@ resources:
 ingress:
   enabled: false
 
-postgres-db-init:
-  image:
-    repository: $DOCKER_SERVER/bitnami/postgresql
-
-  adminDsn: {}
-  migrationsRunnerDsn: {}
-  serviceDsn: {}
-
-  migrations:
-    enabled: true
-
-    image:
-      repository: "$IMAGE_REPO"
-      tag: "$IMAGE_TAG"
-
-    command: ["alembic", "upgrade", "head"]
-
 secrets: []
 
 zipkin: {}
 
 sentry: {}
 
+annotations: {}
+
 authUrl: http://platformauthapi:8080
 
 platform:
   cluster_name: ""
   token: {}
-
-postgres:
-  dsn: {}
 
 corsOrigins:
 enableDocs: false

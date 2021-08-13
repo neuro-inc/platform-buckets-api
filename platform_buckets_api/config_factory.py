@@ -87,8 +87,8 @@ class EnvironConfigFactory:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
-                access_key_id=self._environ["NP_AWS_ACCESS_KEY_ID"],
-                secret_access_key=self._environ["NP_AWS_SECRET_ACCESS_KEY"],
+                access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID"),
+                secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY"),
                 region_name=self._environ.get(
                     "NP_AWS_REGION_NAME", AWSProviderConfig.region_name
                 ),

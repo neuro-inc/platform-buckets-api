@@ -16,6 +16,10 @@ spec:
     metadata:
       labels:
         service: platformbucketsapi
+      annotations:
+        {{- with .Values.annotations }}
+        {{ toYaml . | indent 8 }}
+        {{- end }}
     spec:
       containers:
       - name: platformbucketsapi
@@ -78,9 +82,13 @@ spec:
           value: {{ .Values.bucket_provider.type }}
         {{- if eq .Values.bucket_provider.type "aws" }}
         - name: NP_AWS_ACCESS_KEY_ID
-{{ toYaml .Values.bucket_provider.aws.access_key_id | indent 10 }}
+{{- if .Values.bucket_provider.aws.accessKeyId }}
+{{ toYaml .Values.bucket_provider.aws.accessKeyId | indent 10 }}
+{{- end }}
         - name: NP_AWS_SECRET_ACCESS_KEY
-{{ toYaml .Values.bucket_provider.aws.secret_access_key | indent 10 }}
+{{- if .Values.bucket_provider.aws.secretAccessKey }}
+{{ toYaml .Values.bucket_provider.aws.secretAccessKey | indent 10 }}
+{{- end }}
         {{- end}}
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL
