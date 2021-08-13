@@ -73,19 +73,19 @@ spec:
         - name: NP_CORS_ORIGINS
           value: {{ .Values.corsOrigins }}
         - name: NP_BUCKET_PROVIDER_TYPE
-          value: {{ .Values.bucket_provider.type }}
-        {{- if eq .Values.bucket_provider.type "aws" }}
+          value: {{ .Values.bucketProvider.type }}
+        {{- if eq .Values.bucketProvider.type "aws" }}
+{{- if .Values.bucketProvider.aws }}
+{{- if .Values.bucketProvider.aws.accessKeyId }}
         - name: NP_AWS_ACCESS_KEY_ID
-{{- if .Values.bucket_provider.aws.accessKeyId }}
-{{ toYaml .Values.bucket_provider.aws.accessKeyId | indent 10 }}
+{{ toYaml .Values.bucketProvider.aws.accessKeyId | indent 10 }}
 {{- end }}
+{{- if .Values.bucketProvider.aws.secretAccessKey }}
         - name: NP_AWS_SECRET_ACCESS_KEY
-{{- if .Values.bucket_provider.aws.secretAccessKey }}
-{{ toYaml .Values.bucket_provider.aws.secretAccessKey | indent 10 }}
+{{ toYaml .Values.bucketProvider.aws.secretAccessKey | indent 10 }}
 {{- end }}
         - name: NP_AWS_REGION_NAME
-{{- if .Values.bucket_provider.aws.region_name }}
-          value: {{ .Values.bucket_provider.region_name }}
+          value: {{ .Values.bucketProvider.region_name }}
 {{- end }}
         {{- end}}
         {{- if .Values.zipkin }}
