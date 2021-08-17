@@ -1,5 +1,6 @@
 import abc
 import json
+import secrets
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
@@ -133,7 +134,7 @@ class AWSBucketProvider(BucketProvider):
         )
         res = await self._sts_client.assume_role(
             RoleArn=self._s3_role_arn,
-            RoleSessionName=f"bucket-{name}-for-{requester}",
+            RoleSessionName=f"{name}-{requester}"[:58] + secrets.token_hex(3),
             Policy=json.dumps(policy_doc),
             DurationSeconds=self._session_duration_s,
         )
