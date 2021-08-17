@@ -3,6 +3,7 @@ NP_BUCKETS_API_K8S_NS: platform-jobs
 bucketProvider: {}
 #  type: "aws"  # "aws" or <not-supported-yet>
 #  aws:
+#    s3_role_arn:
 #    accessKeyId:
 #    secretAccessKey:
 #    region_name:
