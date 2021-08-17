@@ -29,7 +29,7 @@ class UniquenessError(StorageError):
 
 @dataclass(frozen=True)
 class ProviderRole:
-    id: str
+    name: str
     provider_type: BucketsProviderType
     credentials: Mapping[str, str]
 
@@ -41,8 +41,11 @@ class ProviderBucket:
 
 
 @dataclass(frozen=True)
-class UserCredentials:
+class PersistentCredentials:
+    id: str
+    name: Optional[str]
     owner: str
+    bucket_ids: List[str]
     role: ProviderRole
 
 
@@ -55,15 +58,7 @@ class UserBucket:
     provider_bucket: ProviderBucket
 
 
-class Storage(abc.ABC):
-    @abc.abstractmethod
-    async def create_credentials(self, credentials: UserCredentials) -> None:
-        pass
-
-    @abc.abstractmethod
-    async def get_credentials(self, owner: str) -> UserCredentials:
-        pass
-
+class BucketsStorage(abc.ABC):
     @abc.abstractmethod
     def list_buckets(self) -> AsyncContextManager[AsyncIterator[UserBucket]]:
         pass
@@ -85,24 +80,35 @@ class Storage(abc.ABC):
         pass
 
 
-class InMemoryStorage(Storage):
+class CredentialsStorage(abc.ABC):
+    @abc.abstractmethod
+    def list_credentials(
+        self, owner: Optional[str] = None
+    ) -> AsyncContextManager[AsyncIterator[PersistentCredentials]]:
+        pass
+
+    @abc.abstractmethod
+    async def get_credentials(self, id: str) -> PersistentCredentials:
+        pass
+
+    @abc.abstractmethod
+    async def get_credentials_by_name(
+        self, name: str, owner: str
+    ) -> PersistentCredentials:
+        pass
+
+    @abc.abstractmethod
+    async def create_credentials(self, credentials: PersistentCredentials) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def delete_credentials(self, id: str) -> None:
+        pass
+
+
+class InMemoryBucketsStorage(BucketsStorage):
     def __init__(self) -> None:
-        self._credentials: List[UserCredentials] = []
         self._buckets: List[UserBucket] = []
-
-    async def create_credentials(self, credentials: UserCredentials) -> None:
-        try:
-            await self.get_credentials(credentials.owner)
-            raise ExistsError(f"UserCredentials for {credentials.owner} already exists")
-        except NotExistsError:
-            pass
-        self._credentials.append(credentials)
-
-    async def get_credentials(self, owner: str) -> UserCredentials:
-        for cred in self._credentials:
-            if cred.owner == owner:
-                return cred
-        raise NotExistsError(f"UserCredentials for {owner} doesn't exists")
 
     @asyncgeneratorcontextmanager
     async def list_buckets(self) -> AsyncIterator[UserBucket]:
@@ -142,3 +148,57 @@ class InMemoryStorage(Storage):
 
     async def delete_bucket(self, id: str) -> None:
         self._buckets = [bucket for bucket in self._buckets if bucket.id != id]
+
+
+class InMemoryCredentialsStorage(CredentialsStorage):
+    def __init__(self) -> None:
+        self._credentials: List[PersistentCredentials] = []
+
+    @asyncgeneratorcontextmanager
+    async def list_credentials(
+        self, owner: Optional[str] = None
+    ) -> AsyncIterator[PersistentCredentials]:
+        for credentials in self._credentials:
+            if owner is None or credentials.owner == owner:
+                yield credentials
+
+    async def create_credentials(self, credentials: PersistentCredentials) -> None:
+        if credentials.name:
+            try:
+                await self.get_credentials_by_name(
+                    owner=credentials.owner, name=credentials.name
+                )
+                raise ExistsError(
+                    f"PersistentCredentials for {credentials.owner} with name "
+                    f"{credentials.name} already exists"
+                )
+            except NotExistsError:
+                pass
+        self._credentials.append(credentials)
+
+    async def get_credentials(
+        self,
+        id: str,
+    ) -> PersistentCredentials:
+        for credentials in self._credentials:
+            if credentials.id == id:
+                return credentials
+        raise NotExistsError(f"PersistentCredentials with id {id} doesn't exists")
+
+    async def get_credentials_by_name(
+        self,
+        name: str,
+        owner: str,
+    ) -> PersistentCredentials:
+        for credentials in self._credentials:
+            if credentials.owner == owner and credentials.name == name:
+                return credentials
+        raise NotExistsError(
+            f"PersistentCredentials with owner = {owner} and name = {name} doesn't"
+            f" exists"
+        )
+
+    async def delete_credentials(self, id: str) -> None:
+        self._credentials = [
+            credentials for credentials in self._credentials if credentials.id != id
+        ]

@@ -7,6 +7,7 @@ from typing import AsyncIterator, Iterator
 import aiobotocore
 import aiohttp
 import pytest
+from aiobotocore.client import AioBaseClient
 from async_timeout import timeout
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
@@ -114,7 +115,7 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
             pass
     boto_session = aiobotocore.get_session()
     async with boto_session.create_client("iam", endpoint_url=str(_moto_server)) as iam:
-        await iam.create_user(UserName="admin")
+        create_user_resp = await iam.create_user(UserName="admin")
         keys = (await iam.create_access_key(UserName="admin"))["AccessKey"]
         policy_document = {
             "Version": "2012-10-17",
@@ -128,6 +129,46 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
         await iam.attach_user_policy(UserName="admin", PolicyArn=policy_arn)
     yield MotoConfig(
         url=_moto_server,
+        admin_user_arn=create_user_resp["User"]["Arn"],
         admin_access_key_id=keys["AccessKeyId"],
         admin_secret_access_key=keys["SecretAccessKey"],
     )
+
+
+@pytest.fixture()
+async def s3(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
+    session = aiobotocore.get_session()
+
+    async with session.create_client(
+        "s3",
+        endpoint_url=str(moto_server.url),
+        aws_access_key_id=moto_server.admin_access_key_id,
+        aws_secret_access_key=moto_server.admin_secret_access_key,
+    ) as s3_client:
+        yield s3_client
+
+
+@pytest.fixture()
+async def iam(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
+    session = aiobotocore.get_session()
+
+    async with session.create_client(
+        "iam",
+        endpoint_url=str(moto_server.url),
+        aws_access_key_id=moto_server.admin_access_key_id,
+        aws_secret_access_key=moto_server.admin_secret_access_key,
+    ) as iam_client:
+        yield iam_client
+
+
+@pytest.fixture()
+async def sts(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
+    session = aiobotocore.get_session()
+
+    async with session.create_client(
+        "sts",
+        endpoint_url=str(moto_server.url),
+        aws_access_key_id=moto_server.admin_access_key_id,
+        aws_secret_access_key=moto_server.admin_secret_access_key,
+    ) as iam_client:
+        yield iam_client

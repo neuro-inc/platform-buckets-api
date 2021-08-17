@@ -1,7 +1,7 @@
 import abc
 import json
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 import botocore.exceptions
 from aiobotocore.client import AioBaseClient
@@ -46,10 +46,6 @@ class BucketPermission:
 
 class BucketProvider(abc.ABC):
     @abc.abstractmethod
-    async def create_role(self, username: str) -> ProviderRole:
-        pass
-
-    @abc.abstractmethod
     async def create_bucket(self, name: str) -> ProviderBucket:
         pass
 
@@ -58,38 +54,42 @@ class BucketProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
+    async def get_bucket_credentials(
+        self, name: str, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        pass
+
+    # Long term tokens methods
+
+    @abc.abstractmethod
+    async def create_role(self, username: str) -> ProviderRole:
+        pass
+
+    @abc.abstractmethod
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
     ) -> None:
         pass
 
+    @abc.abstractmethod
+    async def delete_role(self, username: str) -> None:
+        pass
+
 
 class AWSBucketProvider(BucketProvider):
-    def __init__(self, s3_client: AioBaseClient, iam_client: AioBaseClient):
+    def __init__(
+        self,
+        s3_client: AioBaseClient,
+        iam_client: AioBaseClient,
+        sts_client: AioBaseClient,
+        s3_role_arn: str,
+        session_duration_s: int = 3600,
+    ):
         self._s3_client = s3_client
         self._iam_client = iam_client
-
-    async def create_role(self, username: str) -> ProviderRole:
-        try:
-            user = (
-                await self._iam_client.create_user(
-                    UserName=username,
-                    PermissionsBoundary="arn:aws:iam::aws:policy/AmazonS3FullAccess",
-                )
-            )["User"]
-        except self._iam_client.exceptions.EntityAlreadyExistsException:
-            raise RoleExistsError
-        keys = (await self._iam_client.create_access_key(UserName=username))[
-            "AccessKey"
-        ]
-        return ProviderRole(
-            id=user["UserName"],
-            provider_type=BucketsProviderType.AWS,
-            credentials={
-                "access_key_id": keys["AccessKeyId"],
-                "secret_access_key": keys["SecretAccessKey"],
-            },
-        )
+        self._sts_client = sts_client
+        self._s3_role_arn = s3_role_arn
+        self._session_duration_s = session_duration_s
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         try:
@@ -120,9 +120,53 @@ class AWSBucketProvider(BucketProvider):
         except botocore.exceptions.ClientError as e:
             raise BucketDeleteError(e.args[0])
 
-    async def set_role_permissions(
-        self, role: ProviderRole, permissions: Iterable[BucketPermission]
-    ) -> None:
+    async def get_bucket_credentials(
+        self, name: str, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        policy_doc = self._permissions_to_policy_doc(
+            [
+                BucketPermission(
+                    bucket_name=name,
+                    write=write,
+                )
+            ]
+        )
+        res = await self._sts_client.assume_role(
+            RoleArn=self._s3_role_arn,
+            RoleSessionName=f"bucket-{name}-for-{requester}",
+            Policy=json.dumps(policy_doc),
+            DurationSeconds=self._session_duration_s,
+        )
+        return {
+            "access_key_id": res["Credentials"]["AccessKeyId"],
+            "secret_access_key": res["Credentials"]["SecretAccessKey"],
+            "session_token": res["Credentials"]["SessionToken"],
+            "expiration": res["Credentials"]["Expiration"].isoformat(),
+        }
+
+    async def create_role(self, username: str) -> ProviderRole:
+        try:
+            await self._iam_client.create_user(
+                UserName=username,
+                PermissionsBoundary="arn:aws:iam::aws:policy/AmazonS3FullAccess",
+            )
+        except self._iam_client.exceptions.EntityAlreadyExistsException:
+            raise RoleExistsError
+        keys = (await self._iam_client.create_access_key(UserName=username))[
+            "AccessKey"
+        ]
+        return ProviderRole(
+            name=username,
+            provider_type=BucketsProviderType.AWS,
+            credentials={
+                "access_key_id": keys["AccessKeyId"],
+                "secret_access_key": keys["SecretAccessKey"],
+            },
+        )
+
+    def _permissions_to_policy_doc(
+        self, permissions: Iterable[BucketPermission]
+    ) -> Mapping[str, Any]:
         def _bucket_arn(perm: BucketPermission) -> str:
             return f"arn:aws:s3:::{perm.bucket_name}" + ("*" if perm.is_prefix else "")
 
@@ -153,22 +197,36 @@ class AWSBucketProvider(BucketProvider):
             },
         ]
         statements = [stat for stat in statements if stat["Resource"]]
-        policy_document = {
+        return {
             "Version": "2012-10-17",
             "Statement": statements,
         }
-        print(policy_document)
-        if not statements:
+
+    async def set_role_permissions(
+        self, role: ProviderRole, permissions: Iterable[BucketPermission]
+    ) -> None:
+        policy_doc = self._permissions_to_policy_doc(permissions)
+        if not policy_doc["Statement"]:
             try:
                 await self._iam_client.delete_user_policy(
-                    UserName=role.id,
-                    PolicyName=f"{role.id}-s3-policy",
+                    UserName=role.name,
+                    PolicyName=f"{role.name}-s3-policy",
                 )
             except botocore.exceptions.ClientError:
                 pass  # Used doesn't have any policy
         else:
             await self._iam_client.put_user_policy(
-                UserName=role.id,
-                PolicyName=f"{role.id}-s3-policy",
-                PolicyDocument=json.dumps(policy_document),
+                UserName=role.name,
+                PolicyName=f"{role.name}-s3-policy",
+                PolicyDocument=json.dumps(policy_doc),
             )
+
+    async def delete_role(self, username: str) -> None:
+        try:
+            await self._iam_client.delete_user_policy(
+                UserName=username,
+                PolicyName=f"{username}-s3-policy",
+            )
+        except botocore.exceptions.ClientError:
+            pass  # Used doesn't have any policy
+        await self._iam_client.delete_user(UserName=username)

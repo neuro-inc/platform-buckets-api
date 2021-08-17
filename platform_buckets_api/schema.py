@@ -59,12 +59,49 @@ class Bucket(Schema):
     owner = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,
+        attribute="provider_bucket.provider_type",
         validate=validate.OneOf(
             choices=[provider_type for provider_type in BucketsProviderType]
         ),
     )
     created_at = fields.DateTime(required=True)
+
+
+class BucketCredentials(Schema):
+    bucket_id = fields.String(required=True)
+    provider = ProviderTypeField(
+        required=True,
+        validate=validate.OneOf(
+            choices=[provider_type for provider_type in BucketsProviderType]
+        ),
+    )
     credentials = fields.Dict(required=True)
+
+
+class PersistentBucketsCredentialsRequest(Schema):
+    name = fields.String(
+        required=False,
+        allow_none=True,
+        validate=[
+            validate.Regexp(r"^[a-z](?:-?[a-z0-9_-])*(?!\n)$"),
+            validate.Length(min=3, max=40),
+        ],
+    )
+    bucket_ids = fields.List(fields.String(), required=True)
+
+
+class PersistentBucketsCredentials(Schema):
+    id = fields.String(required=True, dump_only=True)
+    name = fields.String(
+        required=False,
+        allow_none=True,
+        validate=[
+            validate.Regexp(r"^[a-z](?:-?[a-z0-9_-])*(?!\n)$"),
+            validate.Length(min=3, max=40),
+        ],
+    )
+    owner = fields.String(required=True)
+    credentials = fields.List(fields.Nested(BucketCredentials), required=True)
 
 
 class ClientErrorSchema(Schema):

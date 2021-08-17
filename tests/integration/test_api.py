@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional
 
 import aiohttp
 import pytest
@@ -45,10 +45,20 @@ class BucketsApiEndpoints:
 
     @property
     def buckets_url(self) -> str:
-        return f"{self.api_v1_endpoint}/buckets"
+        return f"{self.api_v1_endpoint}/buckets/buckets"
 
     def bucket_url(self, name: str) -> str:
-        return f"{self.api_v1_endpoint}/buckets/{name}"
+        return f"{self.buckets_url}/{name}"
+
+    def bucket_make_tmp_credentials_url(self, name: str) -> str:
+        return f"{self.bucket_url(name)}/make_tmp_credentials"
+
+    @property
+    def credentials_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/persistent_credentials"
+
+    def credential_url(self, name: str) -> str:
+        return f"{self.credentials_url}/{name}"
 
 
 @pytest.fixture
@@ -193,6 +203,30 @@ class TestApi:
 
         return _factory
 
+    CredentialsFactory = Callable[
+        [Optional[str], _User, List[str]], Awaitable[Dict[str, Any]]
+    ]
+
+    @pytest.fixture()
+    async def make_credentials(
+        self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
+    ) -> CredentialsFactory:
+        async def _factory(
+            name: Optional[str], user: _User, bucket_ids: List[str]
+        ) -> Dict[str, Any]:
+            async with client.post(
+                buckets_api.credentials_url,
+                headers=user.headers,
+                json={
+                    "name": name,
+                    "bucket_ids": bucket_ids,
+                },
+            ) as resp:
+                assert resp.status == HTTPCreated.status_code, await resp.text()
+                return await resp.json()
+
+        return _factory
+
     async def test_create_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
@@ -205,10 +239,27 @@ class TestApi:
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test_bucket"
-        assert "test_bucket" in payload["credentials"]["bucket_name"]
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
+    async def test_make_bucket_tmp_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test_bucket", regular_user)
+        async with client.post(
+            buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["bucket_id"] == create_resp["id"]
+            assert payload["provider"] == create_resp["provider"]
+            assert "test_bucket" in payload["credentials"]["bucket_name"]
 
     async def test_create_bucket_duplicate(
         self,
@@ -498,3 +549,287 @@ class TestApi:
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
+
+    async def test_create_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        payload = await make_credentials(
+            "test-creds", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        assert payload["id"]
+        assert payload["name"] == "test-creds"
+        assert payload["owner"] == regular_user.name
+        assert len(payload["credentials"]) == 2
+        bucket1_creds, bucket2_creds = payload["credentials"]
+        if bucket1_creds["bucket_id"] == bucket2["id"]:
+            bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
+        assert bucket1_creds["bucket_id"] == bucket1["id"]
+        assert bucket1_creds["provider"] == bucket1["provider"]
+        assert "test_bucket1" in bucket1_creds["credentials"]["bucket_name"]
+
+        assert bucket2_creds["bucket_id"] == bucket2["id"]
+        assert bucket2_creds["provider"] == bucket2["provider"]
+        assert "test_bucket2" in bucket2_creds["credentials"]["bucket_name"]
+
+    async def test_get_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        create_resp = await make_credentials(
+            "test-creds", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.get(
+            buckets_api.credential_url(create_resp["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_get_credentials_by_name(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        create_resp = await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.get(
+            buckets_api.credential_url("test_credentials"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_get_credentials_not_found(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+    ) -> None:
+        async with client.get(
+            buckets_api.credential_url("test_credentials"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+    async def test_list_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        credentials_list = []
+        for index in range(5):
+            credentials_data = await make_credentials(
+                f"test-creds-{index}", regular_user, [bucket1["id"], bucket2["id"]]
+            )
+            credentials_list.append(credentials_data)
+        for index in range(5):
+            credentials_data = await make_credentials(
+                None, regular_user, [bucket1["id"], bucket2["id"]]
+            )
+            credentials_list.append(credentials_data)
+        async with client.get(
+            buckets_api.credentials_url,
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert len(payload) == len(credentials_list)
+            for credentials_data in credentials_list:
+                assert credentials_data in payload
+
+    async def test_list_credentials_ndjson(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        headers = {"Accept": "application/x-ndjson"}
+        async with client.get(
+            buckets_api.credentials_url,
+            headers={**regular_user.headers, **headers},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = []
+            async for line in resp.content:
+                payload.append(json.loads(line))
+            assert payload == []
+
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        credentials_list = []
+        for index in range(5):
+            credentials_data = await make_credentials(
+                f"test-creds-{index}", regular_user, [bucket1["id"], bucket2["id"]]
+            )
+            credentials_list.append(credentials_data)
+        for index in range(5):
+            credentials_data = await make_credentials(
+                None, regular_user, [bucket1["id"], bucket2["id"]]
+            )
+            credentials_list.append(credentials_data)
+
+        async with client.get(
+            buckets_api.credentials_url,
+            headers={**regular_user.headers, **headers},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = []
+            async for line in resp.content:
+                payload.append(json.loads(line))
+            assert len(payload) == len(credentials_list)
+            for credentials_data in credentials_list:
+                assert credentials_data in payload
+
+    async def test_delete_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        data = await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.delete(
+            buckets_api.credential_url(data["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()
+        async with client.get(
+            buckets_api.credentials_url,
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_delete_credentials_by_name(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.delete(
+            buckets_api.credential_url("test_credentials"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()
+        async with client.get(
+            buckets_api.credentials_url,
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_delete_credentials_not_existing(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_credentials: BucketFactory,
+    ) -> None:
+        async with client.delete(
+            buckets_api.credential_url("test_credentials"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+    async def test_cant_get_another_user_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        create_resp = await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.get(
+            buckets_api.credential_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+    async def test_cant_list_another_user_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.get(
+            buckets_api.credentials_url,
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            assert await resp.json() == []
+
+    async def test_cant_delete_another_user_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test_bucket1", regular_user)
+        bucket2 = await make_bucket("test_bucket2", regular_user)
+        create_resp = await make_credentials(
+            "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        async with client.delete(
+            buckets_api.credential_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()

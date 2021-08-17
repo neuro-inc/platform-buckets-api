@@ -97,9 +97,9 @@ async def kube_client(
                 await kube_client.remove_user_bucket(bucket)
             except ResourceNotFound:
                 pass
-        for creds in await kube_client.list_user_bucket_credentials():
+        for creds in await kube_client.list_persistent_credentials():
             try:
-                await kube_client.remove_user_bucket_credential(creds)
+                await kube_client.remove_persistent_credentials(creds)
             except ResourceNotFound:
                 pass
 

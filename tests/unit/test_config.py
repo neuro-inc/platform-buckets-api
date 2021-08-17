@@ -52,6 +52,7 @@ def test_create(cert_authority_path: str, token_path: str) -> None:
         "NP_AWS_ACCESS_KEY_ID": "key-id",
         "NP_AWS_SECRET_ACCESS_KEY": "key-secret",
         "NP_AWS_REGION_NAME": "us-east-2",
+        "NP_AWS_S3_ROLE_ARN": "role-arn-here",
         "NP_BUCKETS_API_K8S_API_URL": "https://localhost:8443",
         "NP_BUCKETS_API_K8S_AUTH_TYPE": "token",
         "NP_BUCKETS_API_K8S_CA_PATH": cert_authority_path,
@@ -93,5 +94,6 @@ def test_create(cert_authority_path: str, token_path: str) -> None:
             access_key_id="key-id",
             secret_access_key="key-secret",
             region_name="us-east-2",
+            s3_role_arn="role-arn-here",
         ),
     )

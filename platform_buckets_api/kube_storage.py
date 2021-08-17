@@ -1,32 +1,20 @@
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 from platform_buckets_api.kube_client import KubeClient, ResourceExists
 from platform_buckets_api.storage import (
+    BucketsStorage,
+    CredentialsStorage,
     ExistsError,
     NotExistsError,
-    Storage,
+    PersistentCredentials,
     UserBucket,
-    UserCredentials,
 )
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
 
-class K8SStorage(Storage):
+class K8SBucketsStorage(BucketsStorage):
     def __init__(self, kube_client: KubeClient) -> None:
         self._kube_client = kube_client
-
-    async def create_credentials(self, credentials: UserCredentials) -> None:
-        try:
-            await self._kube_client.create_user_bucket_credential(credentials)
-        except ResourceExists:
-            raise ExistsError(f"UserCredentials for {credentials.owner} already exists")
-
-    async def get_credentials(self, owner: str) -> UserCredentials:
-        res = await self._kube_client.list_user_bucket_credentials(owner=owner)
-        assert len(res) <= 1, "Found multiple credentials for single user"
-        if len(res) == 0:
-            raise NotExistsError(f"UserCredentials for {owner} doesn't exists")
-        return res[0]
 
     async def create_bucket(self, bucket: UserBucket) -> None:
         try:
@@ -69,3 +57,58 @@ class K8SStorage(Storage):
         except NotExistsError:
             return
         await self._kube_client.remove_user_bucket(bucket)
+
+
+class K8SCredentialsStorage(CredentialsStorage):
+    def __init__(self, kube_client: KubeClient) -> None:
+        self._kube_client = kube_client
+
+    async def create_credentials(self, credentials: PersistentCredentials) -> None:
+        try:
+            await self._kube_client.create_persistent_credentials(credentials)
+        except ResourceExists:
+            raise ExistsError(
+                f"PersistentCredentials for {credentials.owner} with "
+                f"name {credentials.name} already exists"
+            )
+
+    async def get_credentials(self, id: str) -> PersistentCredentials:
+        res = await self._kube_client.list_persistent_credentials(id=id)
+        assert len(res) <= 1, f"Found multiple credentials for id = {id}"
+        if len(res) == 0:
+            raise NotExistsError(f"PersistentCredentials with id {id} doesn't exists")
+        return res[0]
+
+    async def get_credentials_by_name(
+        self,
+        name: str,
+        owner: str,
+    ) -> PersistentCredentials:
+        res = await self._kube_client.list_persistent_credentials(
+            owner=owner, name=name
+        )
+        assert (
+            len(res) <= 1
+        ), f"Found multiple credentials for name = {name} and owner = {owner}"
+        if len(res) == 0:
+            raise NotExistsError(
+                f"PersistentCredentials with name {name} and owner = {owner}"
+                f" doesn't exists"
+            )
+        return res[0]
+
+    @asyncgeneratorcontextmanager
+    async def list_credentials(
+        self, owner: Optional[str] = None
+    ) -> AsyncIterator[PersistentCredentials]:
+        for credentials in await self._kube_client.list_persistent_credentials(
+            owner=owner
+        ):
+            yield credentials
+
+    async def delete_credentials(self, id: str) -> None:
+        try:
+            credentials = await self.get_credentials(id)
+        except NotExistsError:
+            return
+        await self._kube_client.remove_persistent_credentials(credentials)

@@ -1,3 +1,4 @@
+import json
 import logging
 import secrets
 import subprocess
@@ -9,6 +10,7 @@ from typing import Any, AsyncIterator, Callable
 import aiohttp
 import aiohttp.web
 import pytest
+from aiobotocore.client import AioBaseClient
 from yarl import URL
 
 from platform_buckets_api.config import (
@@ -32,7 +34,7 @@ pytest_plugins = [
 ]
 
 
-def random_name(length: int = 8) -> str:
+def random_name(length: int = 6) -> str:
     return secrets.token_hex(length // 2 + length % 2)[:length]
 
 
@@ -45,8 +47,33 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
 @dataclass(frozen=True)
 class MotoConfig:
     url: URL
+    admin_user_arn: str
     admin_access_key_id: str
     admin_secret_access_key: str
+
+
+@pytest.fixture()
+async def s3_role(iam: AioBaseClient, moto_server: MotoConfig) -> str:
+    assume_doc = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "AWS": moto_server.admin_user_arn,
+                },
+                "Action": "sts:AssumeRole",
+                "Condition": {},
+            }
+        ],
+    }
+    resp = await iam.create_role(
+        RoleName="s3-role", AssumeRolePolicyDocument=json.dumps(assume_doc)
+    )
+    await iam.attach_role_policy(
+        RoleName="s3-role", PolicyArn="arn:aws:iam::aws:policy/AmazonS3FullAccess"
+    )
+    return resp["Role"]["Arn"]
 
 
 @pytest.fixture
@@ -56,6 +83,7 @@ def config_factory(
     kube_config: KubeConfig,
     moto_server: MotoConfig,
     kube_client: None,  # Force cleanup
+    s3_role: str,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = dict(
@@ -69,6 +97,7 @@ def config_factory(
                 endpoint_url=str(moto_server.url),
                 access_key_id=moto_server.admin_access_key_id,
                 secret_access_key=moto_server.admin_secret_access_key,
+                s3_role_arn=s3_role,
             ),
         )
         kwargs = {**defaults, **kwargs}

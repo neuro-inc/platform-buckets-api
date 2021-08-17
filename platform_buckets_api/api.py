@@ -1,9 +1,16 @@
 import json
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
-from dataclasses import dataclass
-from datetime import datetime
-from typing import AsyncIterator, Awaitable, Callable, Dict, List, Mapping, Optional
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+)
 
 import aiobotocore
 import aiohttp
@@ -41,7 +48,6 @@ from neuro_logging import (
 
 from .config import (
     AWSProviderConfig,
-    BucketsProviderType,
     Config,
     CORSConfig,
     KubeConfig,
@@ -50,12 +56,18 @@ from .config import (
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
 from .kube_client import KubeClient
-from .kube_storage import K8SStorage
+from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import AWSBucketProvider, BucketProvider
-from .schema import Bucket, ClientErrorSchema
-from .service import Service
-from .storage import ExistsError, NotExistsError, UserBucket, UserCredentials
+from .schema import (
+    Bucket,
+    BucketCredentials,
+    ClientErrorSchema,
+    PersistentBucketsCredentials,
+    PersistentBucketsCredentialsRequest,
+)
+from .service import BucketsService, PersistentCredentialsService
+from .storage import ExistsError, NotExistsError, PersistentCredentials, UserBucket
 from .utils import ndjson_error_handler
 
 
@@ -69,6 +81,11 @@ def accepts_ndjson(request: aiohttp.web.Request) -> bool:
 
 def _permission_to_primitive(perm: Permission) -> Dict[str, str]:
     return {"uri": perm.uri, "action": perm.action}
+
+
+async def _get_untrusted_user(request: Request) -> User:
+    identity = await untrusted_user(request)
+    return User(name=identity.name)
 
 
 async def check_any_permissions(
@@ -89,32 +106,6 @@ async def check_any_permissions(
         payload = {"missing": [_permission_to_primitive(p) for p in missing]}
         raise aiohttp.web.HTTPForbidden(
             text=json.dumps(payload), content_type="application/json"
-        )
-
-
-@dataclass(frozen=True)
-class ResponseBucket:
-    id: str
-    name: Optional[str]
-    owner: str
-    provider: BucketsProviderType
-    created_at: datetime
-    credentials: Mapping[str, str]
-
-    @classmethod
-    def from_user_bucket(
-        cls, user_bucket: UserBucket, credentials: UserCredentials
-    ) -> "ResponseBucket":
-        return cls(
-            id=user_bucket.id,
-            name=user_bucket.name,
-            owner=user_bucket.owner,
-            provider=user_bucket.provider_bucket.provider_type,
-            created_at=user_bucket.created_at,
-            credentials={
-                "bucket_name": user_bucket.provider_bucket.name,
-                **credentials.role.credentials,
-            },
         )
 
 
@@ -148,28 +139,28 @@ class BucketsApiHandler:
                 aiohttp.web.post("", self.create_bucket),
                 aiohttp.web.get("", self.list_buckets),
                 aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
+                aiohttp.web.post(
+                    "/{bucket_id_or_name}/make_tmp_credentials",
+                    self.make_tmp_credentials,
+                ),
                 aiohttp.web.delete("/{bucket_id_or_name}", self.delete_bucket),
             ]
         )
 
     @property
-    def service(self) -> Service:
+    def service(self) -> BucketsService:
         return self._app["service"]
 
     @property
     def permissions_service(self) -> PermissionsService:
         return self._app["permissions_service"]
 
-    async def _get_untrusted_user(self, request: Request) -> User:
-        identity = await untrusted_user(request)
-        return User(name=identity.name)
-
     async def _resolve_bucket(self, request: Request) -> UserBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
         try:
             bucket = await self.service.get_bucket(id_or_name)
         except NotExistsError:
-            user = await self._get_untrusted_user(request)
+            user = await _get_untrusted_user(request)
             try:
                 bucket = await self.service.get_bucket_by_name(id_or_name, user.name)
             except NotExistsError:
@@ -190,12 +181,12 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["provider", "owner", "credentials", "created_at"]))
+    @request_schema(Bucket(partial=["provider", "owner", "created_at"]))
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        user = await self._get_untrusted_user(request)
+        user = await _get_untrusted_user(request)
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
@@ -213,9 +204,8 @@ class BucketsApiHandler:
                 },
                 status=HTTPConflict.status_code,
             )
-        credentials = await self.service.get_user_credentials(user.name)
         return aiohttp.web.json_response(
-            data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
+            data=Bucket().dump(bucket),
             status=HTTPCreated.status_code,
         )
 
@@ -236,14 +226,12 @@ class BucketsApiHandler:
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        user = await self._get_untrusted_user(request)
         bucket = await self._resolve_bucket(request)
         await check_any_permissions(
             request, self.permissions_service.get_bucket_read_perms(bucket)
         )
-        credentials = await self.service.get_user_credentials(user.name)
         return aiohttp.web.json_response(
-            data=Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials)),
+            data=Bucket().dump(bucket),
             status=HTTPOk.status_code,
         )
 
@@ -257,7 +245,6 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.StreamResponse:
         username = await check_authorized(request)
-        credentials = await self.service.get_user_credentials(username)
         async with self.service.get_user_buckets(owner=username) as buckets_it:
             if accepts_ndjson(request):
                 response = aiohttp.web.StreamResponse()
@@ -265,16 +252,12 @@ class BucketsApiHandler:
                 await response.prepare(request)
                 async with ndjson_error_handler(request, response):
                     async for bucket in buckets_it:
-                        resp_bucket = ResponseBucket.from_user_bucket(
-                            bucket, credentials
-                        )
-                        payload_line = Bucket().dumps(resp_bucket)
+                        payload_line = Bucket().dumps(bucket)
                         await response.write(payload_line.encode() + b"\n")
                 return response
             else:
                 response_payload = [
-                    Bucket().dump(ResponseBucket.from_user_bucket(bucket, credentials))
-                    async for bucket in buckets_it
+                    Bucket().dump(bucket) async for bucket in buckets_it
                 ]
                 return aiohttp.web.json_response(
                     data=response_payload, status=HTTPOk.status_code
@@ -301,6 +284,228 @@ class BucketsApiHandler:
             request, self.permissions_service.get_bucket_write_perms(bucket)
         )
         await self.service.delete_bucket(bucket.id)
+        raise HTTPNoContent
+
+    @docs(
+        tags=["buckets"],
+        summary="Get bucket temporarily credentials",
+        responses={
+            HTTPOk.status_code: {
+                "description": "Bucket temporarily credentials was created",
+                "schema": BucketCredentials(),
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket with such id or name",
+            },
+        },
+    )
+    async def make_tmp_credentials(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        bucket = await self._resolve_bucket(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_bucket_read_perms(bucket)
+        )
+        user = await _get_untrusted_user(request)
+        checker = await self.permissions_service.get_perms_checker(user.name)
+        credentials = await self.service.make_tmp_credentials(
+            bucket,
+            write=checker.can_write(bucket),
+            requester=user.name,
+        )
+        return aiohttp.web.json_response(
+            data={
+                "bucket_id": bucket.id,
+                "provider": bucket.provider_bucket.provider_type,
+                "credentials": {
+                    "bucket_name": bucket.provider_bucket.name,
+                    **credentials,
+                },
+            },
+            status=HTTPOk.status_code,
+        )
+
+
+class PersistentCredentialsApiHandler:
+    def __init__(self, app: aiohttp.web.Application, config: Config) -> None:
+        self._app = app
+        self._config = config
+
+    def register(self, app: aiohttp.web.Application) -> None:
+        app.add_routes(
+            [
+                aiohttp.web.post("", self.create_credentials),
+                aiohttp.web.get("", self.list_credentials),
+                aiohttp.web.get("/{credential_id_or_name}", self.get_credentials),
+                aiohttp.web.delete("/{credential_id_or_name}", self.delete_credentials),
+            ]
+        )
+
+    @property
+    def buckets_service(self) -> BucketsService:
+        return self._app["buckets_service"]
+
+    @property
+    def credentials_service(self) -> PersistentCredentialsService:
+        return self._app["credentials_service"]
+
+    @property
+    def permissions_service(self) -> PermissionsService:
+        return self._app["permissions_service"]
+
+    async def _resolve_credentials(self, request: Request) -> PersistentCredentials:
+        id_or_name = request.match_info["credential_id_or_name"]
+        try:
+            credentials = await self.credentials_service.get_credentials(id_or_name)
+        except NotExistsError:
+            user = await _get_untrusted_user(request)
+            try:
+                credentials = await self.credentials_service.get_credentials_by_name(
+                    id_or_name, user.name
+                )
+            except NotExistsError:
+                raise HTTPNotFound(text=f"PersistentCredentials {id_or_name} not found")
+        username = await check_authorized(request)
+        if username != credentials.owner:
+            raise HTTPNotFound(text=f"PersistentCredentials {id_or_name} not found")
+        return credentials
+
+    async def _serialize_credentials(
+        self, credentials: PersistentCredentials
+    ) -> Mapping[str, Any]:
+        buckets = [
+            await self.buckets_service.get_bucket(bucket_id)
+            for bucket_id in credentials.bucket_ids
+        ]
+        return {
+            "id": credentials.id,
+            "name": credentials.name,
+            "owner": credentials.owner,
+            "credentials": [
+                {
+                    "bucket_id": bucket.id,
+                    "provider": bucket.provider_bucket.provider_type,
+                    "credentials": {
+                        "bucket_name": bucket.provider_bucket.name,
+                        **credentials.role.credentials,
+                    },
+                }
+                for bucket in buckets
+            ],
+        }
+
+    @docs(
+        tags=["credentials"],
+        summary="Create persistent bucket credentials",
+        responses={
+            HTTPCreated.status_code: {
+                "description": "Credentials created",
+                "schema": PersistentBucketsCredentials(),
+            },
+            HTTPConflict.status_code: {
+                "description": "Bucket with such name exists",
+                "schema": ClientErrorSchema(),
+            },
+        },
+    )
+    @request_schema(PersistentBucketsCredentialsRequest())
+    async def create_credentials(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        username = await check_authorized(request)
+        schema = PersistentBucketsCredentialsRequest()
+        data = schema.load(await request.json())
+        for bucket_id in data["bucket_ids"]:
+            bucket = await self.buckets_service.get_bucket(bucket_id)
+            await check_any_permissions(
+                request, self.permissions_service.get_bucket_read_perms(bucket)
+            )
+        credentials = await self.credentials_service.create_credentials(
+            name=data.get("name"),
+            bucket_ids=data["bucket_ids"],
+            owner=username,
+        )
+        return aiohttp.web.json_response(
+            data=await self._serialize_credentials(credentials),
+            status=HTTPCreated.status_code,
+        )
+
+    @docs(
+        tags=["credentials"],
+        summary="Get credentials by id or name",
+        responses={
+            HTTPOk.status_code: {
+                "description": "Credentials found",
+                "schema": PersistentBucketsCredentials(),
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket with such id or name",
+            },
+        },
+    )
+    async def get_credentials(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        credentials = await self._resolve_credentials(request)
+        return aiohttp.web.json_response(
+            data=await self._serialize_credentials(credentials),
+            status=HTTPOk.status_code,
+        )
+
+    @docs(
+        tags=["credentials"],
+        summary="List all persistent credentials available to current user",
+    )
+    @response_schema(PersistentBucketsCredentials(many=True), 200)
+    async def list_credentials(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.StreamResponse:
+        username = await check_authorized(request)
+        async with self.credentials_service.list_user_credentials(
+            owner=username
+        ) as credentials_it:
+            if accepts_ndjson(request):
+                response = aiohttp.web.StreamResponse()
+                response.headers["Content-Type"] = "application/x-ndjson"
+                await response.prepare(request)
+                async with ndjson_error_handler(request, response):
+                    async for credentials in credentials_it:
+                        payload_line = json.dumps(
+                            await self._serialize_credentials(credentials)
+                        )
+                        await response.write(payload_line.encode() + b"\n")
+                return response
+            else:
+                response_payload = [
+                    await self._serialize_credentials(credentials)
+                    async for credentials in credentials_it
+                ]
+                return aiohttp.web.json_response(
+                    data=response_payload, status=HTTPOk.status_code
+                )
+
+    @docs(
+        tags=["credentials"],
+        summary="Delete persistent credentials by id or name",
+        responses={
+            HTTPNoContent.status_code: {
+                "description": "Credentials deleted",
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found credentials with such id or name",
+            },
+        },
+    )
+    async def delete_credentials(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        credentials = await self._resolve_credentials(request)
+        await self.credentials_service.delete_credentials(credentials.id)
         raise HTTPNoContent
 
 
@@ -332,6 +537,13 @@ async def create_api_v1_app() -> aiohttp.web.Application:
 async def create_buckets_app(config: Config) -> aiohttp.web.Application:
     app = aiohttp.web.Application()
     handler = BucketsApiHandler(app, config)
+    handler.register(app)
+    return app
+
+
+async def create_persistent_credentials_app(config: Config) -> aiohttp.web.Application:
+    app = aiohttp.web.Application()
+    handler = PersistentCredentialsApiHandler(app, config)
     handler.register(app)
     return app
 
@@ -435,9 +647,14 @@ async def create_app(
                     iam_client = await exit_stack.enter_async_context(
                         session.create_client("iam", **client_kwargs)
                     )
+                    sts_client = await exit_stack.enter_async_context(
+                        session.create_client("sts", **client_kwargs)
+                    )
                     bucket_provider = AWSBucketProvider(
                         s3_client=s3_client,
                         iam_client=iam_client,
+                        sts_client=sts_client,
+                        s3_role_arn=config.bucket_provider.s3_role_arn,
                     )
                 else:
                     raise Exception(
@@ -455,13 +672,25 @@ async def create_app(
                 cluster_name=config.cluster_name,
             )
             app["buckets_app"]["permissions_service"] = permissions_service
+            app["credentials_app"]["permissions_service"] = permissions_service
 
-            logger.info("Initializing Service")
-            app["buckets_app"]["service"] = Service(
-                storage=K8SStorage(kube_client),
+            logger.info("Initializing BucketsService")
+            buckets_service = BucketsService(
+                storage=K8SBucketsStorage(kube_client),
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
+            app["buckets_app"]["service"] = buckets_service
+
+            logger.info("Initializing PersistentCredentialsService")
+            credentials_service = PersistentCredentialsService(
+                storage=K8SCredentialsStorage(kube_client),
+                bucket_provider=bucket_provider,
+                permissions_service=permissions_service,
+                buckets_service=buckets_service,
+            )
+            app["credentials_app"]["buckets_service"] = buckets_service
+            app["credentials_app"]["credentials_service"] = credentials_service
 
             yield
 
@@ -472,7 +701,11 @@ async def create_app(
 
     buckets_app = await create_buckets_app(config)
     app["buckets_app"] = buckets_app
-    api_v1_app.add_subapp("/buckets", buckets_app)
+    api_v1_app.add_subapp("/buckets/buckets", buckets_app)
+
+    credentials_app = await create_persistent_credentials_app(config)
+    app["credentials_app"] = credentials_app
+    api_v1_app.add_subapp("/buckets/persistent_credentials", credentials_app)
 
     app.add_subapp("/api/v1", api_v1_app)
 

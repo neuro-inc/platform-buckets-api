@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import AsyncContextManager, AsyncIterator, Callable
+from typing import AsyncContextManager, AsyncIterator, Callable, Mapping
 
 import aiobotocore
 import botocore.exceptions
@@ -13,7 +13,7 @@ from platform_buckets_api.providers import (
     BucketPermission,
     RoleExistsError,
 )
-from platform_buckets_api.storage import ProviderBucket, ProviderRole
+from platform_buckets_api.storage import ProviderBucket
 from tests.integration.conftest import MotoConfig
 
 
@@ -21,34 +21,10 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def s3(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
-
-    async with session.create_client(
-        "s3",
-        endpoint_url=str(moto_server.url),
-        aws_access_key_id=moto_server.admin_access_key_id,
-        aws_secret_access_key=moto_server.admin_secret_access_key,
-    ) as s3_client:
-        yield s3_client
-
-
-@pytest.fixture()
-async def iam(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
-
-    async with session.create_client(
-        "iam",
-        endpoint_url=str(moto_server.url),
-        aws_access_key_id=moto_server.admin_access_key_id,
-        aws_secret_access_key=moto_server.admin_secret_access_key,
-    ) as iam_client:
-        yield iam_client
-
-
-@pytest.fixture()
-def aws_provider(s3: AioBaseClient, iam: AioBaseClient) -> AWSBucketProvider:
-    return AWSBucketProvider(s3, iam)
+def aws_provider(
+    s3: AioBaseClient, iam: AioBaseClient, sts: AioBaseClient, s3_role: str
+) -> AWSBucketProvider:
+    return AWSBucketProvider(s3, iam, sts, s3_role)
 
 
 async def test_bucket_create(
@@ -97,19 +73,24 @@ async def test_bucket_delete_not_empty(
         await aws_provider.delete_bucket("integration_test_bucket")
 
 
-RoleClientFactory = Callable[[ProviderRole], AsyncContextManager[AioBaseClient]]
+CredentialsClientFactory = Callable[
+    [Mapping[str, str]], AsyncContextManager[AioBaseClient]
+]
 
 
 @pytest.fixture()
-async def make_role_s3_client(moto_server: MotoConfig) -> RoleClientFactory:
+async def make_s3_client_from_credentials(
+    moto_server: MotoConfig,
+) -> CredentialsClientFactory:
     @asynccontextmanager
-    async def _factory(role: ProviderRole) -> AsyncIterator[AioBaseClient]:
+    async def _factory(credentials: Mapping[str, str]) -> AsyncIterator[AioBaseClient]:
         session = aiobotocore.get_session()
         async with session.create_client(
             "s3",
             endpoint_url=str(moto_server.url),
-            aws_access_key_id=role.credentials["access_key_id"],
-            aws_secret_access_key=role.credentials["secret_access_key"],
+            aws_access_key_id=credentials["access_key_id"],
+            aws_secret_access_key=credentials["secret_access_key"],
+            aws_session_token=credentials.get("session_token"),
         ) as users_s3_client:
             yield users_s3_client
 
@@ -119,14 +100,14 @@ async def make_role_s3_client(moto_server: MotoConfig) -> RoleClientFactory:
 async def test_role_create(
     aws_provider: AWSBucketProvider,
     iam: AioBaseClient,
-    make_role_s3_client: RoleClientFactory,
+    make_s3_client_from_credentials: CredentialsClientFactory,
 ) -> None:
     role = await aws_provider.create_role("integration_test_role")
     user_resp = await iam.get_user(UserName="integration_test_role")
     assert user_resp["User"]["UserName"] == "integration_test_role"
-    assert user_resp["User"]["UserName"] == role.id
+    assert user_resp["User"]["UserName"] == role.name
 
-    async with make_role_s3_client(role) as users_s3:
+    async with make_s3_client_from_credentials(role.credentials) as users_s3:
         with pytest.raises(botocore.exceptions.ClientError) as ex:
             await users_s3.list_buckets()
         assert ex.value.response["Error"]["Code"] == "AccessDenied"
@@ -138,13 +119,41 @@ async def test_role_duplicate(aws_provider: AWSBucketProvider) -> None:
         await aws_provider.create_role("integration_test_role")
 
 
+async def test_role_delete(aws_provider: AWSBucketProvider, iam: AioBaseClient) -> None:
+    role = await aws_provider.create_role("integration_test_role")
+    await aws_provider.delete_role(role.name)
+    users = await iam.list_users()
+    user_names = {user["UserName"] for user in users["Users"]}
+    assert role.name not in user_names
+
+
+async def test_role_delete_with_permissions(
+    aws_provider: AWSBucketProvider, iam: AioBaseClient
+) -> None:
+    role = await aws_provider.create_role("integration_test_role")
+    await aws_provider.set_role_permissions(
+        role,
+        [
+            BucketPermission(
+                bucket_name="",
+                write=True,
+                is_prefix=True,
+            )
+        ],
+    )
+    await aws_provider.delete_role(role.name)
+    users = await iam.list_users()
+    user_names = {user["UserName"] for user in users["Users"]}
+    assert role.name not in user_names
+
+
 async def _test_no_access(
-    make_role_s3_client: RoleClientFactory,
+    make_s3_client_from_credentials: CredentialsClientFactory,
     admin_s3: AioBaseClient,
-    role: ProviderRole,
+    credentials: Mapping[str, str],
     bucket: ProviderBucket,
 ) -> None:
-    async with make_role_s3_client(role) as users_s3:
+    async with make_s3_client_from_credentials(credentials) as users_s3:
         data = b"\x01" * 1024
         key = "foo"
 
@@ -173,9 +182,11 @@ async def _test_no_access(
 
 
 async def _test_write_access(
-    make_role_s3_client: RoleClientFactory, role: ProviderRole, bucket: ProviderBucket
+    make_s3_client_from_credentials: CredentialsClientFactory,
+    credentials: Mapping[str, str],
+    bucket: ProviderBucket,
 ) -> None:
-    async with make_role_s3_client(role) as users_s3:
+    async with make_s3_client_from_credentials(credentials) as users_s3:
         data = b"\x01" * 1024
         key = "foo"
         await users_s3.put_object(
@@ -206,12 +217,12 @@ async def _test_write_access(
 
 
 async def _test_read_access(
-    make_role_s3_client: RoleClientFactory,
+    make_s3_client_from_credentials: CredentialsClientFactory,
     admin_s3: AioBaseClient,
-    role: ProviderRole,
+    credentials: Mapping[str, str],
     bucket: ProviderBucket,
 ) -> None:
-    async with make_role_s3_client(role) as users_s3:
+    async with make_s3_client_from_credentials(credentials) as users_s3:
         data = b"\x01" * 1024
         key = "foo"
         with pytest.raises(botocore.exceptions.ClientError):
@@ -241,8 +252,33 @@ async def _test_read_access(
             await users_s3.delete_object(Bucket=bucket.name, Key=key)
 
 
+async def test_bucket_credentials_write_access(
+    aws_provider: AWSBucketProvider,
+    make_s3_client_from_credentials: CredentialsClientFactory,
+) -> None:
+    bucket = await aws_provider.create_bucket("integration_test_bucket")
+    credentials = await aws_provider.get_bucket_credentials(
+        bucket.name, write=True, requester="testing"
+    )
+    await _test_write_access(make_s3_client_from_credentials, credentials, bucket)
+
+
+@pytest.mark.skip("Moto do not support embedding policies into token")
+async def test_bucket_credentials_read_access(
+    aws_provider: AWSBucketProvider,
+    s3: AioBaseClient,
+    make_s3_client_from_credentials: CredentialsClientFactory,
+) -> None:
+    bucket = await aws_provider.create_bucket("integration_test_bucket")
+    credentials = await aws_provider.get_bucket_credentials(
+        bucket.name, write=False, requester="testing"
+    )
+    await _test_read_access(make_s3_client_from_credentials, s3, credentials, bucket)
+
+
 async def test_role_grant_bucket_write_access(
-    aws_provider: AWSBucketProvider, make_role_s3_client: RoleClientFactory
+    aws_provider: AWSBucketProvider,
+    make_s3_client_from_credentials: CredentialsClientFactory,
 ) -> None:
     role = await aws_provider.create_role("integration_test_role")
     bucket = await aws_provider.create_bucket("integration_test_bucket")
@@ -255,12 +291,12 @@ async def test_role_grant_bucket_write_access(
             )
         ],
     )
-    await _test_write_access(make_role_s3_client, role, bucket)
+    await _test_write_access(make_s3_client_from_credentials, role.credentials, bucket)
 
 
 async def test_role_grant_bucket_read_only_access(
     aws_provider: AWSBucketProvider,
-    make_role_s3_client: RoleClientFactory,
+    make_s3_client_from_credentials: CredentialsClientFactory,
     s3: AioBaseClient,
 ) -> None:
     role = await aws_provider.create_role("integration_test_role")
@@ -274,11 +310,14 @@ async def test_role_grant_bucket_read_only_access(
             )
         ],
     )
-    await _test_read_access(make_role_s3_client, s3, role, bucket)
+    await _test_read_access(
+        make_s3_client_from_credentials, s3, role.credentials, bucket
+    )
 
 
 async def test_role_grant_access_second_time(
-    aws_provider: AWSBucketProvider, make_role_s3_client: RoleClientFactory
+    aws_provider: AWSBucketProvider,
+    make_s3_client_from_credentials: CredentialsClientFactory,
 ) -> None:
     role = await aws_provider.create_role("integration_test_role")
     bucket1 = await aws_provider.create_bucket("integration_test_bucket_1")
@@ -291,7 +330,7 @@ async def test_role_grant_access_second_time(
             )
         ],
     )
-    await _test_write_access(make_role_s3_client, role, bucket1)
+    await _test_write_access(make_s3_client_from_credentials, role.credentials, bucket1)
     bucket2 = await aws_provider.create_bucket("integration_test_bucket_2")
     await aws_provider.set_role_permissions(
         role,
@@ -306,14 +345,14 @@ async def test_role_grant_access_second_time(
             ),
         ],
     )
-    await _test_write_access(make_role_s3_client, role, bucket1)
-    await _test_write_access(make_role_s3_client, role, bucket2)
+    await _test_write_access(make_s3_client_from_credentials, role.credentials, bucket1)
+    await _test_write_access(make_s3_client_from_credentials, role.credentials, bucket2)
 
 
 async def test_role_downgrade_access(
     aws_provider: AWSBucketProvider,
     s3: AioBaseClient,
-    make_role_s3_client: RoleClientFactory,
+    make_s3_client_from_credentials: CredentialsClientFactory,
 ) -> None:
     role = await aws_provider.create_role("integration_test_role")
     bucket = await aws_provider.create_bucket("integration_test_bucket_1")
@@ -326,7 +365,7 @@ async def test_role_downgrade_access(
             )
         ],
     )
-    await _test_write_access(make_role_s3_client, role, bucket)
+    await _test_write_access(make_s3_client_from_credentials, role.credentials, bucket)
     await aws_provider.set_role_permissions(
         role,
         [
@@ -336,9 +375,11 @@ async def test_role_downgrade_access(
             ),
         ],
     )
-    await _test_read_access(make_role_s3_client, s3, role, bucket)
+    await _test_read_access(
+        make_s3_client_from_credentials, s3, role.credentials, bucket
+    )
     await aws_provider.set_role_permissions(
         role,
         [],
     )
-    await _test_no_access(make_role_s3_client, s3, role, bucket)
+    await _test_no_access(make_s3_client_from_credentials, s3, role.credentials, bucket)

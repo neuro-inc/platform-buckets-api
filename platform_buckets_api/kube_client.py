@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .config import BucketsProviderType, KubeClientAuthType
-from .storage import ProviderBucket, ProviderRole, UserBucket, UserCredentials
+from .storage import PersistentCredentials, ProviderBucket, ProviderRole, UserBucket
 from .utils import datetime_dump, datetime_load
 
 
@@ -42,6 +42,7 @@ class ResourceGone(KubeClientException):
 
 ID_LABEL = "platform.neuromation.io/id"
 OWNER_LABEL = "platform.neuromation.io/owner"
+CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
 BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 
 
@@ -52,33 +53,48 @@ def _k8s_name_safe(**kwargs: str) -> str:
     return hasher.hexdigest()
 
 
-class UserCredentialsCRDMapper:
+class PersistentCredentialsCRDMapper:
     @staticmethod
-    def from_primitive(payload: Dict[str, Any]) -> UserCredentials:
-        return UserCredentials(
+    def from_primitive(payload: Dict[str, Any]) -> PersistentCredentials:
+        return PersistentCredentials(
+            id=payload["metadata"]["labels"][ID_LABEL],
+            name=payload["metadata"]["labels"].get(CREDENTIALS_NAME_LABEL),
             owner=payload["metadata"]["labels"][OWNER_LABEL],
             role=ProviderRole(
-                id=payload["spec"]["provider_id"],
+                name=payload["spec"]["provider_name"],
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 credentials=payload["spec"]["credentials"],
             ),
+            bucket_ids=payload["spec"]["bucket_ids"],
         )
 
     @staticmethod
-    def to_primitive(entry: UserCredentials) -> Dict[str, Any]:
+    def to_primitive(entry: PersistentCredentials) -> Dict[str, Any]:
+        if entry.name:
+            name = (
+                "persistent-bucket-credentials-"
+                f"{_k8s_name_safe(owner=entry.owner, name=entry.name)}"
+            )
+        else:
+            name = f"persistent-bucket-credentials-{_k8s_name_safe(id=entry.id)}"
+        labels = {
+            ID_LABEL: entry.id,
+            OWNER_LABEL: entry.owner,
+        }
+        if entry.name:
+            labels[CREDENTIALS_NAME_LABEL] = entry.name
         return {
-            "kind": "UserBucketCredential",
+            "kind": "PersistentBucketCredential",
             "apiVersion": "neuromation.io/v1",
             "metadata": {
-                "name": f"user-credentials--{_k8s_name_safe(owner=entry.owner)}",
-                "labels": {
-                    OWNER_LABEL: entry.owner,
-                },
+                "name": name,
+                "labels": labels,
             },
             "spec": {
-                "provider_id": entry.role.id,
+                "provider_name": entry.role.name,
                 "provider_type": entry.role.provider_type.value,
                 "credentials": entry.role.credentials,
+                "bucket_ids": entry.bucket_ids,
             },
         }
 
@@ -235,14 +251,14 @@ class KubeClient:
         return self._generate_namespace_url(self._namespace)
 
     @property
-    def _user_bucket_credentials_url(self) -> str:
+    def _persistent_bucket_credentials_url(self) -> str:
         return (
             f"{self._base_url}/apis/neuromation.io/v1/"
-            f"namespaces/{self._namespace}/userbucketcredentials"
+            f"namespaces/{self._namespace}/persistentbucketcredentials"
         )
 
-    def _generate_user_bucket_credential_url(self, name: str) -> str:
-        return f"{self._user_bucket_credentials_url}/{name}"
+    def _generate_persistent_bucket_credential_url(self, name: str) -> str:
+        return f"{self._persistent_bucket_credentials_url}/{name}"
 
     @property
     def _user_buckets_url(self) -> str:
@@ -279,46 +295,47 @@ class KubeClient:
                 raise ResourceInvalid(payload["message"])
             raise KubeClientException(payload["message"])
 
-    async def create_user_bucket_credential(
-        self, user_credentials: UserCredentials
+    async def create_persistent_credentials(
+        self, user_credentials: PersistentCredentials
     ) -> None:
-        url = self._user_bucket_credentials_url
+        url = self._persistent_bucket_credentials_url
         payload = await self._request(
             method="POST",
             url=url,
-            json=UserCredentialsCRDMapper.to_primitive(user_credentials),
+            json=PersistentCredentialsCRDMapper.to_primitive(user_credentials),
         )
         self._raise_for_status(payload)
 
-    async def list_user_bucket_credentials(
-        self, owner: Optional[str] = None
-    ) -> List[UserCredentials]:
-        url = self._user_bucket_credentials_url
+    async def list_persistent_credentials(
+        self,
+        id: Optional[str] = None,
+        owner: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> List[PersistentCredentials]:
+        url = self._persistent_bucket_credentials_url
         label_selectors = []
         params = []
+        if id:
+            label_selectors.append(f"{ID_LABEL}={id}")
         if owner:
             label_selectors.append(f"{OWNER_LABEL}={owner}")
+        if name:
+            label_selectors.append(f"{CREDENTIALS_NAME_LABEL}={name}")
         if label_selectors:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)
         return [
-            UserCredentialsCRDMapper.from_primitive(item)
+            PersistentCredentialsCRDMapper.from_primitive(item)
             for item in payload.get("items", [])
         ]
 
-    async def get_user_bucket_credential(self, name: str) -> UserCredentials:
-        url = self._generate_user_bucket_credential_url(name)
-        payload = await self._request(method="GET", url=url)
-        self._raise_for_status(payload)
-        return UserCredentialsCRDMapper.from_primitive(payload)
-
-    async def remove_user_bucket_credential(
-        self, user_credentials: UserCredentials
+    async def remove_persistent_credentials(
+        self, user_credentials: PersistentCredentials
     ) -> None:
-        name = UserCredentialsCRDMapper.to_primitive(user_credentials)["metadata"][
-            "name"
-        ]
-        url = self._generate_user_bucket_credential_url(name)
+        name = PersistentCredentialsCRDMapper.to_primitive(user_credentials)[
+            "metadata"
+        ]["name"]
+        url = self._generate_persistent_bucket_credential_url(name)
         payload = await self._request(method="DELETE", url=url)
         self._raise_for_status(payload)
 

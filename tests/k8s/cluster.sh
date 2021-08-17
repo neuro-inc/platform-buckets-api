@@ -43,7 +43,7 @@ function k8s::apply_all_configurations {
     kubectl config use-context minikube
     kubectl apply -f tests/k8s/rb.default.gke.yml
     kubectl apply -f tests/k8s/crd-userbucket.yml
-    kubectl apply -f tests/k8s/crd-userbucketcredential.yml
+    kubectl apply -f tests/k8s/crd-persistentbucketcredential.yml
 }
 
 
