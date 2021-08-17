@@ -10,8 +10,7 @@ ARTIFACTORY_HELM_VIRTUAL_REPO ?= https://neuro.jfrog.io/artifactory/helm-virtual
 
 HELM_ENV ?= dev
 
-TAG ?= 50ac8ce3818cebbc6af5e2e9a110b37ee123bd29
-CLOUD_PROVIDER = aws
+TAG ?= latest
 
 IMAGE_NAME ?= platformbucketsapi
 IMAGE ?= $(IMAGE_NAME):$(TAG)

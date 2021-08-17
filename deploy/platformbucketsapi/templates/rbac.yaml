@@ -8,7 +8,7 @@ rules:
   - "neuromation.io"
   resources:
   - userbuckets
-  - userbucketcredentials
+  - persistentbucketcredentials
   verbs:
   - create
   - get
