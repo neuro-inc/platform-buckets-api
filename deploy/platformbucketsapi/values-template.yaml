@@ -3,10 +3,10 @@ NP_BUCKETS_API_K8S_NS: platform-jobs
 bucketProvider: {}
 #  type: "aws"  # "aws" or <not-supported-yet>
 #  aws:
-#    s3_role_arn:
+#    s3RoleArn:
 #    accessKeyId:
 #    secretAccessKey:
-#    region_name:
+#    regionName:
 
 image:
   repository: $IMAGE_REPO
@@ -37,7 +37,7 @@ annotations: {}
 authUrl: http://platformauthapi:8080
 
 platform:
-  cluster_name: ""
+  clusterName: ""
   token: {}
 
 corsOrigins:
