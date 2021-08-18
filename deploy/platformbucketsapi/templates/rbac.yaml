@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: userbuckets-admin
+  name: userbucketscrd-admin
   namespace: {{ .Values.NP_BUCKETS_API_K8S_NS }}
 rules:
 - apiGroups:
@@ -18,7 +18,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: userbuckets-admin
+  name: userbucketscrd-admin
   namespace: {{ .Values.NP_BUCKETS_API_K8S_NS }}
 subjects:
 - kind: ServiceAccount
@@ -26,5 +26,5 @@ subjects:
   namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: userbuckets-admin
+  name: userbucketscrd-admin
   apiGroup: rbac.authorization.k8s.io
