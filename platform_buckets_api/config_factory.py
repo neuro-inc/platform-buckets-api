@@ -88,11 +88,10 @@ class EnvironConfigFactory:
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
                 s3_role_arn=self._environ["NP_AWS_S3_ROLE_ARN"],
-                access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID"),
-                secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY"),
-                region_name=self._environ.get(
-                    "NP_AWS_REGION_NAME", AWSProviderConfig.region_name
-                ),
+                access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID") or None,
+                secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY") or None,
+                region_name=self._environ.get("NP_AWS_REGION_NAME")
+                or AWSProviderConfig.region_name,
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")
