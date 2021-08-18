@@ -26,5 +26,5 @@ subjects:
   namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: disknamings-admin
+  name: userbuckets-admin
   apiGroup: rbac.authorization.k8s.io

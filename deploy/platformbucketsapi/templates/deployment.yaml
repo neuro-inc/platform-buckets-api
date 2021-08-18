@@ -76,7 +76,7 @@ spec:
           value: {{ .Values.bucketProvider.type }}
         {{- if eq .Values.bucketProvider.type "aws" }}
         - name: NP_AWS_S3_ROLE_ARN
-          value: {{ .Values.bucketProvider.aws.s3_role_arn }}
+          value: {{ .Values.bucketProvider.aws.s3RoleArn }}
 {{- if .Values.bucketProvider.aws.accessKeyId }}
         - name: NP_AWS_ACCESS_KEY_ID
 {{ toYaml .Values.bucketProvider.aws.accessKeyId | indent 10 }}
@@ -85,9 +85,9 @@ spec:
         - name: NP_AWS_SECRET_ACCESS_KEY
 {{ toYaml .Values.bucketProvider.aws.secretAccessKey | indent 10 }}
 {{- end }}
-{{- if .Values.bucketProvider.aws.region_name }}
+{{- if .Values.bucketProvider.aws.regionName }}
         - name: NP_AWS_REGION_NAME
-          value: {{ .Values.bucketProvider.aws.region_name }}
+          value: {{ .Values.bucketProvider.aws.regionName }}
 {{- end}}
         {{- end }}
         {{- if .Values.zipkin }}
