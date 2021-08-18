@@ -87,9 +87,9 @@ spec:
 {{- end }}
 {{- if .Values.bucketProvider.aws.region_name }}
         - name: NP_AWS_REGION_NAME
-          value: {{ .Values.bucketProvider.region_name }}
-        {{- end}}
-{{- end }}
+          value: {{ .Values.bucketProvider.aws.region_name }}
+{{- end}}
+        {{- end }}
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL
           value: {{ .Values.zipkin.url }}
