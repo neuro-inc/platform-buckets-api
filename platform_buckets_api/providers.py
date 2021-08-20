@@ -230,4 +230,15 @@ class AWSBucketProvider(BucketProvider):
             )
         except botocore.exceptions.ClientError:
             pass  # Used doesn't have any policy
+        try:
+            resp = await self._iam_client.list_access_keys(
+                UserName=username,
+            )
+            for key in resp["AccessKeyMetadata"]:
+                await self._iam_client.delete_access_key(
+                    UserName=username,
+                    AccessKeyId=key["AccessKeyId"],
+                )
+        except botocore.exceptions.ClientError:
+            pass  # Used doesn't have any policy
         await self._iam_client.delete_user(UserName=username)
