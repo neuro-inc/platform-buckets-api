@@ -18,6 +18,7 @@ from platform_buckets_api.config import (
     Config,
     CORSConfig,
     KubeConfig,
+    MinioProviderConfig,
     PlatformAuthConfig,
     ServerConfig,
 )
@@ -30,6 +31,7 @@ pytest_plugins = [
     "tests.integration.docker",
     "tests.integration.auth",
     "tests.integration.moto_server",
+    "tests.integration.minio",
     "tests.integration.kube",
 ]
 
@@ -94,7 +96,7 @@ def config_factory(
             sentry=None,
             cluster_name=cluster_name,
             bucket_provider=AWSProviderConfig(
-                endpoint_url=str(moto_server.url),
+                endpoint_url=moto_server.url,
                 access_key_id=moto_server.admin_access_key_id,
                 secret_access_key=moto_server.admin_secret_access_key,
                 s3_role_arn=s3_role,
@@ -106,11 +108,25 @@ def config_factory(
     return _f
 
 
-@pytest.fixture
+@pytest.fixture(params=["aws-moto", "minio"])
 def config(
+    request: Any,
     config_factory: Callable[..., Config],
+    moto_server: MotoConfig,
+    minio_server: URL,
 ) -> Config:
-    return config_factory()
+    if request.param == "aws-moto":
+        return config_factory()  # Moto is by default
+    elif request.param == "minio":
+        return config_factory(
+            bucket_provider=MinioProviderConfig(
+                endpoint_url=minio_server,
+                access_key_id="access_key",
+                secret_access_key="secret_key",
+                region_name="region-1",
+            )
+        )
+    raise Exception(f"Unknown bucket provider {request.param}.")
 
 
 @dataclass(frozen=True)

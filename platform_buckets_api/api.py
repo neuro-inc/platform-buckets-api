@@ -51,6 +51,7 @@ from .config import (
     Config,
     CORSConfig,
     KubeConfig,
+    MinioProviderConfig,
     PlatformAuthConfig,
 )
 from .config_factory import EnvironConfigFactory
@@ -58,7 +59,12 @@ from .identity import untrusted_user
 from .kube_client import KubeClient
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
-from .providers import AWSBucketProvider, BucketProvider
+from .providers import (
+    AWSBucketProvider,
+    BMCWrapper,
+    BucketProvider,
+    MinioBucketProvider,
+)
 from .schema import (
     Bucket,
     BucketCredentials,
@@ -638,9 +644,9 @@ async def create_app(
                         aws_access_key_id=config.bucket_provider.access_key_id,
                     )
                     if config.bucket_provider.endpoint_url:
-                        client_kwargs[
-                            "endpoint_url"
-                        ] = config.bucket_provider.endpoint_url
+                        client_kwargs["endpoint_url"] = str(
+                            config.bucket_provider.endpoint_url
+                        )
                     s3_client = await exit_stack.enter_async_context(
                         session.create_client("s3", **client_kwargs)
                     )
@@ -655,6 +661,32 @@ async def create_app(
                         iam_client=iam_client,
                         sts_client=sts_client,
                         s3_role_arn=config.bucket_provider.s3_role_arn,
+                    )
+                elif isinstance(config.bucket_provider, MinioProviderConfig):
+                    session = aiobotocore.get_session()
+                    client_kwargs = dict(
+                        region_name=config.bucket_provider.region_name,
+                        aws_secret_access_key=config.bucket_provider.secret_access_key,
+                        aws_access_key_id=config.bucket_provider.access_key_id,
+                        endpoint_url=str(config.bucket_provider.endpoint_url),
+                    )
+                    s3_client = await exit_stack.enter_async_context(
+                        session.create_client("s3", **client_kwargs)
+                    )
+                    sts_client = await exit_stack.enter_async_context(
+                        session.create_client("sts", **client_kwargs)
+                    )
+                    bmc_wrapper = await exit_stack.enter_async_context(
+                        BMCWrapper(
+                            url=config.bucket_provider.endpoint_url,
+                            username=config.bucket_provider.access_key_id,
+                            password=config.bucket_provider.secret_access_key,
+                        )
+                    )
+                    bucket_provider = MinioBucketProvider(
+                        s3_client=s3_client,
+                        sts_client=sts_client,
+                        mc=bmc_wrapper,
                     )
                 else:
                     raise Exception(

@@ -74,6 +74,7 @@ spec:
           value: {{ .Values.corsOrigins }}
         - name: NP_BUCKET_PROVIDER_TYPE
           value: {{ .Values.bucketProvider.type }}
+        # AWS S3 provider
         {{- if eq .Values.bucketProvider.type "aws" }}
         - name: NP_AWS_S3_ROLE_ARN
           value: {{ .Values.bucketProvider.aws.s3RoleArn }}
@@ -89,6 +90,17 @@ spec:
         - name: NP_AWS_REGION_NAME
           value: {{ .Values.bucketProvider.aws.regionName }}
 {{- end}}
+        {{- end }}
+        # Minio provider
+        {{- if eq .Values.bucketProvider.type "minio" }}
+        - name: NP_MINIO_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.minio.url }}
+        - name: NP_MINIO_ACCESS_KEY_ID
+          value: {{ .Values.bucketProvider.minio.accessKeyId }}
+        - name: NP_MINIO_SECRET_ACCESS_KEY
+          value: {{ .Values.bucketProvider.minio.secretAccessKey }}
+        - name: NP_MINIO_REGION_NAME
+          value: {{ .Values.bucketProvider.minio.regionName }}
         {{- end }}
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL

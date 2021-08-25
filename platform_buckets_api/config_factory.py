@@ -12,6 +12,7 @@ from .config import (
     CORSConfig,
     KubeClientAuthType,
     KubeConfig,
+    MinioProviderConfig,
     PlatformAuthConfig,
     SentryConfig,
     ServerConfig,
@@ -83,7 +84,7 @@ class EnvironConfigFactory:
             ),
         )
 
-    def create_bucket_provider(self) -> Union[AWSProviderConfig]:
+    def create_bucket_provider(self) -> Union[AWSProviderConfig, MinioProviderConfig]:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
@@ -92,6 +93,13 @@ class EnvironConfigFactory:
                 secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY") or None,
                 region_name=self._environ.get("NP_AWS_REGION_NAME")
                 or AWSProviderConfig.region_name,
+            )
+        elif type == BucketsProviderType.MINIO:
+            return MinioProviderConfig(
+                access_key_id=self._environ["NP_MINIO_ACCESS_KEY_ID"],
+                secret_access_key=self._environ["NP_MINIO_SECRET_ACCESS_KEY"],
+                region_name=self._environ["NP_MINIO_REGION_NAME"],
+                endpoint_url=URL(self._environ["NP_MINIO_ENDPOINT_URL"]),
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")
