@@ -39,6 +39,7 @@ class SentryConfig:
 
 class BucketsProviderType(str, enum.Enum):
     AWS = "aws"
+    MINIO = "minio"
 
 
 @dataclass(frozen=True)
