@@ -10,7 +10,7 @@ print("\n".join(str(r) for r in dist.requires()));\
 ' > requirements.txt
 RUN pip install --user -r requirements.txt
 
-RUN apt -q update && apt -q install -y wget
+RUN apt-get -q update && apt-get -q install -y wget
 RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc
 RUN chmod +x mc
 

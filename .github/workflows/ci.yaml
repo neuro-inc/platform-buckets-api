@@ -41,8 +41,8 @@ jobs:
         run: make setup
       - name: Install MC (minio client)
         run: |
-          sudo apt -q update
-          sudo apt -q install -y wget
+          sudo apt-get -q update
+          sudo apt-get -q install -y wget
           wget https://dl.min.io/client/mc/release/linux-amd64/mc
           sudo chmod +x mc
           sudo mv mc /usr/bin/mc
