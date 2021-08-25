@@ -30,7 +30,7 @@ def aws_provider(
 async def test_bucket_create(
     aws_provider: AWSBucketProvider, s3: AioBaseClient
 ) -> None:
-    bucket = await aws_provider.create_bucket("§")
+    bucket = await aws_provider.create_bucket("integration-test-bucket")
     assert bucket.name == "integration-test-bucket"
     buckets = await s3.list_buckets()
     assert buckets["Buckets"][0]["Name"] == "integration-test-bucket"
