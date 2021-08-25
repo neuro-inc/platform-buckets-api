@@ -10,6 +10,10 @@ print("\n".join(str(r) for r in dist.requires()));\
 ' > requirements.txt
 RUN pip install --user -r requirements.txt
 
+RUN apt -q update && apt -q install -y wget
+RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc
+RUN chmod +x mc
+
 ARG DIST_FILENAME
 
 # Install service itself
@@ -21,6 +25,7 @@ FROM python:3.8.10-buster as service
 WORKDIR /app
 
 COPY --from=installer /root/.local/ /root/.local/
+COPY --from=installer /mc /usr/bin/mc
 
 ENV PATH=/root/.local/bin:$PATH
 

@@ -39,6 +39,13 @@ jobs:
           key: ${{ runner.os }}-py-3.8.10-${{ hashFiles('requirements/*.txt') }}-${{ hashFiles('setup.py') }}
       - name: Install dependencies
         run: make setup
+      - name: Install MC (minio client)
+        run: |
+          sudo apt -q update
+          sudo apt -q install -y wget
+          wget https://dl.min.io/client/mc/release/linux-amd64/mc
+          sudo chmod +x mc
+          sudo mv mc /usr/bin/mc
       - name: Lint
         run: make lint
       - name: Run unit tests
