@@ -1,5 +1,5 @@
 bucketProvider:
-  type: "aws"  # "aws" or <not-supported-yet>
+  type: "aws"  # "aws" or "minio"
   aws:
     s3RoleArn: arn:aws:iam::771188043543:role/bucker-api-users-role
 
