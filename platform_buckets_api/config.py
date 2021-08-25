@@ -49,7 +49,16 @@ class AWSProviderConfig:
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
     region_name: str = "us-east-1"
-    endpoint_url: Optional[str] = None
+    endpoint_url: Optional[URL] = None
+
+
+@dataclass(frozen=True)
+class MinioProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.MINIO
+    access_key_id: str
+    secret_access_key: str
+    region_name: str
+    endpoint_url: URL
 
 
 class KubeClientAuthType(str, enum.Enum):
@@ -81,7 +90,7 @@ class Config:
     kube: KubeConfig
     cors: CORSConfig
     cluster_name: str
-    bucket_provider: Union[AWSProviderConfig]
+    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

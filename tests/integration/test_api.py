@@ -235,10 +235,10 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         before = utc_now()
-        payload = await make_bucket("test_bucket", regular_user)
+        payload = await make_bucket("test-bucket", regular_user)
         after = utc_now()
         assert "id" in payload
-        assert payload["name"] == "test_bucket"
+        assert payload["name"] == "test-bucket"
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
@@ -250,7 +250,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test_bucket", regular_user)
+        create_resp = await make_bucket("test-bucket", regular_user)
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user.headers,
@@ -259,7 +259,7 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
-            assert "test_bucket" in payload["credentials"]["bucket_name"]
+            assert "test-bucket" in payload["credentials"]["bucket_name"]
 
     async def test_create_bucket_duplicate(
         self,
@@ -268,12 +268,12 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test_bucket", regular_user)
+        await make_bucket("test-bucket", regular_user)
         async with client.post(
             buckets_api.buckets_url,
             headers=regular_user.headers,
             json={
-                "name": "test_bucket",
+                "name": "test-bucket",
             },
         ) as resp:
             assert resp.status == HTTPConflict.status_code, await resp.text()
@@ -287,7 +287,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test_bucket", regular_user)
+        create_resp = await make_bucket("test-bucket", regular_user)
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user.headers,
@@ -303,9 +303,9 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test_bucket", regular_user)
+        create_resp = await make_bucket("test-bucket", regular_user)
         async with client.get(
-            buckets_api.bucket_url("test_bucket"),
+            buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -320,7 +320,7 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         async with client.get(
-            buckets_api.bucket_url("test_bucket"),
+            buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
@@ -334,7 +334,7 @@ class TestApi:
     ) -> None:
         buckets_data = []
         for index in range(5):
-            bucket_data = await make_bucket(f"test_bucket_{index}", regular_user)
+            bucket_data = await make_bucket(f"test-bucket-{index}", regular_user)
             buckets_data.append(bucket_data)
         for index in range(5):
             bucket_data = await make_bucket(None, regular_user)
@@ -370,7 +370,7 @@ class TestApi:
 
         buckets_data = []
         for index in range(5):
-            bucket_data = await make_bucket(f"test_bucket_{index}", regular_user)
+            bucket_data = await make_bucket(f"test-bucket-{index}", regular_user)
             buckets_data.append(bucket_data)
 
         async with client.get(
@@ -392,7 +392,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        data = await make_bucket("test_bucket", regular_user)
+        data = await make_bucket("test-bucket", regular_user)
         async with client.delete(
             buckets_api.bucket_url(data["id"]),
             headers=regular_user.headers,
@@ -413,9 +413,9 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test_bucket", regular_user)
+        await make_bucket("test-bucket", regular_user)
         async with client.delete(
-            buckets_api.bucket_url("test_bucket"),
+            buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
@@ -435,7 +435,7 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         async with client.delete(
-            buckets_api.bucket_url("test_bucket"),
+            buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
@@ -448,7 +448,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test_bucket", regular_user)
+        create_resp = await make_bucket("test-bucket", regular_user)
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
@@ -463,7 +463,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test_bucket", regular_user)
+        await make_bucket("test-bucket", regular_user)
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user2.headers,
@@ -479,7 +479,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test_bucket", regular_user)
+        create_resp = await make_bucket("test-bucket", regular_user)
         async with client.delete(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
@@ -495,8 +495,8 @@ class TestApi:
         grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp1 = await make_bucket("test_bucket1", regular_user)
-        create_resp2 = await make_bucket("test_bucket2", regular_user)
+        create_resp1 = await make_bucket("test-bucket1", regular_user)
+        create_resp2 = await make_bucket("test-bucket2", regular_user)
         await grant_bucket_permission(
             regular_user2, regular_user.name, create_resp1["id"]
         )
@@ -531,8 +531,8 @@ class TestApi:
         grant_bucket_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp1 = await make_bucket("test_bucket1", regular_user)
-        create_resp2 = await make_bucket("test_bucket2", regular_user)
+        create_resp1 = await make_bucket("test-bucket1", regular_user)
+        create_resp2 = await make_bucket("test-bucket2", regular_user)
         await grant_bucket_permission(
             regular_user2, regular_user.name, create_resp1["id"], "read"
         )
@@ -558,8 +558,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         payload = await make_credentials(
             "test-creds", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -572,11 +572,11 @@ class TestApi:
             bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
         assert bucket1_creds["bucket_id"] == bucket1["id"]
         assert bucket1_creds["provider"] == bucket1["provider"]
-        assert "test_bucket1" in bucket1_creds["credentials"]["bucket_name"]
+        assert "test-bucket1" in bucket1_creds["credentials"]["bucket_name"]
 
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
-        assert "test_bucket2" in bucket2_creds["credentials"]["bucket_name"]
+        assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
 
     async def test_get_credentials(
         self,
@@ -586,8 +586,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         create_resp = await make_credentials(
             "test-creds", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -607,8 +607,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         create_resp = await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -640,8 +640,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         credentials_list = []
         for index in range(5):
             credentials_data = await make_credentials(
@@ -682,8 +682,8 @@ class TestApi:
                 payload.append(json.loads(line))
             assert payload == []
 
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         credentials_list = []
         for index in range(5):
             credentials_data = await make_credentials(
@@ -716,8 +716,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         data = await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -742,8 +742,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -782,8 +782,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         create_resp = await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -802,8 +802,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
@@ -823,8 +823,8 @@ class TestApi:
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
     ) -> None:
-        bucket1 = await make_bucket("test_bucket1", regular_user)
-        bucket2 = await make_bucket("test_bucket2", regular_user)
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
         create_resp = await make_credentials(
             "test_credentials", regular_user, [bucket1["id"], bucket2["id"]]
         )
