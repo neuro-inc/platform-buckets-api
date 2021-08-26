@@ -107,6 +107,7 @@ def test_create_minio() -> None:
         "NP_MINIO_SECRET_ACCESS_KEY": "key-secret",
         "NP_MINIO_REGION_NAME": "region",
         "NP_MINIO_ENDPOINT_URL": "https://play.min.io",
+        "NP_MINIO_ENDPOINT_PUBLIC_URL": "https://public.play.min.io",
     }
     config = EnvironConfigFactory(environ).create_bucket_provider()
     assert config == MinioProviderConfig(
@@ -114,4 +115,5 @@ def test_create_minio() -> None:
         secret_access_key="key-secret",
         region_name="region",
         endpoint_url=URL("https://play.min.io"),
+        endpoint_public_url=URL("https://public.play.min.io"),
     )

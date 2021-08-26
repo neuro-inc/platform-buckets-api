@@ -59,6 +59,7 @@ class MinioProviderConfig:
     secret_access_key: str
     region_name: str
     endpoint_url: URL
+    endpoint_public_url: URL
 
 
 class KubeClientAuthType(str, enum.Enum):

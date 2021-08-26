@@ -9,6 +9,7 @@ bucketProvider: {}
 #    regionName:
 #  minio:
 #    url:
+#    publicUrl:
 #    accessKeyId:
 #    secretAccessKey:
 #    regionName:

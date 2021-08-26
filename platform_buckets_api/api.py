@@ -687,6 +687,7 @@ async def create_app(
                         s3_client=s3_client,
                         sts_client=sts_client,
                         mc=bmc_wrapper,
+                        public_url=config.bucket_provider.endpoint_public_url,
                     )
                 else:
                     raise Exception(

@@ -5,6 +5,7 @@ import aiobotocore
 import botocore.exceptions
 import pytest
 from aiobotocore.client import AioBaseClient
+from yarl import URL
 
 from platform_buckets_api.providers import (
     BMCWrapper,
@@ -241,6 +242,19 @@ async def _test_read_access(
 
         with pytest.raises(botocore.exceptions.ClientError):
             await users_s3.delete_object(Bucket=bucket.name, Key=key)
+
+
+async def test_bucket_credentials_public_url(
+    minio_s3: AioBaseClient, minio_sts: AioBaseClient, bmc_wrapper: BMCWrapper
+) -> None:
+    minio_provider = MinioBucketProvider(
+        minio_s3, minio_sts, bmc_wrapper, public_url=URL("https://foo.bar")
+    )
+    bucket = await minio_provider.create_bucket("integration-test-bucket")
+    credentials = await minio_provider.get_bucket_credentials(
+        bucket.name, write=True, requester="testing"
+    )
+    assert credentials["endpoint_url"] == "https://foo.bar"
 
 
 async def test_bucket_credentials_write_access(

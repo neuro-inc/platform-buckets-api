@@ -100,6 +100,7 @@ class EnvironConfigFactory:
                 secret_access_key=self._environ["NP_MINIO_SECRET_ACCESS_KEY"],
                 region_name=self._environ["NP_MINIO_REGION_NAME"],
                 endpoint_url=URL(self._environ["NP_MINIO_ENDPOINT_URL"]),
+                endpoint_public_url=URL(self._environ["NP_MINIO_ENDPOINT_PUBLIC_URL"]),
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")

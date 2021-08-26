@@ -121,6 +121,7 @@ def config(
         return config_factory(
             bucket_provider=MinioProviderConfig(
                 endpoint_url=minio_server,
+                endpoint_public_url=minio_server,
                 access_key_id="access_key",
                 secret_access_key="secret_key",
                 region_name="region-1",

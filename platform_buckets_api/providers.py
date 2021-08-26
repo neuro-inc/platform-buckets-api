@@ -92,11 +92,13 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
         sts_client: AioBaseClient,
         s3_role_arn: str,
         session_duration_s: int = 3600,
+        public_url: Optional[URL] = None,
     ):
         self._s3_client = s3_client
         self._sts_client = sts_client
         self._s3_role_arn = s3_role_arn
         self._session_duration_s = session_duration_s
+        self._public_url = str(public_url) or self._s3_client.meta.endpoint_url
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         try:
@@ -130,7 +132,7 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
     def _get_basic_credentials_data(self) -> Mapping[str, str]:
         return {
             "region_name": self._s3_client.meta.region_name,
-            "endpoint_url": self._s3_client.meta.endpoint_url,
+            "endpoint_url": self._public_url,
         }
 
     async def get_bucket_credentials(
@@ -323,12 +325,14 @@ class MinioBucketProvider(AWSLikeBucketProvider):
         sts_client: AioBaseClient,
         mc: BMCWrapper,
         session_duration_s: int = 3600,
+        public_url: Optional[URL] = None,
     ):
         super().__init__(
             s3_client,
             sts_client,
             s3_role_arn="arn:xxx:xxx:xxx:xxxx",
             session_duration_s=session_duration_s,
+            public_url=public_url,
         )
         self._mc = mc
 
