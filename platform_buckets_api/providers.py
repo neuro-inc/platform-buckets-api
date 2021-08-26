@@ -98,7 +98,9 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
         self._sts_client = sts_client
         self._s3_role_arn = s3_role_arn
         self._session_duration_s = session_duration_s
-        self._public_url = str(public_url) or self._s3_client.meta.endpoint_url
+        self._public_url = (
+            str(public_url) if public_url else self._s3_client.meta.endpoint_url
+        )
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         try:
