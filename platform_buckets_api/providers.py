@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import datetime
 import functools
 import json
 import os
@@ -13,6 +14,9 @@ from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional
 import bmc
 import botocore.exceptions
 from aiobotocore.client import AioBaseClient
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.storage.blob import ContainerSasPermissions, generate_container_sas
+from azure.storage.blob.aio import BlobServiceClient
 from yarl import URL
 
 from platform_buckets_api.config import BucketsProviderType
@@ -379,3 +383,64 @@ class MinioBucketProvider(AWSLikeBucketProvider):
 
     async def delete_role(self, username: str) -> None:
         await self._mc.admin_user_remove(username=username)
+
+
+class AzureBucketProvider(BucketProvider):
+    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
+        self._storage_endpoint = storage_endpoint
+        self._blob_client = blob_client
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        try:
+            await self._blob_client.create_container(name)
+        except ResourceExistsError:
+            raise BucketExistsError(name)
+        return ProviderBucket(name=name, provider_type=BucketsProviderType.AZURE)
+
+    async def delete_bucket(self, name: str) -> None:
+        try:
+            await self._blob_client.delete_container(name)
+        except ResourceNotFoundError:
+            raise BucketDeleteError(name)
+
+    async def get_bucket_credentials(
+        self, name: str, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        if write:
+            permissions = ContainerSasPermissions(
+                read=True,
+                list=True,
+                write=True,
+                delete=True,
+                delete_previous_version=True,
+                tag=True,
+            )
+        else:
+            permissions = ContainerSasPermissions(
+                read=True,
+                list=True,
+            )
+        expiry = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+        token: str = generate_container_sas(
+            account_name=self._blob_client.account_name,
+            container_name=name,
+            account_key=self._blob_client.credential.account_key,
+            permission=permissions,
+            expiry=expiry,
+        )
+        return {
+            "storage_endpoint": self._storage_endpoint,
+            "container_name": name,
+            "sas_token": token,
+        }
+
+    async def create_role(self, username: str) -> ProviderRole:
+        pass
+
+    async def set_role_permissions(
+        self, role: ProviderRole, permissions: Iterable[BucketPermission]
+    ) -> None:
+        pass
+
+    async def delete_role(self, username: str) -> None:
+        pass
