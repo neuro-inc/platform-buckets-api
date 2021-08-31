@@ -5,10 +5,15 @@ from typing import AsyncIterator, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
 from platform_buckets_api.permissions_service import PermissionsService
-from platform_buckets_api.providers import BucketPermission, BucketProvider
+from platform_buckets_api.providers import (
+    BucketNotExistsError,
+    BucketPermission,
+    BucketProvider,
+)
 from platform_buckets_api.storage import (
     BucketsStorage,
     CredentialsStorage,
+    NotExistsError,
     PersistentCredentials,
     UserBucket,
 )
@@ -92,9 +97,12 @@ class BucketsService:
                     yield bucket
 
     async def delete_bucket(self, bucket_id: str) -> None:
-        bucket = await self.get_bucket(bucket_id)
-        await self._provider.delete_bucket(bucket.provider_bucket.name)
-        await self._storage.delete_bucket(bucket_id)
+        try:
+            bucket = await self.get_bucket(bucket_id)
+            await self._provider.delete_bucket(bucket.provider_bucket.name)
+            await self._storage.delete_bucket(bucket_id)
+        except (NotExistsError, BucketNotExistsError):
+            pass  # Bucket already removed or there was concurrent removal, just ignore
 
 
 class PersistentCredentialsService:
@@ -148,9 +156,12 @@ class PersistentCredentialsService:
                 yield credentials
 
     async def delete_credentials(self, credentials_id: str) -> None:
-        credentials = await self.get_credentials(credentials_id)
-        await self._provider.delete_role(credentials.role.name)
-        await self._storage.delete_credentials(credentials_id)
+        try:
+            credentials = await self.get_credentials(credentials_id)
+            await self._provider.delete_role(credentials.role.name)
+            await self._storage.delete_credentials(credentials_id)
+        except NotExistsError:
+            pass  # Already removed
 
     async def _sync_permissions(self, credentials: PersistentCredentials) -> None:
 

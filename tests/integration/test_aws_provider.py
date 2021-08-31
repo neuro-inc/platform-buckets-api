@@ -8,8 +8,8 @@ from aiobotocore.client import AioBaseClient
 
 from platform_buckets_api.providers import (
     AWSBucketProvider,
-    BucketDeleteError,
     BucketExistsError,
+    BucketNotExistsError,
     BucketPermission,
     RoleExistsError,
 )
@@ -56,20 +56,7 @@ async def test_bucket_delete(
 async def test_bucket_delete_unknown(
     aws_provider: AWSBucketProvider, s3: AioBaseClient
 ) -> None:
-    with pytest.raises(BucketDeleteError):
-        await aws_provider.delete_bucket("integration-test-bucket")
-
-
-async def test_bucket_delete_not_empty(
-    aws_provider: AWSBucketProvider, s3: AioBaseClient
-) -> None:
-    bucket = await aws_provider.create_bucket("integration-test-bucket")
-    await s3.put_object(
-        Bucket=bucket.name,
-        Key="test",
-        Body=b"42",
-    )
-    with pytest.raises(BucketDeleteError):
+    with pytest.raises(BucketNotExistsError):
         await aws_provider.delete_bucket("integration-test-bucket")
 
 

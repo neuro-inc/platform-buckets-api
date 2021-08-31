@@ -31,7 +31,7 @@ class BucketExistsError(ProviderError):
     pass
 
 
-class BucketDeleteError(ProviderError):
+class BucketNotExistsError(ProviderError):
     pass
 
 
@@ -128,8 +128,8 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
             await self._s3_client.delete_bucket(
                 Bucket=name,
             )
-        except botocore.exceptions.ClientError as e:
-            raise BucketDeleteError(e.args[0])
+        except self._s3_client.exceptions.NoSuchBucket:
+            raise BucketNotExistsError(name)
 
     def _get_basic_credentials_data(self) -> Mapping[str, str]:
         return {

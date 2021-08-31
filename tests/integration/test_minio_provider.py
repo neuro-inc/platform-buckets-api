@@ -9,8 +9,8 @@ from yarl import URL
 
 from platform_buckets_api.providers import (
     BMCWrapper,
-    BucketDeleteError,
     BucketExistsError,
+    BucketNotExistsError,
     BucketPermission,
     MinioBucketProvider,
     RoleExistsError,
@@ -57,20 +57,7 @@ async def test_bucket_delete(
 async def test_bucket_delete_unknown(
     minio_provider: MinioBucketProvider, minio_s3: AioBaseClient
 ) -> None:
-    with pytest.raises(BucketDeleteError):
-        await minio_provider.delete_bucket("integration-test-bucket")
-
-
-async def test_bucket_delete_not_empty(
-    minio_provider: MinioBucketProvider, minio_s3: AioBaseClient
-) -> None:
-    bucket = await minio_provider.create_bucket("integration-test-bucket")
-    await minio_s3.put_object(
-        Bucket=bucket.name,
-        Key="test",
-        Body=b"42",
-    )
-    with pytest.raises(BucketDeleteError):
+    with pytest.raises(BucketNotExistsError):
         await minio_provider.delete_bucket("integration-test-bucket")
 
 
