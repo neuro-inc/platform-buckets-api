@@ -1,7 +1,12 @@
 bucketProvider:
-  type: "aws"  # "aws" or "minio"
-  aws:
-    s3RoleArn: arn:aws:iam::771188043543:role/bucker-api-users-role
+  type: "azure"  # "aws" or "minio" or "azure"
+  azure:
+    url: https://neuromlops.blob.core.windows.net/
+    credential:
+      valueFrom:
+        secretKeyRef:
+          name: buckets-azure-storage
+          key: credential
 
 annotations:
   iam.amazonaws.com/role: arn:aws:iam::771188043543:role/buckets-366c09e4841fcc83df56b8f070c34716
