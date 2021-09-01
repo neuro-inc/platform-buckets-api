@@ -434,8 +434,9 @@ class AzureBucketProvider(BucketProvider):
     async def get_bucket_credentials(
         self, name: str, write: bool, requester: str
     ) -> Mapping[str, str]:
-
-        expiry = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            hours=1
+        )
         token: str = generate_container_sas(
             account_name=self._blob_client.account_name,
             container_name=name,
