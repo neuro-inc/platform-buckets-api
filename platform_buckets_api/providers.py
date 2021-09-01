@@ -446,6 +446,7 @@ class AzureBucketProvider(BucketProvider):
         return {
             "storage_endpoint": self._storage_endpoint,
             "sas_token": token,
+            "expiry": expiry.isoformat(),
         }
 
     async def create_role(
