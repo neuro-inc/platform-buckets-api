@@ -7,6 +7,7 @@ from yarl import URL
 
 from .config import (
     AWSProviderConfig,
+    AzureProviderConfig,
     BucketsProviderType,
     Config,
     CORSConfig,
@@ -84,7 +85,9 @@ class EnvironConfigFactory:
             ),
         )
 
-    def create_bucket_provider(self) -> Union[AWSProviderConfig, MinioProviderConfig]:
+    def create_bucket_provider(
+        self,
+    ) -> Union[AWSProviderConfig, MinioProviderConfig, AzureProviderConfig]:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
@@ -101,6 +104,11 @@ class EnvironConfigFactory:
                 region_name=self._environ["NP_MINIO_REGION_NAME"],
                 endpoint_url=URL(self._environ["NP_MINIO_ENDPOINT_URL"]),
                 endpoint_public_url=URL(self._environ["NP_MINIO_ENDPOINT_PUBLIC_URL"]),
+            )
+        elif type == BucketsProviderType.AZURE:
+            return AzureProviderConfig(
+                endpoint_url=URL(self._environ["NP_AZURE_STORAGE_ACCOUNT_URL"]),
+                credential=self._environ["NP_AZURE_STORAGE_CREDENTIAL"],
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")

@@ -1,7 +1,7 @@
 NP_BUCKETS_API_K8S_NS: platform-jobs
 
 bucketProvider: {}
-#  type: "aws"  # "aws" or "minio"
+#  type: "aws"  # "aws" or "minio" or "azure"
 #  aws:
 #    s3RoleArn:
 #    accessKeyId:
@@ -13,6 +13,10 @@ bucketProvider: {}
 #    accessKeyId:
 #    secretAccessKey:
 #    regionName:
+#  azure:
+#    url:
+#    credential:
+
 
 image:
   repository: $IMAGE_REPO

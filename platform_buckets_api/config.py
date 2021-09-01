@@ -40,6 +40,7 @@ class SentryConfig:
 class BucketsProviderType(str, enum.Enum):
     AWS = "aws"
     MINIO = "minio"
+    AZURE = "azure"
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,13 @@ class MinioProviderConfig:
     region_name: str
     endpoint_url: URL
     endpoint_public_url: URL
+
+
+@dataclass(frozen=True)
+class AzureProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.AZURE
+    endpoint_url: URL
+    credential: str
 
 
 class KubeClientAuthType(str, enum.Enum):
@@ -91,7 +99,7 @@ class Config:
     kube: KubeConfig
     cors: CORSConfig
     cluster_name: str
-    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig]
+    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig, AzureProviderConfig]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

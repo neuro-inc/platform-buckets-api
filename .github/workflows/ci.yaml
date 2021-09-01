@@ -79,6 +79,9 @@ jobs:
           make apply_configuration_k8s
           make test_k8s
       - name: Run integration tests
+        env:
+          AZURE_STORAGE_ACCOUNT_URL: ${{ secrets.AZURE_STORAGE_ACCOUNT_URL }}
+          AZURE_STORAGE_CREDENTIAL: ${{ secrets.AZURE_STORAGE_CREDENTIAL }}
         run: make test_integration
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2.0.3

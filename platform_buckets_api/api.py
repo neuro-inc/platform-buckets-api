@@ -35,6 +35,7 @@ from aiohttp.web_exceptions import (
 from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
+from azure.storage.blob.aio import BlobServiceClient
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
@@ -48,6 +49,7 @@ from neuro_logging import (
 
 from .config import (
     AWSProviderConfig,
+    AzureProviderConfig,
     Config,
     CORSConfig,
     KubeConfig,
@@ -61,6 +63,7 @@ from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import (
     AWSBucketProvider,
+    AzureBucketProvider,
     BMCWrapper,
     BucketProvider,
     MinioBucketProvider,
@@ -688,6 +691,17 @@ async def create_app(
                         sts_client=sts_client,
                         mc=bmc_wrapper,
                         public_url=config.bucket_provider.endpoint_public_url,
+                    )
+                elif isinstance(config.bucket_provider, AzureProviderConfig):
+                    blob_client = await exit_stack.enter_async_context(
+                        BlobServiceClient(
+                            account_url=str(config.bucket_provider.endpoint_url),
+                            credential=config.bucket_provider.credential,
+                        )
+                    )
+                    bucket_provider = AzureBucketProvider(
+                        blob_client=blob_client,
+                        storage_endpoint=str(config.bucket_provider.endpoint_url),
                     )
                 else:
                     raise Exception(

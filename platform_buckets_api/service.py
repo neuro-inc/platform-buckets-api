@@ -122,7 +122,10 @@ class PersistentCredentialsService:
         self, bucket_ids: Iterable[str], owner: str, name: Optional[str] = None
     ) -> PersistentCredentials:
         role_name = make_role_name(name, owner)
-        role = await self._provider.create_role(role_name)
+        permissions = await self._get_permissions(owner, bucket_ids)
+        role = await self._provider.create_role(
+            role_name, initial_permissions=permissions
+        )
 
         credentials = PersistentCredentials(
             id=f"bucket-credentials-{uuid4()}",
@@ -134,9 +137,8 @@ class PersistentCredentialsService:
         try:
             await self._storage.create_credentials(credentials)
         except Exception:
-            await self._provider.delete_role(role.name)
+            await self._provider.delete_role(role)
             raise
-        await self._sync_permissions(credentials)
         return credentials
 
     async def get_credentials(self, credentials_id: str) -> PersistentCredentials:
@@ -158,73 +160,32 @@ class PersistentCredentialsService:
     async def delete_credentials(self, credentials_id: str) -> None:
         try:
             credentials = await self.get_credentials(credentials_id)
-            await self._provider.delete_role(credentials.role.name)
+            await self._provider.delete_role(credentials.role)
             await self._storage.delete_credentials(credentials_id)
         except NotExistsError:
             pass  # Already removed
 
     async def _sync_permissions(self, credentials: PersistentCredentials) -> None:
+        permissions = await self._get_permissions(
+            credentials.owner, credentials.bucket_ids
+        )
+        await self._provider.set_role_permissions(credentials.role, permissions)
 
-        checker = await self._permissions_service.get_perms_checker(credentials.owner)
+    async def _get_permissions(
+        self, owner: str, bucket_ids: Iterable[str]
+    ) -> List[BucketPermission]:
+        checker = await self._permissions_service.get_perms_checker(owner)
         buckets = [
             await self._buckets_service.get_bucket(bucket_id)
-            for bucket_id in credentials.bucket_ids
+            for bucket_id in bucket_ids
         ]
-
         permissions: List[BucketPermission] = []
-
-        def _append(perm: BucketPermission) -> None:
-            if not any(
-                (
-                    (
-                        perm.is_prefix
-                        and bucket.provider_bucket.name.startswith(perm.bucket_name)
-                    )
-                    or (perm.bucket_name == bucket.provider_bucket.name)
-                )
-                for bucket in buckets
-            ):
-                return  # Permission has no effect on buckets
-            if not any(
-                existing_perm.is_more_general_then(perm)
-                for existing_perm in permissions
-            ):
-                permissions.append(perm)
-
-        if checker.can_write_any():
-            _append(
-                BucketPermission(
-                    write=True, bucket_name=NEURO_BUCKET_PREFIX, is_prefix=True
-                )
-            )
-        if checker.can_read_any():
-            _append(
-                BucketPermission(
-                    write=False, bucket_name=NEURO_BUCKET_PREFIX, is_prefix=True
-                )
-            )
-        for username in checker.write_access_for_owner_by():
-            _append(
-                BucketPermission(
-                    write=True,
-                    bucket_name=make_owner_prefix(username),
-                    is_prefix=True,
-                )
-            )
-        for username in checker.read_access_for_owner_by():
-            _append(
-                BucketPermission(
-                    write=False,
-                    bucket_name=make_owner_prefix(username),
-                    is_prefix=True,
-                )
-            )
         for bucket in buckets:
             if checker.can_read(bucket):
-                _append(
+                permissions.append(
                     BucketPermission(
                         bucket_name=bucket.provider_bucket.name,
                         write=checker.can_write(bucket),
                     )
                 )
-        await self._provider.set_role_permissions(credentials.role, permissions)
+        return permissions
