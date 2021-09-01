@@ -63,6 +63,13 @@ class MinioProviderConfig:
     endpoint_public_url: URL
 
 
+@dataclass(frozen=True)
+class AzureProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.AZURE
+    endpoint_url: URL
+    credential: str
+
+
 class KubeClientAuthType(str, enum.Enum):
     NONE = "none"
     TOKEN = "token"
@@ -92,7 +99,7 @@ class Config:
     kube: KubeConfig
     cors: CORSConfig
     cluster_name: str
-    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig]
+    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig, AzureProviderConfig]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

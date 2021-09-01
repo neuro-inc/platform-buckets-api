@@ -6,6 +6,7 @@ from yarl import URL
 
 from platform_buckets_api.config import (
     AWSProviderConfig,
+    AzureProviderConfig,
     Config,
     CORSConfig,
     KubeClientAuthType,
@@ -116,4 +117,17 @@ def test_create_minio() -> None:
         region_name="region",
         endpoint_url=URL("https://play.min.io"),
         endpoint_public_url=URL("https://public.play.min.io"),
+    )
+
+
+def test_create_azure() -> None:
+    environ: Dict[str, Any] = {
+        "NP_BUCKET_PROVIDER_TYPE": "azure",
+        "NP_AZURE_STORAGE_ACCOUNT_URL": "https://some.url.windows.com/",
+        "NP_AZURE_STORAGE_CREDENTIAL": "secret",
+    }
+    config = EnvironConfigFactory(environ).create_bucket_provider()
+    assert config == AzureProviderConfig(
+        endpoint_url=URL("https://some.url.windows.com/"),
+        credential="secret",
     )
