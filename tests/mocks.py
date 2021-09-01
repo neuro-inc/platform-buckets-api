@@ -29,17 +29,20 @@ class MockBucketProvider(BucketProvider):
     ) -> Mapping[str, str]:
         return {"token": "value"}
 
-    async def create_role(self, username: str) -> ProviderRole:
+    async def create_role(
+        self, username: str, initial_permissions: Iterable[BucketPermission]
+    ) -> ProviderRole:
         role = ProviderRole(
             name=username,
             provider_type=BucketsProviderType.AWS,
             credentials={"token": "value"},
         )
         self.created_roles.append(role)
+        await self.set_role_permissions(role, initial_permissions)
         return role
 
-    async def delete_role(self, username: str) -> None:
-        self.deleted_roles.append(username)
+    async def delete_role(self, role: ProviderRole) -> None:
+        self.deleted_roles.append(role.name)
 
     async def set_role_permissions(
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
