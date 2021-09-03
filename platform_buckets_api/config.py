@@ -41,6 +41,7 @@ class BucketsProviderType(str, enum.Enum):
     AWS = "aws"
     MINIO = "minio"
     AZURE = "azure"
+    GCP = "gcp"
 
 
 @dataclass(frozen=True)

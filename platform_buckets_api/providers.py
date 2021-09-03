@@ -2,10 +2,12 @@ import abc
 import asyncio
 import datetime
 import functools
+import hashlib
 import json
 import os
 import secrets
 import tempfile
+import typing
 from abc import ABC
 from dataclasses import dataclass
 from os import fdopen
@@ -13,6 +15,7 @@ from typing import Any, Awaitable, Callable, Dict, Iterable, List, Mapping, Opti
 
 import bmc
 import botocore.exceptions
+import google.cloud.exceptions
 from aiobotocore.client import AioBaseClient
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import (
@@ -21,6 +24,10 @@ from azure.storage.blob import (
     generate_container_sas,
 )
 from azure.storage.blob.aio import BlobServiceClient
+from google.api_core.iam import Policy
+from google.cloud.iam_credentials import IAMCredentialsAsyncClient
+from google.cloud.storage import Client as GSClient
+from googleapiclient.errors import HttpError as GoogleHttpError
 from yarl import URL
 
 from platform_buckets_api.config import BucketsProviderType
@@ -534,3 +541,226 @@ class AzureBucketProvider(BucketProvider):
 
     async def delete_role(self, role: ProviderRole) -> None:
         await self.set_role_permissions(role, ())
+
+
+R = typing.TypeVar("R")
+
+
+def run_in_executor(func: Callable[..., R]) -> Callable[..., Awaitable[R]]:
+    async def _wrapper(*args: Any, **kwargs: Any) -> R:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, functools.partial(func, *args, **kwargs)
+        )
+
+    return _wrapper
+
+
+class GoogleBucketProvider(BucketProvider):
+    def __init__(
+        self,
+        gs_client: GSClient,
+        iam_client: Any,
+        iam_client_2: IAMCredentialsAsyncClient,
+    ):
+        self._gs_client = gs_client
+        self._iam_client = iam_client
+        self._iam_client_2 = iam_client_2
+
+    def _make_bucket_sa_name(self, bucket_name: str, *, write: bool) -> str:
+        hasher = hashlib.new("sha256")
+        hasher.update(bucket_name.encode("utf-8"))
+        return ("bucket-api-" + ("wr-" if write else "rd-") + hasher.hexdigest())[:30]
+
+    def _make_sa_email(self, name: str) -> str:
+        return f"{name}@{self._gs_client.project}.iam.gserviceaccount.com"
+
+    def _make_bucket_sa_email(self, bucket_name: str, *, write: bool) -> str:
+        return self._make_sa_email(self._make_bucket_sa_name(bucket_name, write=write))
+
+    def _make_sa_full_name(self, name: str, *, placeholder: bool = False) -> str:
+        return (
+            f"projects/{'-' if placeholder else self._gs_client.project}"
+            f"/serviceAccounts/{self._make_sa_email(name)}"
+        )
+
+    def _make_bucket_sa_full_name(
+        self, bucket_name: str, *, write: bool, placeholder: bool = False
+    ) -> str:
+        return self._make_sa_full_name(
+            name=self._make_bucket_sa_name(bucket_name, write=write),
+            placeholder=placeholder,
+        )
+
+    @run_in_executor
+    def _create_bucket(self, bucket_name: str) -> None:
+        self._gs_client.create_bucket(bucket_name)
+
+    @run_in_executor
+    def _delete_bucket(self, bucket_name: str) -> None:
+        self._gs_client.bucket(bucket_name).delete()
+
+    @run_in_executor
+    def _add_iam_policy_to_bucket(
+        self, bucket_name: str, role: str, sa_email: str
+    ) -> None:
+        bucket = self._gs_client.bucket(bucket_name)
+        policy = bucket.get_iam_policy()
+        policy.bindings += [
+            {"members": {policy.service_account(sa_email)}, "role": role}
+        ]
+        bucket.set_iam_policy(policy)
+
+    @run_in_executor
+    def _drop_sa_roles_for_buckets(self, sa_email: str) -> None:
+        sa_member_entry = Policy.service_account(sa_email)
+        for bucket in self._gs_client.list_buckets():
+            policy = bucket.get_iam_policy()
+            changed = False
+            for binding in policy.bindings:
+                if sa_member_entry in binding["members"]:
+                    changed = True
+                    binding["members"].remove(sa_member_entry)
+            if changed:
+                bucket.set_iam_policy(policy)
+
+    @run_in_executor
+    def _create_sa(self, name: str, display_name: str, description: str) -> None:
+        self._iam_client.projects().serviceAccounts().create(
+            name="projects/" + self._gs_client.project,
+            body={
+                "accountId": name,
+                "serviceAccount": {
+                    "displayName": display_name,
+                    "description": description,
+                },
+            },
+        ).execute()
+
+    @run_in_executor
+    def _delete_sa(self, full_name: str) -> None:
+        self._iam_client.projects().serviceAccounts().delete(name=full_name).execute()
+
+    @run_in_executor
+    def _create_sa_key(self, full_name: str) -> Mapping[str, Any]:
+        return (
+            self._iam_client.projects()
+            .serviceAccounts()
+            .keys()
+            .create(name=full_name)
+            .execute()
+        )
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        write_role_created = False
+        read_role_created = False
+        bucket_created = False
+        try:
+            await self._create_bucket(name)
+            bucket_created = True
+            await self._create_sa(
+                name=self._make_bucket_sa_name(name, write=True),
+                display_name=f"RW SA for bucket {name}",
+                description="Read/write SA generated by platform bucket api",
+            )
+            write_role_created = True
+            await self._create_sa(
+                name=self._make_bucket_sa_name(name, write=False),
+                display_name=f"RO SA for bucket {name}",
+                description="Read only SA generated by platform bucket api",
+            )
+            read_role_created = True
+            await self._add_iam_policy_to_bucket(
+                bucket_name=name,
+                role="roles/storage.objectAdmin",
+                sa_email=self._make_bucket_sa_email(name, write=True),
+            )
+            await self._add_iam_policy_to_bucket(
+                bucket_name=name,
+                role="roles/storage.objectViewer",
+                sa_email=self._make_bucket_sa_email(name, write=False),
+            )
+        except Exception as e:
+            if bucket_created:
+                await self._delete_bucket(name)
+            if write_role_created:
+                await self._delete_sa(self._make_bucket_sa_full_name(name, write=True))
+            if read_role_created:
+                await self._delete_sa(self._make_bucket_sa_full_name(name, write=False))
+            if isinstance(e, google.cloud.exceptions.Conflict):
+                raise BucketExistsError(name)
+            raise
+        return ProviderBucket(name=name, provider_type=BucketsProviderType.GCP)
+
+    async def delete_bucket(self, name: str) -> None:
+        try:
+            await self._delete_bucket(name)
+            await self._delete_sa(self._make_bucket_sa_full_name(name, write=True))
+            await self._delete_sa(self._make_bucket_sa_full_name(name, write=False))
+        except google.cloud.exceptions.NotFound:
+            raise BucketNotExistsError(name)
+
+    async def get_bucket_credentials(
+        self, name: str, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        resp = await self._iam_client_2.generate_access_token(
+            name=self._make_bucket_sa_full_name(name, write=write, placeholder=True),
+            scope=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        return {
+            "project": self._gs_client.project,
+            "access_token": resp.access_token,
+            "expire_time": resp.expire_time,
+        }
+
+    async def create_role(
+        self, username: str, initial_permissions: Iterable[BucketPermission]
+    ) -> ProviderRole:
+        if len(username) > 30:
+            raise ValueError("GCS account name cannot be larger then 30 characters")
+        try:
+            await self._create_sa(
+                name=username,
+                display_name="SA for bucket api persistent credentials",
+                description="This service account was generated after user request",
+            )
+        except GoogleHttpError as e:
+            if e.status_code == 409:
+                raise RoleExistsError(username)
+        resp = await self._create_sa_key(full_name=self._make_sa_full_name(username))
+        role = ProviderRole(
+            provider_type=BucketsProviderType.GCP,
+            name=username,
+            credentials={
+                "project": self._gs_client.project,
+                "key_data": resp["privateKeyData"],
+            },
+        )
+        await self._set_role_permissions(
+            self._make_sa_email(role.name), initial_permissions
+        )
+        return role
+
+    async def set_role_permissions(
+        self, role: ProviderRole, permissions: Iterable[BucketPermission]
+    ) -> None:
+        sa_email = self._make_sa_email(role.name)
+        await self._drop_sa_roles_for_buckets(sa_email)
+        await self._set_role_permissions(sa_email, permissions)
+
+    async def _set_role_permissions(
+        self, sa_email: str, permissions: Iterable[BucketPermission]
+    ) -> None:
+        for permission in permissions:
+            if permission.write:
+                role = "roles/storage.objectAdmin"
+            else:
+                role = "roles/storage.objectViewer"
+            await self._add_iam_policy_to_bucket(
+                bucket_name=permission.bucket_name,
+                role=role,
+                sa_email=sa_email,
+            )
+
+    async def delete_role(self, role: ProviderRole) -> None:
+        await self._delete_sa(self._make_sa_full_name(role.name))
