@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from functools import partial
@@ -111,20 +112,28 @@ class GoogleBasicBucketClient(BasicBucketClient):
         self._bucket_client.blob(key).upload_from_string(data)
 
 
-ACCOUNT_URL_ENV = "AZURE_STORAGE_ACCOUNT_URL"
-ACCOUNT_CREDENTIAL_ENV = "AZURE_STORAGE_CREDENTIAL"
-
-KEY_JSON: Any = {}
+KEY_JSON_ENV = "GCLOUD_SA_KEY_JSON"
 
 
 @pytest.fixture()
-def sa_credentials() -> SACredentials:
-    return SACredentials.from_service_account_info(info=KEY_JSON)
+def gcloud_key_json() -> Mapping[str, str]:
+    if KEY_JSON_ENV not in os.environ:
+        pytest.skip(
+            f"Skipping GCS provider tests. Please set {KEY_JSON_ENV}"
+            f" environ variables to enable tests"
+        )
+    raw = os.environ[KEY_JSON_ENV]
+    return json.loads(base64.b64decode(raw).decode())
 
 
 @pytest.fixture()
-def project_id() -> str:
-    return KEY_JSON["project_id"]
+def sa_credentials(gcloud_key_json: Mapping[str, str]) -> SACredentials:
+    return SACredentials.from_service_account_info(info=gcloud_key_json)
+
+
+@pytest.fixture()
+def project_id(gcloud_key_json: Mapping[str, str]) -> str:
+    return gcloud_key_json["project_id"]
 
 
 @pytest.fixture()
