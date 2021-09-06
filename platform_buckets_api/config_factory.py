@@ -1,3 +1,5 @@
+import base64
+import json
 import logging
 import os
 from pathlib import Path
@@ -11,6 +13,7 @@ from .config import (
     BucketsProviderType,
     Config,
     CORSConfig,
+    GCPProviderConfig,
     KubeClientAuthType,
     KubeConfig,
     MinioProviderConfig,
@@ -87,7 +90,9 @@ class EnvironConfigFactory:
 
     def create_bucket_provider(
         self,
-    ) -> Union[AWSProviderConfig, MinioProviderConfig, AzureProviderConfig]:
+    ) -> Union[
+        AWSProviderConfig, MinioProviderConfig, AzureProviderConfig, GCPProviderConfig
+    ]:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
@@ -109,6 +114,12 @@ class EnvironConfigFactory:
             return AzureProviderConfig(
                 endpoint_url=URL(self._environ["NP_AZURE_STORAGE_ACCOUNT_URL"]),
                 credential=self._environ["NP_AZURE_STORAGE_CREDENTIAL"],
+            )
+        elif type == BucketsProviderType.GCP:
+            key_raw = self._environ["NP_GCP_SERVICE_ACCOUNT_KEY_JSON_B64"]
+            key_json = json.loads(base64.b64decode(key_raw).decode())
+            return GCPProviderConfig(
+                key_json=key_json,
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")

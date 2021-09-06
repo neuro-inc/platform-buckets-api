@@ -26,7 +26,7 @@ from azure.storage.blob import (
 from azure.storage.blob.aio import BlobServiceClient
 from google.api_core.iam import Policy
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
-from google.cloud.storage import Client as GSClient
+from google.cloud.storage import Client as GCSClient
 from googleapiclient.errors import HttpError as GoogleHttpError
 from yarl import URL
 
@@ -559,11 +559,11 @@ def run_in_executor(func: Callable[..., R]) -> Callable[..., Awaitable[R]]:
 class GoogleBucketProvider(BucketProvider):
     def __init__(
         self,
-        gs_client: GSClient,
+        gcs_client: GCSClient,
         iam_client: Any,
         iam_client_2: IAMCredentialsAsyncClient,
     ):
-        self._gs_client = gs_client
+        self._gcs_client = gcs_client
         self._iam_client = iam_client
         self._iam_client_2 = iam_client_2
 
@@ -573,14 +573,14 @@ class GoogleBucketProvider(BucketProvider):
         return ("bucket-api-" + ("wr-" if write else "rd-") + hasher.hexdigest())[:30]
 
     def _make_sa_email(self, name: str) -> str:
-        return f"{name}@{self._gs_client.project}.iam.gserviceaccount.com"
+        return f"{name}@{self._gcs_client.project}.iam.gserviceaccount.com"
 
     def _make_bucket_sa_email(self, bucket_name: str, *, write: bool) -> str:
         return self._make_sa_email(self._make_bucket_sa_name(bucket_name, write=write))
 
     def _make_sa_full_name(self, name: str, *, placeholder: bool = False) -> str:
         return (
-            f"projects/{'-' if placeholder else self._gs_client.project}"
+            f"projects/{'-' if placeholder else self._gcs_client.project}"
             f"/serviceAccounts/{self._make_sa_email(name)}"
         )
 
@@ -594,17 +594,17 @@ class GoogleBucketProvider(BucketProvider):
 
     @run_in_executor
     def _create_bucket(self, bucket_name: str) -> None:
-        self._gs_client.create_bucket(bucket_name)
+        self._gcs_client.create_bucket(bucket_name)
 
     @run_in_executor
     def _delete_bucket(self, bucket_name: str) -> None:
-        self._gs_client.bucket(bucket_name).delete()
+        self._gcs_client.bucket(bucket_name).delete()
 
     @run_in_executor
     def _add_iam_policy_to_bucket(
         self, bucket_name: str, role: str, sa_email: str
     ) -> None:
-        bucket = self._gs_client.bucket(bucket_name)
+        bucket = self._gcs_client.bucket(bucket_name)
         policy = bucket.get_iam_policy()
         policy.bindings += [
             {"members": {policy.service_account(sa_email)}, "role": role}
@@ -614,7 +614,7 @@ class GoogleBucketProvider(BucketProvider):
     @run_in_executor
     def _drop_sa_roles_for_buckets(self, sa_email: str) -> None:
         sa_member_entry = Policy.service_account(sa_email)
-        for bucket in self._gs_client.list_buckets():
+        for bucket in self._gcs_client.list_buckets():
             policy = bucket.get_iam_policy()
             changed = False
             for binding in policy.bindings:
@@ -627,7 +627,7 @@ class GoogleBucketProvider(BucketProvider):
     @run_in_executor
     def _create_sa(self, name: str, display_name: str, description: str) -> None:
         self._iam_client.projects().serviceAccounts().create(
-            name="projects/" + self._gs_client.project,
+            name="projects/" + self._gcs_client.project,
             body={
                 "accountId": name,
                 "serviceAccount": {
@@ -708,7 +708,7 @@ class GoogleBucketProvider(BucketProvider):
             scope=["https://www.googleapis.com/auth/cloud-platform"],
         )
         return {
-            "project": self._gs_client.project,
+            "project": self._gcs_client.project,
             "access_token": resp.access_token,
             "expire_time": resp.expire_time,
         }
@@ -732,7 +732,7 @@ class GoogleBucketProvider(BucketProvider):
             provider_type=BucketsProviderType.GCP,
             name=username,
             credentials={
-                "project": self._gs_client.project,
+                "project": self._gcs_client.project,
                 "key_data": resp["privateKeyData"],
             },
         )

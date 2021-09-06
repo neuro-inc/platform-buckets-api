@@ -11,7 +11,7 @@ import googleapiclient.discovery
 import pytest
 from google.api_core.exceptions import Forbidden
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
-from google.cloud.storage import Bucket, Client as GSClient
+from google.cloud.storage import Bucket, Client as GCSClient
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.asyncio
 
 
 @run_in_executor
-def gcs_bucket_exists(gs_client: GSClient, name: str) -> bool:
+def gcs_bucket_exists(gs_client: GCSClient, name: str) -> bool:
     try:
         return gs_client.bucket(name).exists()
     except google.cloud.exceptions.NotFound:
@@ -55,7 +55,7 @@ def gcs_role_exists(iam: Any, project_id: str, name: str) -> bool:
 
 
 class GoogleBasicBucketClient(BasicBucketClient):
-    def __init__(self, client: GSClient, bucket_name: str) -> None:
+    def __init__(self, client: GCSClient, bucket_name: str) -> None:
         self._bucket_name = bucket_name
         self._client = client
         self._bucket_client = client.bucket(bucket_name)
@@ -80,14 +80,14 @@ class GoogleBasicBucketClient(BasicBucketClient):
         cls, bucket: ProviderBucket, credentials: Mapping[str, str]
     ) -> AsyncIterator["GoogleBasicBucketClient"]:
         if "access_token" in credentials:
-            client = GSClient(
+            client = GCSClient(
                 project=credentials["project"],
                 credentials=Credentials(credentials["access_token"]),
             )
         else:
             credential = credentials["key_data"]
             key_json = json.loads(base64.b64decode(credential).decode())
-            client = GSClient(
+            client = GCSClient(
                 project=credentials["project"],
                 credentials=SACredentials.from_service_account_info(info=key_json),
             )
@@ -112,7 +112,7 @@ class GoogleBasicBucketClient(BasicBucketClient):
         self._bucket_client.blob(key).upload_from_string(data)
 
 
-KEY_JSON_ENV = "GCLOUD_SA_KEY_JSON"
+KEY_JSON_ENV = "GCLOUD_SA_KEY_JSON_B64"
 
 
 @pytest.fixture()
@@ -139,9 +139,9 @@ def project_id(gcloud_key_json: Mapping[str, str]) -> str:
 @pytest.fixture()
 async def gcs_client(
     sa_credentials: SACredentials, project_id: str
-) -> AsyncIterator[GSClient]:
+) -> AsyncIterator[GCSClient]:
     @run_in_executor
-    def _cleanup_buckets(client: GSClient) -> None:
+    def _cleanup_buckets(client: GCSClient) -> None:
         for bucket in client.list_buckets():
             if bucket.name.startswith(BUCKET_NAME_PREFIX):
                 client.bucket(bucket.name).delete(force=True)
@@ -152,7 +152,7 @@ async def gcs_client(
     #         f" and {ACCOUNT_CREDENTIAL_ENV} environ variables to enable tests"
     #     )
 
-    client = GSClient(
+    client = GCSClient(
         project=project_id,
         credentials=sa_credentials,
     )
@@ -208,7 +208,7 @@ class TestGoogleProvider(TestProviderBase):
     @pytest.fixture()
     async def provider_option(
         self,
-        gcs_client: GSClient,
+        gcs_client: GCSClient,
         iam_client: Any,
         iam_client_2: IAMCredentialsAsyncClient,
         project_id: str,
@@ -216,7 +216,7 @@ class TestGoogleProvider(TestProviderBase):
         return ProviderTestOption(
             type="gcs",
             provider=GoogleBucketProvider(
-                gs_client=gcs_client,
+                gcs_client=gcs_client,
                 iam_client=iam_client,
                 iam_client_2=iam_client_2,
             ),

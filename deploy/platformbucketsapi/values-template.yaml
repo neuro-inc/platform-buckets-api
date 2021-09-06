@@ -1,7 +1,7 @@
 NP_BUCKETS_API_K8S_NS: platform-jobs
 
 bucketProvider: {}
-#  type: "aws"  # "aws" or "minio" or "azure"
+#  type: "aws"  # "aws" or "minio" or "azure" or "gcp
 #  aws:
 #    s3RoleArn:
 #    accessKeyId:
@@ -16,6 +16,8 @@ bucketProvider: {}
 #  azure:
 #    url:
 #    credential:
+#  gcp:
+#    SAKeyJsonB64:
 
 
 image:
