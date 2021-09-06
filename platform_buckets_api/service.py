@@ -41,10 +41,10 @@ def make_bucket_name(name: Optional[str], owner: str) -> str:
 
 
 def make_role_name(name: Optional[str], owner: str) -> str:
-    res = f"neuro-bucketuser-{owner}"
+    res = f"bkt-user-{owner}"
     if name is not None:
         res += f"-{name}"
-    return res + secrets.token_hex(5)
+    return res[:24] + secrets.token_hex(3)
 
 
 class BucketsService:

@@ -184,11 +184,13 @@ class TestPersistentCredentialsService:
         bucket_ids: List[str],
     ) -> None:
         credentials = await service.create_credentials(
-            owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+            owner="usr", name="creds", bucket_ids=bucket_ids
         )
         assert mock_provider.created_roles == [credentials.role]
-        assert "test-user" in credentials.role.name
-        assert "test-credentials" in credentials.role.name
+        # Because role name size is limited in GCP, only short owner/name
+        # can be embedded in user name
+        assert "usr" in credentials.role.name
+        assert "creds" in credentials.role.name
 
     async def test_credentials_create_duplicate(
         self,

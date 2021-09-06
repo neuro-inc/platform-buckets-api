@@ -1,7 +1,8 @@
 import enum
 from dataclasses import dataclass, field
-from typing import ClassVar, Optional, Sequence, Union
+from typing import ClassVar, Mapping, Optional, Sequence, Union
 
+from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL
 
 
@@ -41,6 +42,7 @@ class BucketsProviderType(str, enum.Enum):
     AWS = "aws"
     MINIO = "minio"
     AZURE = "azure"
+    GCP = "gcp"
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,16 @@ class AzureProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.AZURE
     endpoint_url: URL
     credential: str
+
+
+@dataclass(frozen=True)
+class GCPProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.GCP
+    key_json: Mapping[str, str]
+
+    @property
+    def sa_credentials(self) -> SACredentials:
+        return SACredentials.from_service_account_info(info=self.key_json)
 
 
 class KubeClientAuthType(str, enum.Enum):
@@ -99,7 +111,9 @@ class Config:
     kube: KubeConfig
     cors: CORSConfig
     cluster_name: str
-    bucket_provider: Union[AWSProviderConfig, MinioProviderConfig, AzureProviderConfig]
+    bucket_provider: Union[
+        AWSProviderConfig, MinioProviderConfig, AzureProviderConfig, GCPProviderConfig
+    ]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

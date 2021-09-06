@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -16,6 +17,7 @@ import aiobotocore
 import aiohttp
 import aiohttp.web
 import aiohttp_cors
+import googleapiclient.discovery
 from aiohttp.web import (
     HTTPBadRequest,
     HTTPInternalServerError,
@@ -36,6 +38,8 @@ from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
 from azure.storage.blob.aio import BlobServiceClient
+from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
+from google.cloud.storage import Client as GCSClient
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
@@ -52,6 +56,7 @@ from .config import (
     AzureProviderConfig,
     Config,
     CORSConfig,
+    GCPProviderConfig,
     KubeConfig,
     MinioProviderConfig,
     PlatformAuthConfig,
@@ -66,6 +71,7 @@ from .providers import (
     AzureBucketProvider,
     BMCWrapper,
     BucketProvider,
+    GoogleBucketProvider,
     MinioBucketProvider,
 )
 from .schema import (
@@ -590,6 +596,32 @@ async def create_kube_client(
         await client.close()
 
 
+@asynccontextmanager
+async def make_gcs_client(config: GCPProviderConfig) -> AsyncIterator[GCSClient]:
+    client = GCSClient(
+        project=config.key_json["project_id"],
+        credentials=config.sa_credentials,
+    )
+    yield client
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, client.close)
+
+
+@asynccontextmanager
+async def make_google_iam_client(config: GCPProviderConfig) -> AsyncIterator[Any]:
+    iam = googleapiclient.discovery.build(
+        "iam", "v1", credentials=config.sa_credentials
+    )
+    yield iam
+    iam.close()
+
+
+@asynccontextmanager
+async def make_google_iam_client_2(config: GCPProviderConfig) -> AsyncIterator[Any]:
+    iam_2 = IAMCredentialsAsyncClient(credentials=config.sa_credentials)
+    yield iam_2
+
+
 def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
     trace_configs = []
 
@@ -702,6 +734,21 @@ async def create_app(
                     bucket_provider = AzureBucketProvider(
                         blob_client=blob_client,
                         storage_endpoint=str(config.bucket_provider.endpoint_url),
+                    )
+                elif isinstance(config.bucket_provider, GCPProviderConfig):
+                    gcs_client = await exit_stack.enter_async_context(
+                        make_gcs_client(config.bucket_provider)
+                    )
+                    iam_client = await exit_stack.enter_async_context(
+                        make_google_iam_client(config.bucket_provider)
+                    )
+                    iam_client_2 = await exit_stack.enter_async_context(
+                        make_google_iam_client_2(config.bucket_provider)
+                    )
+                    bucket_provider = GoogleBucketProvider(
+                        gcs_client=gcs_client,
+                        iam_client=iam_client,
+                        iam_client_2=iam_client_2,
                     )
                 else:
                     raise Exception(

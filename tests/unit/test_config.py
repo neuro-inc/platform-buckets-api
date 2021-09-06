@@ -1,3 +1,5 @@
+import base64
+import json
 from pathlib import Path
 from typing import Any, Dict
 
@@ -9,6 +11,7 @@ from platform_buckets_api.config import (
     AzureProviderConfig,
     Config,
     CORSConfig,
+    GCPProviderConfig,
     KubeClientAuthType,
     KubeConfig,
     MinioProviderConfig,
@@ -131,3 +134,14 @@ def test_create_azure() -> None:
         endpoint_url=URL("https://some.url.windows.com/"),
         credential="secret",
     )
+
+
+def test_create_gcs() -> None:
+    environ: Dict[str, Any] = {
+        "NP_BUCKET_PROVIDER_TYPE": "gcp",
+        "NP_GCP_SERVICE_ACCOUNT_KEY_JSON_B64": base64.b64encode(
+            json.dumps({"key": "value"}).encode()
+        ).decode(),
+    }
+    config = EnvironConfigFactory(environ).create_bucket_provider()
+    assert config == GCPProviderConfig(key_json={"key": "value"})

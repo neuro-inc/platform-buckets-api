@@ -17,16 +17,16 @@ from platform_buckets_api.storage import ProviderBucket
 
 pytestmark = pytest.mark.asyncio
 
-BUCKET_NAME_PREFIX = "integration-test-bucket-"
-ROLE_NAME_PREFIX = "integration-test-role-"
+BUCKET_NAME_PREFIX = "integration-tests-"
+ROLE_NAME_PREFIX = "integration-tests-"
 
 
 def _make_bucket_name() -> str:
-    return BUCKET_NAME_PREFIX + secrets.token_hex(8)
+    return BUCKET_NAME_PREFIX + secrets.token_hex(5)
 
 
 def _make_role_name() -> str:
-    return ROLE_NAME_PREFIX + secrets.token_hex(8)
+    return ROLE_NAME_PREFIX + secrets.token_hex(5)
 
 
 class BasicBucketClient(abc.ABC):
