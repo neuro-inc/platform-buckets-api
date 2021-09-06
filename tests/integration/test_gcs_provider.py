@@ -41,6 +41,7 @@ def gcs_bucket_exists(gs_client: GCSClient, name: str) -> bool:
 @run_in_executor
 def gcs_role_exists(iam: Any, project_id: str, name: str) -> bool:
     try:
+        time.sleep(1)  # Wait some time to avoid flakiness
         iam.projects().serviceAccounts().get(
             name=(
                 f"projects/{project_id}/serviceAccounts"
