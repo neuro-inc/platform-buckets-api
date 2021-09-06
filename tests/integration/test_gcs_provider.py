@@ -27,6 +27,9 @@ from tests.integration.test_provider_base import (
 )
 
 
+BUCKET_SA_PREFIX = "bucket-e2e-test-"
+
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -177,7 +180,7 @@ async def iam_client(
         )
         prefixes = [
             f"projects/{project_id}/serviceAccounts/{ROLE_NAME_PREFIX}",
-            f"projects/{project_id}/serviceAccounts/bucket-api",
+            f"projects/{project_id}/serviceAccounts/{BUCKET_SA_PREFIX}",
         ]
         for account in resp["accounts"]:
             if any(account["name"].startswith(prefix) for prefix in prefixes):
@@ -220,6 +223,7 @@ class TestGoogleProvider(TestProviderBase):
                 gcs_client=gcs_client,
                 iam_client=iam_client,
                 iam_client_2=iam_client_2,
+                sa_prefix=BUCKET_SA_PREFIX,
             ),
             bucket_exists=partial(gcs_bucket_exists, gcs_client),
             make_client=GoogleBasicBucketClient.create,

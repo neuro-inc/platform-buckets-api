@@ -562,15 +562,17 @@ class GoogleBucketProvider(BucketProvider):
         gcs_client: GCSClient,
         iam_client: Any,
         iam_client_2: IAMCredentialsAsyncClient,
+        sa_prefix: str = "bucket-api-",
     ):
         self._gcs_client = gcs_client
         self._iam_client = iam_client
         self._iam_client_2 = iam_client_2
+        self._sa_prefix = sa_prefix
 
     def _make_bucket_sa_name(self, bucket_name: str, *, write: bool) -> str:
         hasher = hashlib.new("sha256")
         hasher.update(bucket_name.encode("utf-8"))
-        return ("bucket-api-" + ("wr-" if write else "rd-") + hasher.hexdigest())[:30]
+        return (self._sa_prefix + ("wr-" if write else "rd-") + hasher.hexdigest())[:30]
 
     def _make_sa_email(self, name: str) -> str:
         return f"{name}@{self._gcs_client.project}.iam.gserviceaccount.com"
