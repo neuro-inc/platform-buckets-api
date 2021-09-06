@@ -710,7 +710,7 @@ class GoogleBucketProvider(BucketProvider):
         return {
             "project": self._gcs_client.project,
             "access_token": resp.access_token,
-            "expire_time": resp.expire_time,
+            "expire_time": resp.expire_time.isoformat(),
         }
 
     async def create_role(
