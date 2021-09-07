@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import os
@@ -24,6 +25,7 @@ from tests.integration.test_provider_base import (
     BasicBucketClient,
     ProviderTestOption,
     TestProviderBase,
+    _make_bucket_name,
 )
 
 
@@ -150,12 +152,6 @@ async def gcs_client(
             if bucket.name.startswith(BUCKET_NAME_PREFIX):
                 client.bucket(bucket.name).delete(force=True)
 
-    # if ACCOUNT_URL_ENV not in os.environ or ACCOUNT_CREDENTIAL_ENV not in os.environ:
-    #     pytest.skip(
-    #         f"Skipping Azure provider tests. Please set {ACCOUNT_URL_ENV}"
-    #         f" and {ACCOUNT_CREDENTIAL_ENV} environ variables to enable tests"
-    #     )
-
     client = GCSClient(
         project=project_id,
         credentials=sa_credentials,
@@ -166,23 +162,28 @@ async def gcs_client(
     client.close()
 
 
+def _list_all_accounts(iam: Any, project_id: str) -> List[Mapping[str, Any]]:
+    accounts = []
+    req = iam.projects().serviceAccounts().list(name=f"projects/{project_id}")
+    while req:
+        resp = req.execute()
+        accounts += resp["accounts"]
+        req = iam.projects().serviceAccounts().list_next(req, resp)
+    return accounts
+
+
 @pytest.fixture()
 async def iam_client(
     sa_credentials: SACredentials, project_id: str
 ) -> AsyncIterator[Any]:
     @run_in_executor
     def _cleanup_sa(iam: Any) -> None:
-        resp = (
-            iam.projects()
-            .serviceAccounts()
-            .list(name=f"projects/{project_id}")
-            .execute()
-        )
+        accounts = _list_all_accounts(iam, project_id)
         prefixes = [
             f"projects/{project_id}/serviceAccounts/{ROLE_NAME_PREFIX}",
             f"projects/{project_id}/serviceAccounts/{BUCKET_SA_PREFIX}",
         ]
-        for account in resp["accounts"]:
+        for account in accounts:
             if any(account["name"].startswith(prefix) for prefix in prefixes):
                 try:
                     iam.projects().serviceAccounts().delete(
@@ -230,3 +231,13 @@ class TestGoogleProvider(TestProviderBase):
             get_admin=lambda bucket: GoogleBasicBucketClient(gcs_client, bucket.name),
             role_exists=partial(gcs_role_exists, iam_client, project_id),
         )
+
+    async def test_bucket_delete_no_hanging_sa(
+        self, provider_option: ProviderTestOption, iam_client: Any, project_id: str
+    ) -> None:
+        name = _make_bucket_name()
+        bucket = await provider_option.provider.create_bucket(name)
+        await provider_option.provider.delete_bucket(bucket.name)
+        await asyncio.sleep(5)  # Allow GCP to delete accounts
+        accounts = await run_in_executor(_list_all_accounts)(iam_client, project_id)
+        assert all(bucket.name not in account["displayName"] for account in accounts)
