@@ -167,7 +167,7 @@ def _list_all_accounts(iam: Any, project_id: str) -> List[Mapping[str, Any]]:
     req = iam.projects().serviceAccounts().list(name=f"projects/{project_id}")
     while req:
         resp = req.execute()
-        accounts += resp["accounts"]
+        accounts += resp.get("accounts", [])
         req = iam.projects().serviceAccounts().list_next(req, resp)
     return accounts
 
