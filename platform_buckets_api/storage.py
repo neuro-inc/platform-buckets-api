@@ -47,6 +47,7 @@ class PersistentCredentials:
     owner: str
     bucket_ids: List[str]
     role: ProviderRole
+    read_only: bool = False
 
 
 @dataclass(frozen=True)

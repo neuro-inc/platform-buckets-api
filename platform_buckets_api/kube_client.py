@@ -66,6 +66,7 @@ class PersistentCredentialsCRDMapper:
                 credentials=payload["spec"]["credentials"],
             ),
             bucket_ids=payload["spec"]["bucket_ids"],
+            read_only=payload["spec"].get("read_only", False),
         )
 
     @staticmethod
@@ -95,6 +96,7 @@ class PersistentCredentialsCRDMapper:
                 "provider_type": entry.role.provider_type.value,
                 "credentials": entry.role.credentials,
                 "bucket_ids": entry.bucket_ids,
+                "read_only": entry.read_only,
             },
         }
 

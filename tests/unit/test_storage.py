@@ -30,7 +30,7 @@ class TestCredentialsStorage:
         return in_memory_credentials_storage
 
     def _make_credentials(
-        self, owner: str, name: Optional[str] = None
+        self, owner: str, name: Optional[str] = None, read_only: bool = False
     ) -> PersistentCredentials:
         return PersistentCredentials(
             id=f"credentials-{uuid4()}",
@@ -45,12 +45,13 @@ class TestCredentialsStorage:
                 },
             ),
             bucket_ids=["1", "2", "3"],
+            read_only=read_only,
         )
 
     async def test_credentials_create_list(self, storage: CredentialsStorage) -> None:
         credentials1 = self._make_credentials("user1", "test")
         credentials2 = self._make_credentials("user2", None)
-        credentials3 = self._make_credentials("user2", None)
+        credentials3 = self._make_credentials("user2", None, read_only=True)
         await storage.create_credentials(credentials1)
         await storage.create_credentials(credentials2)
         await storage.create_credentials(credentials3)

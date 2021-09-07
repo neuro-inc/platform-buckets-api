@@ -119,10 +119,14 @@ class PersistentCredentialsService:
         self._permissions_service = permissions_service
 
     async def create_credentials(
-        self, bucket_ids: Iterable[str], owner: str, name: Optional[str] = None
+        self,
+        bucket_ids: Iterable[str],
+        owner: str,
+        name: Optional[str] = None,
+        read_only: bool = False,
     ) -> PersistentCredentials:
         role_name = make_role_name(name, owner)
-        permissions = await self._get_permissions(owner, bucket_ids)
+        permissions = await self._get_permissions(owner, bucket_ids, read_only)
         role = await self._provider.create_role(
             role_name, initial_permissions=permissions
         )
@@ -133,6 +137,7 @@ class PersistentCredentialsService:
             owner=owner,
             bucket_ids=list(bucket_ids),
             role=role,
+            read_only=read_only,
         )
         try:
             await self._storage.create_credentials(credentials)
@@ -167,12 +172,12 @@ class PersistentCredentialsService:
 
     async def _sync_permissions(self, credentials: PersistentCredentials) -> None:
         permissions = await self._get_permissions(
-            credentials.owner, credentials.bucket_ids
+            credentials.owner, credentials.bucket_ids, credentials.read_only
         )
         await self._provider.set_role_permissions(credentials.role, permissions)
 
     async def _get_permissions(
-        self, owner: str, bucket_ids: Iterable[str]
+        self, owner: str, bucket_ids: Iterable[str], read_only: bool
     ) -> List[BucketPermission]:
         checker = await self._permissions_service.get_perms_checker(owner)
         buckets = [
@@ -185,7 +190,7 @@ class PersistentCredentialsService:
                 permissions.append(
                     BucketPermission(
                         bucket_name=bucket.provider_bucket.name,
-                        write=checker.can_write(bucket),
+                        write=not read_only and checker.can_write(bucket),
                     )
                 )
         return permissions

@@ -88,6 +88,7 @@ class PersistentBucketsCredentialsRequest(Schema):
         ],
     )
     bucket_ids = fields.List(fields.String(), required=True)
+    read_only = fields.Boolean(required=False, allow_none=True, load_default=False)
 
 
 class PersistentBucketsCredentials(Schema):

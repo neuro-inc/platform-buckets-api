@@ -206,13 +206,19 @@ class TestApi:
     CredentialsFactory = Callable[
         [Optional[str], _User, List[str]], Awaitable[Dict[str, Any]]
     ]
+    CredentialsFactoryWithReadOnly = Callable[
+        [Optional[str], _User, List[str], bool], Awaitable[Dict[str, Any]]
+    ]
 
     @pytest.fixture()
     async def make_credentials(
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> CredentialsFactory:
         async def _factory(
-            name: Optional[str], user: _User, bucket_ids: List[str]
+            name: Optional[str],
+            user: _User,
+            bucket_ids: List[str],
+            read_only: bool = False,
         ) -> Dict[str, Any]:
             async with client.post(
                 buckets_api.credentials_url,
@@ -562,6 +568,34 @@ class TestApi:
         bucket2 = await make_bucket("test-bucket2", regular_user)
         payload = await make_credentials(
             "test-creds", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        assert payload["id"]
+        assert payload["name"] == "test-creds"
+        assert payload["owner"] == regular_user.name
+        assert len(payload["credentials"]) == 2
+        bucket1_creds, bucket2_creds = payload["credentials"]
+        if bucket1_creds["bucket_id"] == bucket2["id"]:
+            bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
+        assert bucket1_creds["bucket_id"] == bucket1["id"]
+        assert bucket1_creds["provider"] == bucket1["provider"]
+        assert "test-bucket1" in bucket1_creds["credentials"]["bucket_name"]
+
+        assert bucket2_creds["bucket_id"] == bucket2["id"]
+        assert bucket2_creds["provider"] == bucket2["provider"]
+        assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
+
+    async def test_create_credentials_read_only(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactoryWithReadOnly,
+    ) -> None:
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
+        payload = await make_credentials(
+            "test-creds", regular_user, [bucket1["id"], bucket2["id"]], True
         )
         assert payload["id"]
         assert payload["name"] == "test-creds"

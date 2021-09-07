@@ -341,3 +341,19 @@ class TestPersistentCredentialsService:
         assert all(
             not _check_access(perms, bucket, write=False) for bucket in user_2_buckets
         )
+
+        credentials = await service.create_credentials(
+            name=None, owner="test-user", bucket_ids=all_buckets_ids, read_only=True
+        )
+        perms = mock_provider.role_to_permissions[credentials.role.name]
+        assert all(
+            not _check_access(perms, bucket, write=True) for bucket in all_buckets
+        )
+        assert all(
+            _check_access(perms, bucket, write=False) for bucket in user_1_buckets
+        )
+        assert _check_access(perms, bucket3_1, write=False)
+        assert _check_access(perms, bucket3_2, write=False)
+        assert all(
+            not _check_access(perms, bucket, write=False) for bucket in user_2_buckets
+        )

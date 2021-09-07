@@ -441,6 +441,7 @@ class PersistentCredentialsApiHandler:
             name=data.get("name"),
             bucket_ids=data["bucket_ids"],
             owner=username,
+            read_only=data["read_only"],
         )
         return aiohttp.web.json_response(
             data=await self._serialize_credentials(credentials),
