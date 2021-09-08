@@ -2,6 +2,7 @@ from typing import Iterable, List
 
 import pytest
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.providers import BucketPermission
 from platform_buckets_api.service import BucketsService, PersistentCredentialsService
@@ -70,6 +71,7 @@ class TestBucketsService:
         self, service: BucketsService, mock_provider: MockBucketProvider
     ) -> None:
         bucket = await service.create_bucket(owner="test-user", name="test-bucket")
+        assert bucket.owner == "test-user"
         assert mock_provider.created_buckets == [bucket.provider_bucket]
         assert "test-user" in bucket.provider_bucket.name
         assert "test-bucket" in bucket.provider_bucket.name
@@ -93,6 +95,36 @@ class TestBucketsService:
             bucket1.provider_bucket,
             bucket2.provider_bucket,
         ]
+
+    async def test_bucket_import(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.import_bucket(
+            owner="test-user",
+            provider_bucket_name="in-provider-name",
+            provider_type=BucketsProviderType.AWS,
+            credentials={"key": "value"},
+            name="test-bucket",
+        )
+        assert bucket.name == "test-bucket"
+        assert bucket.owner == "test-user"
+        assert bucket.provider_bucket.name == "in-provider-name"
+        assert bucket.provider_bucket.provider_type == BucketsProviderType.AWS
+        assert bucket.credentials == {"key": "value"}
+        assert bucket.imported
+
+    async def test_bucket_import_get(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.import_bucket(
+            owner="test-user",
+            provider_bucket_name="in-provider-name",
+            provider_type=BucketsProviderType.AWS,
+            credentials={"key": "value"},
+            name="test-bucket",
+        )
+        bucket_get = await service.get_bucket(bucket.id)
+        assert bucket == bucket_get
 
     async def test_get_bucket(
         self, service: BucketsService, mock_provider: MockBucketProvider

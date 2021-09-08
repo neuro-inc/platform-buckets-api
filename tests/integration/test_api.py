@@ -47,6 +47,10 @@ class BucketsApiEndpoints:
     def buckets_url(self) -> str:
         return f"{self.api_v1_endpoint}/buckets/buckets"
 
+    @property
+    def bucket_import_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/buckets/import/external"
+
     def bucket_url(self, name: str) -> str:
         return f"{self.buckets_url}/{name}"
 
@@ -203,6 +207,26 @@ class TestApi:
 
         return _factory
 
+    @pytest.fixture()
+    async def import_bucket(
+        self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
+    ) -> BucketFactory:
+        async def _factory(name: Optional[str], user: _User) -> Dict[str, Any]:
+            async with client.post(
+                buckets_api.bucket_import_url,
+                headers=user.headers,
+                json={
+                    "name": name,
+                    "provider_bucket_name": f"in-provider-{name}",
+                    "provider": "aws",
+                    "credentials": {"key": f"key-for-{name}"},
+                },
+            ) as resp:
+                assert resp.status == HTTPCreated.status_code, await resp.text()
+                return await resp.json()
+
+        return _factory
+
     CredentialsFactory = Callable[
         [Optional[str], _User, List[str]], Awaitable[Dict[str, Any]]
     ]
@@ -247,6 +271,24 @@ class TestApi:
         assert payload["name"] == "test-bucket"
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
+        assert not payload["imported"]
+        assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
+    async def test_import_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        import_bucket: BucketFactory,
+    ) -> None:
+        before = utc_now()
+        payload = await import_bucket("test-bucket", regular_user)
+        after = utc_now()
+        assert "id" in payload
+        assert payload["name"] == "test-bucket"
+        assert payload["provider"] == "aws"
+        assert payload["owner"] == regular_user.name
+        assert payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
     async def test_make_bucket_tmp_credentials(
@@ -266,6 +308,25 @@ class TestApi:
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
             assert "test-bucket" in payload["credentials"]["bucket_name"]
+
+    async def test_imported_bucket_tmp_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        import_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await import_bucket("test-bucket", regular_user)
+        async with client.post(
+            buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["bucket_id"] == create_resp["id"]
+            assert payload["provider"] == create_resp["provider"]
+            assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
+            assert payload["credentials"]["key"] == "key-for-test-bucket"
 
     async def test_create_bucket_duplicate(
         self,

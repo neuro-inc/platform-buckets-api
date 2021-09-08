@@ -78,6 +78,7 @@ from .schema import (
     Bucket,
     BucketCredentials,
     ClientErrorSchema,
+    ImportBucketRequest,
     PersistentBucketsCredentials,
     PersistentBucketsCredentialsRequest,
 )
@@ -159,6 +160,7 @@ class BucketsApiHandler:
         app.add_routes(
             [
                 aiohttp.web.post("", self.create_bucket),
+                aiohttp.web.post("/import/external", self.import_bucket),
                 aiohttp.web.get("", self.list_buckets),
                 aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
                 aiohttp.web.post(
@@ -203,7 +205,7 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["provider", "owner", "created_at"]))
+    @request_schema(Bucket(partial=["provider", "owner", "created_at", "imported"]))
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
@@ -212,11 +214,57 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
-        schema = Bucket(partial=["provider", "owner", "created_at"])
+        schema = Bucket(partial=["provider", "owner", "created_at", "imported"])
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name, name=data.get("name")
+            )
+        except ExistsError:
+            return json_response(
+                {
+                    "code": "unique",
+                    "description": "Bucket with given name exists",
+                },
+                status=HTTPConflict.status_code,
+            )
+        return aiohttp.web.json_response(
+            data=Bucket().dump(bucket),
+            status=HTTPCreated.status_code,
+        )
+
+    @docs(
+        tags=["buckets"],
+        summary="Create bucket",
+        responses={
+            HTTPCreated.status_code: {
+                "description": "Bucket created",
+                "schema": Bucket(),
+            },
+            HTTPConflict.status_code: {
+                "description": "Bucket with such name exists",
+                "schema": ClientErrorSchema(),
+            },
+        },
+    )
+    @request_schema(ImportBucketRequest())
+    async def import_bucket(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        user = await _get_untrusted_user(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_create_bucket_perms(user)
+        )
+        schema = ImportBucketRequest()
+        data = schema.load(await request.json())
+        try:
+            bucket = await self.service.import_bucket(
+                owner=user.name,
+                provider_type=data["provider"],
+                provider_bucket_name=data["provider_bucket_name"],
+                credentials=data["credentials"],
+                name=data.get("name"),
             )
         except ExistsError:
             return json_response(

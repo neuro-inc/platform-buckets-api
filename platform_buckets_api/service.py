@@ -4,6 +4,7 @@ import secrets
 from typing import AsyncIterator, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.providers import (
     BucketNotExistsError,
@@ -14,8 +15,10 @@ from platform_buckets_api.storage import (
     BaseBucket,
     BucketsStorage,
     CredentialsStorage,
+    ImportedBucket,
     NotExistsError,
     PersistentCredentials,
+    ProviderBucket,
     UserBucket,
 )
 from platform_buckets_api.utils import utc_now
@@ -74,6 +77,28 @@ class BucketsService:
         except Exception:
             await self._provider.delete_bucket(provider_bucket.name)
             raise
+        return bucket
+
+    async def import_bucket(
+        self,
+        owner: str,
+        provider_bucket_name: str,
+        provider_type: BucketsProviderType,
+        credentials: Mapping[str, str],
+        name: Optional[str] = None,
+    ) -> ImportedBucket:
+        bucket = ImportedBucket(
+            id=f"bucket-{uuid4()}",
+            name=name,
+            owner=owner,
+            provider_bucket=ProviderBucket(
+                name=provider_bucket_name,
+                provider_type=provider_type,
+            ),
+            created_at=utc_now(),
+            credentials=credentials,
+        )
+        await self._storage.create_bucket(bucket)
         return bucket
 
     async def get_bucket(self, id: str) -> BaseBucket:
