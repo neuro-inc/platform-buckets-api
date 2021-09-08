@@ -78,11 +78,19 @@ from .schema import (
     Bucket,
     BucketCredentials,
     ClientErrorSchema,
+    ImportBucketRequest,
     PersistentBucketsCredentials,
     PersistentBucketsCredentialsRequest,
 )
 from .service import BucketsService, PersistentCredentialsService
-from .storage import ExistsError, NotExistsError, PersistentCredentials, UserBucket
+from .storage import (
+    BaseBucket,
+    ExistsError,
+    ImportedBucket,
+    NotExistsError,
+    PersistentCredentials,
+    UserBucket,
+)
 from .utils import ndjson_error_handler
 
 
@@ -152,6 +160,7 @@ class BucketsApiHandler:
         app.add_routes(
             [
                 aiohttp.web.post("", self.create_bucket),
+                aiohttp.web.post("/import/external", self.import_bucket),
                 aiohttp.web.get("", self.list_buckets),
                 aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
                 aiohttp.web.post(
@@ -170,7 +179,7 @@ class BucketsApiHandler:
     def permissions_service(self) -> PermissionsService:
         return self._app["permissions_service"]
 
-    async def _resolve_bucket(self, request: Request) -> UserBucket:
+    async def _resolve_bucket(self, request: Request) -> BaseBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
         try:
             bucket = await self.service.get_bucket(id_or_name)
@@ -196,7 +205,7 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["provider", "owner", "created_at"]))
+    @request_schema(Bucket(partial=["provider", "owner", "created_at", "imported"]))
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
@@ -205,11 +214,57 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
-        schema = Bucket(partial=["provider", "owner", "credentials", "created_at"])
+        schema = Bucket(partial=["provider", "owner", "created_at", "imported"])
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name, name=data.get("name")
+            )
+        except ExistsError:
+            return json_response(
+                {
+                    "code": "unique",
+                    "description": "Bucket with given name exists",
+                },
+                status=HTTPConflict.status_code,
+            )
+        return aiohttp.web.json_response(
+            data=Bucket().dump(bucket),
+            status=HTTPCreated.status_code,
+        )
+
+    @docs(
+        tags=["buckets"],
+        summary="Create bucket",
+        responses={
+            HTTPCreated.status_code: {
+                "description": "Bucket created",
+                "schema": Bucket(),
+            },
+            HTTPConflict.status_code: {
+                "description": "Bucket with such name exists",
+                "schema": ClientErrorSchema(),
+            },
+        },
+    )
+    @request_schema(ImportBucketRequest())
+    async def import_bucket(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        user = await _get_untrusted_user(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_create_bucket_perms(user)
+        )
+        schema = ImportBucketRequest()
+        data = schema.load(await request.json())
+        try:
+            bucket = await self.service.import_bucket(
+                owner=user.name,
+                provider_type=data["provider"],
+                provider_bucket_name=data["provider_bucket_name"],
+                credentials=data["credentials"],
+                name=data.get("name"),
             )
         except ExistsError:
             return json_response(
@@ -324,11 +379,16 @@ class BucketsApiHandler:
         )
         user = await _get_untrusted_user(request)
         checker = await self.permissions_service.get_perms_checker(user.name)
-        credentials = await self.service.make_tmp_credentials(
-            bucket,
-            write=checker.can_write(bucket),
-            requester=user.name,
-        )
+        if isinstance(bucket, UserBucket):
+            credentials = await self.service.make_tmp_credentials(
+                bucket,
+                write=checker.can_write(bucket),
+                requester=user.name,
+            )
+        elif isinstance(bucket, ImportedBucket):
+            credentials = bucket.credentials
+        else:
+            assert False, "unreachable"
         return aiohttp.web.json_response(
             data={
                 "bucket_id": bucket.id,

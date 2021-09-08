@@ -4,6 +4,7 @@ import secrets
 from typing import AsyncIterator, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
+from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.providers import (
     BucketNotExistsError,
@@ -11,10 +12,13 @@ from platform_buckets_api.providers import (
     BucketProvider,
 )
 from platform_buckets_api.storage import (
+    BaseBucket,
     BucketsStorage,
     CredentialsStorage,
+    ImportedBucket,
     NotExistsError,
     PersistentCredentials,
+    ProviderBucket,
     UserBucket,
 )
 from platform_buckets_api.utils import utc_now
@@ -75,10 +79,32 @@ class BucketsService:
             raise
         return bucket
 
-    async def get_bucket(self, id: str) -> UserBucket:
+    async def import_bucket(
+        self,
+        owner: str,
+        provider_bucket_name: str,
+        provider_type: BucketsProviderType,
+        credentials: Mapping[str, str],
+        name: Optional[str] = None,
+    ) -> ImportedBucket:
+        bucket = ImportedBucket(
+            id=f"bucket-{uuid4()}",
+            name=name,
+            owner=owner,
+            provider_bucket=ProviderBucket(
+                name=provider_bucket_name,
+                provider_type=provider_type,
+            ),
+            created_at=utc_now(),
+            credentials=credentials,
+        )
+        await self._storage.create_bucket(bucket)
+        return bucket
+
+    async def get_bucket(self, id: str) -> BaseBucket:
         return await self._storage.get_bucket(id)
 
-    async def get_bucket_by_name(self, name: str, owner: str) -> UserBucket:
+    async def get_bucket_by_name(self, name: str, owner: str) -> BaseBucket:
         return await self._storage.get_bucket_by_name(name, owner)
 
     async def make_tmp_credentials(
@@ -89,7 +115,7 @@ class BucketsService:
         )
 
     @asyncgeneratorcontextmanager
-    async def get_user_buckets(self, owner: str) -> AsyncIterator[UserBucket]:
+    async def get_user_buckets(self, owner: str) -> AsyncIterator[BaseBucket]:
         checker = await self._permissions_service.get_perms_checker(owner)
         async with self._storage.list_buckets() as it:
             async for bucket in it:

@@ -46,6 +46,26 @@ class ProviderTypeField(fields.String):
         return super()._serialize(value.value, *args, **kwargs)
 
 
+class ImportBucketRequest(Schema):
+    id = fields.String(required=True, dump_only=True)
+    name = fields.String(
+        required=False,
+        allow_none=True,
+        validate=[
+            validate.Regexp(r"^[a-z](?:-?[a-z0-9_-])*(?!\n)$"),
+            validate.Length(min=3, max=40),
+        ],
+    )
+    provider = ProviderTypeField(
+        required=True,
+        validate=validate.OneOf(
+            choices=[provider_type for provider_type in BucketsProviderType]
+        ),
+    )
+    provider_bucket_name = fields.String(required=True)
+    credentials = fields.Dict(required=True)
+
+
 class Bucket(Schema):
     id = fields.String(required=True, dump_only=True)
     name = fields.String(
@@ -65,6 +85,7 @@ class Bucket(Schema):
         ),
     )
     created_at = fields.DateTime(required=True)
+    imported = fields.Boolean(required=True)
 
 
 class BucketCredentials(Schema):

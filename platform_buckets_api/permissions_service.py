@@ -3,7 +3,7 @@ from typing import List
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission, User
 from neuro_auth_client.client import check_action_allowed
 
-from platform_buckets_api.storage import UserBucket
+from platform_buckets_api.storage import BaseBucket
 
 
 class PermissionsService:
@@ -14,7 +14,7 @@ class PermissionsService:
     def get_create_bucket_perms(self, user: User) -> List[Permission]:
         return [Permission(f"{self._bucket_cluster_uri}/{user.name}", "write")]
 
-    def get_bucket_read_perms(self, bucket: UserBucket) -> List[Permission]:
+    def get_bucket_read_perms(self, bucket: BaseBucket) -> List[Permission]:
         return [
             Permission(
                 f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.name}", "read"
@@ -24,7 +24,7 @@ class PermissionsService:
             ),
         ]
 
-    def get_bucket_write_perms(self, bucket: UserBucket) -> List[Permission]:
+    def get_bucket_write_perms(self, bucket: BaseBucket) -> List[Permission]:
         return [
             Permission(
                 f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.name}", "write"
@@ -64,13 +64,13 @@ class PermissionsService:
             except KeyError:
                 return False
 
-        def can_read(self, bucket: UserBucket) -> bool:
+        def can_read(self, bucket: BaseBucket) -> bool:
             return any(
                 self._has_perm(perm)
                 for perm in self._service.get_bucket_read_perms(bucket)
             )
 
-        def can_write(self, bucket: UserBucket) -> bool:
+        def can_write(self, bucket: BaseBucket) -> bool:
             return any(
                 self._has_perm(perm)
                 for perm in self._service.get_bucket_write_perms(bucket)

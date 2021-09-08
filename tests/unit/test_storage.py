@@ -8,6 +8,7 @@ from platform_buckets_api.storage import (
     BucketsStorage,
     CredentialsStorage,
     ExistsError,
+    ImportedBucket,
     InMemoryBucketsStorage,
     InMemoryCredentialsStorage,
     NotExistsError,
@@ -136,16 +137,34 @@ class TestBucketsStorage:
             ),
         )
 
+    def _make_imported_bucket(
+        self, username: str, name: Optional[str]
+    ) -> ImportedBucket:
+        return ImportedBucket(
+            id=f"bucket-{uuid4()}",
+            owner=username,
+            name=name,
+            created_at=utc_now(),
+            provider_bucket=ProviderBucket(
+                provider_type=BucketsProviderType.AWS,
+                name=f"{name}--{username}",
+            ),
+            credentials={"key": "value"},
+        )
+
     async def test_buckets_create_list(self, storage: BucketsStorage) -> None:
         bucket1 = self._make_bucket("user1", "test")
         bucket2 = self._make_bucket("user2", None)
         bucket3 = self._make_bucket("user2", None)
+        bucket4 = self._make_imported_bucket("user2", None)
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         await storage.create_bucket(bucket3)
+        await storage.create_bucket(bucket4)
         async with storage.list_buckets() as it:
-            buckets = {bucket async for bucket in it}
-        assert buckets == {bucket1, bucket2, bucket3}
+            buckets = [bucket async for bucket in it]
+        assert len(buckets) == 4
+        assert all(bucket in buckets for bucket in [bucket1, bucket2, bucket3, bucket4])
 
     async def test_bucket_duplicate_not_allowed(self, storage: BucketsStorage) -> None:
         bucket1 = self._make_bucket("user", "test")
@@ -166,7 +185,7 @@ class TestBucketsStorage:
 
     async def test_buckets_create_get_by_name(self, storage: BucketsStorage) -> None:
         bucket1 = self._make_bucket("user1", "test-1")
-        bucket2 = self._make_bucket("user1", "test-2")
+        bucket2 = self._make_imported_bucket("user1", "test-2")
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         assert bucket1.name
