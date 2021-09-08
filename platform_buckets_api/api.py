@@ -498,6 +498,11 @@ class PersistentCredentialsApiHandler:
             await check_any_permissions(
                 request, self.permissions_service.get_bucket_read_perms(bucket)
             )
+            if bucket.imported:
+                raise ValueError(
+                    "Cannot create credential for imported "
+                    f"bucket {bucket.name or bucket.id}"
+                )
         credentials = await self.credentials_service.create_credentials(
             name=data.get("name"),
             bucket_ids=data["bucket_ids"],

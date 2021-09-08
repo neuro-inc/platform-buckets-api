@@ -7,6 +7,7 @@ import aiohttp
 import pytest
 from aiohttp.web import HTTPOk
 from aiohttp.web_exceptions import (
+    HTTPBadRequest,
     HTTPConflict,
     HTTPCreated,
     HTTPForbidden,
@@ -674,6 +675,25 @@ class TestApi:
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
         assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
+
+    async def test_cannot_create_credential_for_imported_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        import_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket = await import_bucket("test-bucket", regular_user)
+        async with client.post(
+            buckets_api.credentials_url,
+            headers=regular_user.headers,
+            json={
+                "name": "test-creds",
+                "bucket_ids": [bucket["id"]],
+            },
+        ) as resp:
+            assert resp.status == HTTPBadRequest.status_code
 
     async def test_get_credentials(
         self,
