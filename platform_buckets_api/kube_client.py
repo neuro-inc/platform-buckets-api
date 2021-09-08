@@ -9,7 +9,14 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .config import BucketsProviderType, KubeClientAuthType
-from .storage import PersistentCredentials, ProviderBucket, ProviderRole, UserBucket
+from .storage import (
+    BucketType,
+    ImportedBucket,
+    PersistentCredentials,
+    ProviderBucket,
+    ProviderRole,
+    UserBucket,
+)
 from .utils import datetime_dump, datetime_load
 
 
@@ -101,10 +108,10 @@ class PersistentCredentialsCRDMapper:
         }
 
 
-class UserBucketCRDMapper:
+class BucketCRDMapper:
     @staticmethod
-    def from_primitive(payload: Dict[str, Any]) -> UserBucket:
-        return UserBucket(
+    def from_primitive(payload: Dict[str, Any]) -> BucketType:
+        common_kwargs = dict(
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
             owner=payload["metadata"]["labels"][OWNER_LABEL],
@@ -114,9 +121,18 @@ class UserBucketCRDMapper:
                 name=payload["spec"]["provider_name"],
             ),
         )
+        if payload["spec"].get("imported", False):
+            return ImportedBucket(
+                **common_kwargs,
+                credentials=payload["spec"]["credentials"],
+            )
+        else:
+            return UserBucket(
+                **common_kwargs,
+            )
 
     @staticmethod
-    def to_primitive(entry: UserBucket) -> Dict[str, Any]:
+    def to_primitive(entry: BucketType) -> Dict[str, Any]:
         # Use this strange key as name to enable uniqueness of owner/name pair
         if entry.name:
             name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, name=entry.name)}"
@@ -128,7 +144,7 @@ class UserBucketCRDMapper:
         }
         if entry.name:
             labels[BUCKET_NAME_LABEL] = entry.name
-        return {
+        res: Dict[str, Any] = {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
             "metadata": {
@@ -141,6 +157,10 @@ class UserBucketCRDMapper:
                 "created_at": datetime_dump(entry.created_at),
             },
         }
+        if isinstance(entry, ImportedBucket):
+            res["spec"]["imported"] = True
+            res["spec"]["credentials"] = entry.credentials
+        return res
 
 
 class KubeClient:
@@ -341,10 +361,10 @@ class KubeClient:
         payload = await self._request(method="DELETE", url=url)
         self._raise_for_status(payload)
 
-    async def create_user_bucket(self, user_bucket: UserBucket) -> None:
+    async def create_user_bucket(self, user_bucket: BucketType) -> None:
         url = self._user_buckets_url
         payload = await self._request(
-            method="POST", url=url, json=UserBucketCRDMapper.to_primitive(user_bucket)
+            method="POST", url=url, json=BucketCRDMapper.to_primitive(user_bucket)
         )
         self._raise_for_status(payload)
 
@@ -353,7 +373,7 @@ class KubeClient:
         id: Optional[str] = None,
         owner: Optional[str] = None,
         name: Optional[str] = None,
-    ) -> List[UserBucket]:
+    ) -> List[BucketType]:
         url = self._user_buckets_url
         label_selectors = []
         params = []
@@ -367,18 +387,17 @@ class KubeClient:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)
         return [
-            UserBucketCRDMapper.from_primitive(item)
-            for item in payload.get("items", [])
+            BucketCRDMapper.from_primitive(item) for item in payload.get("items", [])
         ]
 
-    async def get_user_bucket(self, name: str) -> UserBucket:
+    async def get_user_bucket(self, name: str) -> BucketType:
         url = self._generate_user_bucket_url(name)
         payload = await self._request(method="GET", url=url)
         self._raise_for_status(payload)
-        return UserBucketCRDMapper.from_primitive(payload)
+        return BucketCRDMapper.from_primitive(payload)
 
-    async def remove_user_bucket(self, bucket: UserBucket) -> None:
-        name = UserBucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
+    async def remove_user_bucket(self, bucket: BucketType) -> None:
+        name = BucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
         url = self._generate_user_bucket_url(name)
         payload = await self._request(method="DELETE", url=url)
         self._raise_for_status(payload)

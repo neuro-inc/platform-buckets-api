@@ -82,7 +82,14 @@ from .schema import (
     PersistentBucketsCredentialsRequest,
 )
 from .service import BucketsService, PersistentCredentialsService
-from .storage import ExistsError, NotExistsError, PersistentCredentials, UserBucket
+from .storage import (
+    BaseBucket,
+    ExistsError,
+    ImportedBucket,
+    NotExistsError,
+    PersistentCredentials,
+    UserBucket,
+)
 from .utils import ndjson_error_handler
 
 
@@ -170,7 +177,7 @@ class BucketsApiHandler:
     def permissions_service(self) -> PermissionsService:
         return self._app["permissions_service"]
 
-    async def _resolve_bucket(self, request: Request) -> UserBucket:
+    async def _resolve_bucket(self, request: Request) -> BaseBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
         try:
             bucket = await self.service.get_bucket(id_or_name)
@@ -205,7 +212,7 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
-        schema = Bucket(partial=["provider", "owner", "credentials", "created_at"])
+        schema = Bucket(partial=["provider", "owner", "created_at"])
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
@@ -324,11 +331,16 @@ class BucketsApiHandler:
         )
         user = await _get_untrusted_user(request)
         checker = await self.permissions_service.get_perms_checker(user.name)
-        credentials = await self.service.make_tmp_credentials(
-            bucket,
-            write=checker.can_write(bucket),
-            requester=user.name,
-        )
+        if isinstance(bucket, UserBucket):
+            credentials = await self.service.make_tmp_credentials(
+                bucket,
+                write=checker.can_write(bucket),
+                requester=user.name,
+            )
+        elif isinstance(bucket, ImportedBucket):
+            credentials = bucket.credentials
+        else:
+            assert False, "unreachable"
         return aiohttp.web.json_response(
             data={
                 "bucket_id": bucket.id,

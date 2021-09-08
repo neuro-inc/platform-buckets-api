@@ -3,11 +3,11 @@ from typing import AsyncIterator, Optional
 from platform_buckets_api.kube_client import KubeClient, ResourceExists
 from platform_buckets_api.storage import (
     BucketsStorage,
+    BucketType,
     CredentialsStorage,
     ExistsError,
     NotExistsError,
     PersistentCredentials,
-    UserBucket,
 )
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
@@ -16,7 +16,7 @@ class K8SBucketsStorage(BucketsStorage):
     def __init__(self, kube_client: KubeClient) -> None:
         self._kube_client = kube_client
 
-    async def create_bucket(self, bucket: UserBucket) -> None:
+    async def create_bucket(self, bucket: BucketType) -> None:
         try:
             await self._kube_client.create_user_bucket(bucket)
         except ResourceExists:
@@ -24,7 +24,7 @@ class K8SBucketsStorage(BucketsStorage):
                 f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
             )
 
-    async def get_bucket(self, id: str) -> UserBucket:
+    async def get_bucket(self, id: str) -> BucketType:
         res = await self._kube_client.list_user_buckets(id=id)
         assert len(res) <= 1, f"Found multiple buckets for id = {id}"
         if len(res) == 0:
@@ -35,7 +35,7 @@ class K8SBucketsStorage(BucketsStorage):
         self,
         name: str,
         owner: str,
-    ) -> UserBucket:
+    ) -> BucketType:
         res = await self._kube_client.list_user_buckets(owner=owner, name=name)
         assert (
             len(res) <= 1
@@ -47,7 +47,7 @@ class K8SBucketsStorage(BucketsStorage):
         return res[0]
 
     @asyncgeneratorcontextmanager
-    async def list_buckets(self) -> AsyncIterator[UserBucket]:
+    async def list_buckets(self) -> AsyncIterator[BucketType]:
         for bucket in await self._kube_client.list_user_buckets():
             yield bucket
 

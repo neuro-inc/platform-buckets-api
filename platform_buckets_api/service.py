@@ -11,6 +11,7 @@ from platform_buckets_api.providers import (
     BucketProvider,
 )
 from platform_buckets_api.storage import (
+    BaseBucket,
     BucketsStorage,
     CredentialsStorage,
     NotExistsError,
@@ -75,10 +76,10 @@ class BucketsService:
             raise
         return bucket
 
-    async def get_bucket(self, id: str) -> UserBucket:
+    async def get_bucket(self, id: str) -> BaseBucket:
         return await self._storage.get_bucket(id)
 
-    async def get_bucket_by_name(self, name: str, owner: str) -> UserBucket:
+    async def get_bucket_by_name(self, name: str, owner: str) -> BaseBucket:
         return await self._storage.get_bucket_by_name(name, owner)
 
     async def make_tmp_credentials(
@@ -89,7 +90,7 @@ class BucketsService:
         )
 
     @asyncgeneratorcontextmanager
-    async def get_user_buckets(self, owner: str) -> AsyncIterator[UserBucket]:
+    async def get_user_buckets(self, owner: str) -> AsyncIterator[BaseBucket]:
         checker = await self._permissions_service.get_perms_checker(owner)
         async with self._storage.list_buckets() as it:
             async for bucket in it:

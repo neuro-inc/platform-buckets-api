@@ -28,6 +28,10 @@ spec:
               type: string
             created_at:
               type: string
+            imported:
+              type: boolean
+            credentials:
+              type: object
   scope: Namespaced
   names:
     kind: UserBucket

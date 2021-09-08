@@ -1,7 +1,15 @@
 import abc
 from dataclasses import dataclass
 from datetime import datetime
-from typing import AsyncContextManager, AsyncIterator, List, Mapping, Optional
+from typing import (
+    AsyncContextManager,
+    AsyncIterator,
+    ClassVar,
+    List,
+    Mapping,
+    Optional,
+    Union,
+)
 
 from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
@@ -51,29 +59,44 @@ class PersistentCredentials:
 
 
 @dataclass(frozen=True)
-class UserBucket:
+class BaseBucket(abc.ABC):
     id: str
     name: Optional[str]
     owner: str
     created_at: datetime
     provider_bucket: ProviderBucket
+    imported: ClassVar[bool]
+
+
+@dataclass(frozen=True)
+class UserBucket(BaseBucket):
+    imported: ClassVar[bool] = False
+
+
+@dataclass(frozen=True)
+class ImportedBucket(BaseBucket):
+    imported: ClassVar[bool] = True
+    credentials: Mapping[str, str]
+
+
+BucketType = Union[UserBucket, ImportedBucket]
 
 
 class BucketsStorage(abc.ABC):
     @abc.abstractmethod
-    def list_buckets(self) -> AsyncContextManager[AsyncIterator[UserBucket]]:
+    def list_buckets(self) -> AsyncContextManager[AsyncIterator[BucketType]]:
         pass
 
     @abc.abstractmethod
-    async def get_bucket(self, id: str) -> UserBucket:
+    async def get_bucket(self, id: str) -> BucketType:
         pass
 
     @abc.abstractmethod
-    async def get_bucket_by_name(self, name: str, owner: str) -> UserBucket:
+    async def get_bucket_by_name(self, name: str, owner: str) -> BucketType:
         pass
 
     @abc.abstractmethod
-    async def create_bucket(self, bucket: UserBucket) -> None:
+    async def create_bucket(self, bucket: BucketType) -> None:
         pass
 
     @abc.abstractmethod
@@ -109,14 +132,14 @@ class CredentialsStorage(abc.ABC):
 
 class InMemoryBucketsStorage(BucketsStorage):
     def __init__(self) -> None:
-        self._buckets: List[UserBucket] = []
+        self._buckets: List[BucketType] = []
 
     @asyncgeneratorcontextmanager
-    async def list_buckets(self) -> AsyncIterator[UserBucket]:
+    async def list_buckets(self) -> AsyncIterator[BucketType]:
         for bucket in self._buckets:
             yield bucket
 
-    async def create_bucket(self, bucket: UserBucket) -> None:
+    async def create_bucket(self, bucket: BucketType) -> None:
         if bucket.name:
             try:
                 await self.get_bucket_by_name(owner=bucket.owner, name=bucket.name)
@@ -131,7 +154,7 @@ class InMemoryBucketsStorage(BucketsStorage):
     async def get_bucket(
         self,
         id: str,
-    ) -> UserBucket:
+    ) -> BucketType:
         for bucket in self._buckets:
             if bucket.id == id:
                 return bucket
@@ -141,7 +164,7 @@ class InMemoryBucketsStorage(BucketsStorage):
         self,
         name: str,
         owner: str,
-    ) -> UserBucket:
+    ) -> BucketType:
         for bucket in self._buckets:
             if bucket.owner == owner and bucket.name == name:
                 return bucket
