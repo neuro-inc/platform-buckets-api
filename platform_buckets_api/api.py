@@ -397,6 +397,7 @@ class PersistentCredentialsApiHandler:
             "id": credentials.id,
             "name": credentials.name,
             "owner": credentials.owner,
+            "read_only": credentials.read_only,
             "credentials": [
                 {
                     "bucket_id": bucket.id,

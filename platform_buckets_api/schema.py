@@ -103,6 +103,7 @@ class PersistentBucketsCredentials(Schema):
     )
     owner = fields.String(required=True)
     credentials = fields.List(fields.Nested(BucketCredentials), required=True)
+    read_only = fields.Boolean(required=True)
 
 
 class ClientErrorSchema(Schema):

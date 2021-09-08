@@ -572,6 +572,7 @@ class TestApi:
         assert payload["id"]
         assert payload["name"] == "test-creds"
         assert payload["owner"] == regular_user.name
+        assert not payload["read_only"]
         assert len(payload["credentials"]) == 2
         bucket1_creds, bucket2_creds = payload["credentials"]
         if bucket1_creds["bucket_id"] == bucket2["id"]:
@@ -600,6 +601,7 @@ class TestApi:
         assert payload["id"]
         assert payload["name"] == "test-creds"
         assert payload["owner"] == regular_user.name
+        assert payload["read_only"]
         assert len(payload["credentials"]) == 2
         bucket1_creds, bucket2_creds = payload["credentials"]
         if bucket1_creds["bucket_id"] == bucket2["id"]:
