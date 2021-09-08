@@ -251,6 +251,7 @@ class TestApi:
                 json={
                     "name": name,
                     "bucket_ids": bucket_ids,
+                    "read_only": read_only,
                 },
             ) as resp:
                 assert resp.status == HTTPCreated.status_code, await resp.text()
