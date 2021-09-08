@@ -1,11 +1,7 @@
 bucketProvider:
-  type: "gcp"  # "aws" or "minio" or "azure" or "gcp"
-  gcp:
-    SAKeyJsonB64:
-      valueFrom:
-        secretKeyRef:
-          name: gcp-sa-token-for-buckets
-          key: keyJsonB64
+  type: "aws"  # "aws" or "minio"
+  aws:
+    s3RoleArn: arn:aws:iam::771188043543:role/bucker-api-users-role
 
 annotations:
   iam.amazonaws.com/role: arn:aws:iam::771188043543:role/buckets-366c09e4841fcc83df56b8f070c34716
