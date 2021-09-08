@@ -125,7 +125,8 @@ class BucketsService:
     async def delete_bucket(self, bucket_id: str) -> None:
         try:
             bucket = await self.get_bucket(bucket_id)
-            await self._provider.delete_bucket(bucket.provider_bucket.name)
+            if not bucket.imported:
+                await self._provider.delete_bucket(bucket.provider_bucket.name)
             await self._storage.delete_bucket(bucket_id)
         except (NotExistsError, BucketNotExistsError):
             pass  # Bucket already removed or there was concurrent removal, just ignore
