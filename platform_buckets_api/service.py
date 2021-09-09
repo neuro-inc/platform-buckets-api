@@ -4,6 +4,8 @@ import secrets
 from typing import AsyncIterator, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
+from yarl import URL
+
 from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.providers import (
@@ -112,6 +114,13 @@ class BucketsService:
     ) -> Mapping[str, str]:
         return await self._provider.get_bucket_credentials(
             bucket.provider_bucket.name, write, requester
+        )
+
+    async def sign_url_for_blob(
+        self, bucket: UserBucket, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        return await self._provider.sign_url_for_blob(
+            bucket.provider_bucket.name, key, expires_in_sec
         )
 
     @asyncgeneratorcontextmanager

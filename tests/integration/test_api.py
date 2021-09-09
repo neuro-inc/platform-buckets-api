@@ -16,6 +16,7 @@ from aiohttp.web_exceptions import (
     HTTPUnauthorized,
 )
 from neuro_auth_client import AuthClient, Permission
+from yarl import URL
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
@@ -57,6 +58,9 @@ class BucketsApiEndpoints:
 
     def bucket_make_tmp_credentials_url(self, name: str) -> str:
         return f"{self.bucket_url(name)}/make_tmp_credentials"
+
+    def bucket_sign_blob_url(self, name: str) -> str:
+        return f"{self.bucket_url(name)}/sign_blob_url"
 
     @property
     def credentials_url(self) -> str:
@@ -329,6 +333,23 @@ class TestApi:
             assert payload["provider"] == create_resp["provider"]
             assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
             assert payload["credentials"]["key"] == "key-for-test-bucket"
+
+    async def test_make_signed_url(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test-bucket", regular_user)
+        async with client.post(
+            buckets_api.bucket_sign_blob_url(create_resp["id"]),
+            headers=regular_user.headers,
+            options={"key": "some/file"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert URL(payload["url"])
 
     async def test_create_bucket_duplicate(
         self,

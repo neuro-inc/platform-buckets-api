@@ -130,3 +130,7 @@ class PersistentBucketsCredentials(Schema):
 class ClientErrorSchema(Schema):
     code = fields.String(required=True)
     description = fields.String(required=True)
+
+
+class SignedUrl(Schema):
+    url = fields.Url(required=True)
