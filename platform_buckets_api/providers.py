@@ -219,6 +219,8 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
     async def sign_url_for_blob(
         self, bucket_name: str, key: str, expires_in_sec: int = 3600
     ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("S3 do not support signed urls for more then 7 days")
         return URL(
             await self._s3_client.generate_presigned_url(
                 ClientMethod="get_object",
@@ -807,6 +809,8 @@ class GoogleBucketProvider(BucketProvider):
     async def sign_url_for_blob(
         self, bucket_name: str, key: str, expires_in_sec: int = 3600
     ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("GCP do not support signed urls for more then 7 days")
         return URL(
             self._gcs_client.bucket(bucket_name)
             .blob(key)
