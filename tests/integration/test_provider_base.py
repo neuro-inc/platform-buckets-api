@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import AsyncContextManager, Awaitable, Callable, List, Mapping
 
 import pytest
+from aiohttp import ClientSession
 
 from platform_buckets_api.providers import (
     BucketExistsError,
@@ -172,6 +173,18 @@ class TestProviderBase:
         )
         async with provider_option.make_client(bucket, credentials) as user_client:
             await _test_read_access(provider_option.get_admin(bucket), user_client)
+
+    async def test_signed_url_for_blob(
+        self, provider_option: ProviderTestOption
+    ) -> None:
+        bucket = await provider_option.provider.create_bucket(_make_bucket_name())
+        admin_client = provider_option.get_admin(bucket)
+        await admin_client.put_object("foo/bar", b"test data")
+        url = await provider_option.provider.sign_url_for_blob(bucket.name, "foo/bar")
+        async with ClientSession() as session:
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"test data"
 
     @pytest.fixture()
     async def sample_role_permissions(
