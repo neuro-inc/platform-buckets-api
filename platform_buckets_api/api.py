@@ -426,7 +426,7 @@ class BucketsApiHandler:
             validate=[
                 validate.Range(min=1, error="Duration must be greater than 0 seconds")
             ],
-            missing=3600,
+            load_default=3600,
         ),
     )
     async def sign_blob_url(
