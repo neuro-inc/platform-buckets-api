@@ -130,3 +130,17 @@ class PersistentBucketsCredentials(Schema):
 class ClientErrorSchema(Schema):
     code = fields.String(required=True)
     description = fields.String(required=True)
+
+
+class SignedUrlRequest(Schema):
+    key = fields.String(required=True)
+    expires_in_sec = fields.Integer(
+        validate=[
+            validate.Range(min=1, error="Duration must be greater than 0 seconds")
+        ],
+        load_default=3600,
+    )
+
+
+class SignedUrl(Schema):
+    url = fields.Url(required=True)

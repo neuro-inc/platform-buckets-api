@@ -20,10 +20,12 @@ from aiobotocore.client import AioBaseClient
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import (
     AccessPolicy,
+    BlobSasPermissions,
     ContainerSasPermissions,
+    generate_blob_sas,
     generate_container_sas,
 )
-from azure.storage.blob.aio import BlobServiceClient
+from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from google.api_core.iam import Policy
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
@@ -91,6 +93,12 @@ class BucketProvider(abc.ABC):
 
     @abc.abstractmethod
     async def delete_role(self, role: ProviderRole) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
         pass
 
 
@@ -207,6 +215,19 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
             "Version": "2012-10-17",
             "Statement": statements,
         }
+
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("S3 do not support signed urls for more then 7 days")
+        return URL(
+            await self._s3_client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": bucket_name, "Key": key},
+                ExpiresIn=expires_in_sec,
+            )
+        )
 
 
 class AWSBucketProvider(AWSLikeBucketProvider):
@@ -456,6 +477,24 @@ class AzureBucketProvider(BucketProvider):
             "sas_token": token,
             "expiry": expiry.isoformat(),
         }
+
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            seconds=expires_in_sec
+        )
+        token: str = generate_blob_sas(
+            account_name=self._blob_client.account_name,
+            blob_name=key,
+            container_name=bucket_name,
+            account_key=self._blob_client.credential.account_key,
+            permission=BlobSasPermissions.from_string("r"),
+            expiry=expiry,
+        )
+        return URL(
+            BlobClient(self._storage_endpoint, bucket_name, key, credential=token).url
+        )
 
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
@@ -766,3 +805,14 @@ class GoogleBucketProvider(BucketProvider):
 
     async def delete_role(self, role: ProviderRole) -> None:
         await self._delete_sa(self._make_sa_full_name(role.name))
+
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("GCP do not support signed urls for more then 7 days")
+        return URL(
+            self._gcs_client.bucket(bucket_name)
+            .blob(key)
+            .generate_signed_url(expiration=datetime.timedelta(seconds=expires_in_sec))
+        )
