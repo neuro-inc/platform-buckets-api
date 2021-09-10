@@ -345,7 +345,7 @@ class TestApi:
         async with client.post(
             buckets_api.bucket_sign_blob_url(create_resp["id"]),
             headers=regular_user.headers,
-            options={"key": "some/file"},
+            params={"key": "some/file"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
