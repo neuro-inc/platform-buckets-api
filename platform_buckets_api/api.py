@@ -40,7 +40,6 @@ from aiohttp_security.api import AUTZ_KEY
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
-from marshmallow import fields, validate
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
@@ -83,7 +82,7 @@ from .schema import (
     PersistentBucketsCredentials,
     PersistentBucketsCredentialsRequest,
     SignedUrl,
-    query_schema,
+    SignedUrlRequest,
 )
 from .service import BucketsService, PersistentCredentialsService
 from .storage import (
@@ -420,27 +419,21 @@ class BucketsApiHandler:
             },
         },
     )
-    @query_schema(
-        key=fields.String(required=True),
-        expires_in_sec=fields.Integer(
-            validate=[
-                validate.Range(min=1, error="Duration must be greater than 0 seconds")
-            ],
-            load_default=3600,
-        ),
-    )
+    @request_schema(SignedUrlRequest())
     async def sign_blob_url(
         self,
         request: aiohttp.web.Request,
-        key: str,
-        expires_in_sec: int,
     ) -> aiohttp.web.Response:
         bucket = await self._resolve_bucket(request)
         await check_any_permissions(
             request, self.permissions_service.get_bucket_read_perms(bucket)
         )
+        schema = SignedUrlRequest()
+        data = schema.load(await request.json())
         if isinstance(bucket, UserBucket):
-            url = await self.service.sign_url_for_blob(bucket, key, expires_in_sec)
+            url = await self.service.sign_url_for_blob(
+                bucket, data["key"], data["expires_in_sec"]
+            )
         else:
             raise ValueError("Cannot generate signed url for imported bucket")
         return aiohttp.web.json_response(
