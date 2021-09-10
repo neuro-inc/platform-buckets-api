@@ -177,6 +177,8 @@ class TestProviderBase:
     async def test_signed_url_for_blob(
         self, provider_option: ProviderTestOption
     ) -> None:
+        if provider_option.type == "aws":
+            pytest.skip("Moto fails for signed url with 500")
         bucket = await provider_option.provider.create_bucket(_make_bucket_name())
         admin_client = provider_option.get_admin(bucket)
         await admin_client.put_object("foo/bar", b"test data")
