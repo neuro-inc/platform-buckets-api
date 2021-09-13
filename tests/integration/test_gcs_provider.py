@@ -10,12 +10,14 @@ from typing import Any, AsyncIterator, List, Mapping
 import google.cloud.exceptions
 import googleapiclient.discovery
 import pytest
+from aiohttp import ClientSession
 from google.api_core.exceptions import Forbidden
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Bucket, Client as GCSClient
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError
+from yarl import URL
 
 from platform_buckets_api.providers import GoogleBucketProvider, run_in_executor
 from platform_buckets_api.storage import ProviderBucket
@@ -234,6 +236,10 @@ class TestGoogleProvider(TestProviderBase):
             make_client=GoogleBasicBucketClient.create,
             get_admin=lambda bucket: GoogleBasicBucketClient(gcs_client, bucket.name),
             role_exists=partial(gcs_role_exists, iam_client, project_id),
+            get_public_url=lambda bucket, key: URL(
+                f"https://storage.googleapis.com/"
+                f"storage/v1/b/{bucket}/o/{key}?alt=media"
+            ),
         )
 
     async def test_bucket_delete_no_hanging_sa(
@@ -245,3 +251,23 @@ class TestGoogleProvider(TestProviderBase):
         await asyncio.sleep(5)  # Allow GCP to delete accounts
         accounts = await run_in_executor(_list_all_accounts)(iam_client, project_id)
         assert all(bucket.name not in account["displayName"] for account in accounts)
+
+    async def test_public_access_to_bucket(
+        self, provider_option: ProviderTestOption
+    ) -> None:
+        if provider_option.type == "aws":
+            pytest.skip("Moto fails with 500")
+        bucket = await provider_option.provider.create_bucket(_make_bucket_name())
+        admin_client = provider_option.get_admin(bucket)
+        await admin_client.put_object("blob1", b"blob data 1")
+        await admin_client.put_object("blob2", b"blob data 2")
+        await provider_option.provider.set_public_access(bucket.name, True)
+        async with ClientSession() as session:
+            url = provider_option.get_public_url(bucket.name, "blob1")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 1"
+            url = provider_option.get_public_url(bucket.name, "blob2")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 2"

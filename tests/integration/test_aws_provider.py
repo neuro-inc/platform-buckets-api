@@ -5,6 +5,7 @@ from typing import AsyncIterator, List, Mapping
 import aiobotocore
 import pytest
 from aiobotocore.client import AioBaseClient
+from yarl import URL
 
 from platform_buckets_api.providers import AWSBucketProvider
 from platform_buckets_api.storage import ProviderBucket
@@ -93,4 +94,7 @@ class TestAWSProvider(TestProviderBase):
             make_client=AwsBasicBucketClient.create,
             get_admin=lambda bucket: AwsBasicBucketClient(s3, bucket.name),
             role_exists=partial(aws_role_exists, iam),
+            get_public_url=lambda bucket_name, key: URL(
+                s3.meta.endpoint_url + f"/{bucket_name}/{key}"
+            ),
         )

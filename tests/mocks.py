@@ -55,3 +55,6 @@ class MockBucketProvider(BucketProvider):
         self, bucket_name: str, key: str, expires_in_sec: int = 3600
     ) -> URL:
         raise NotImplementedError
+
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        raise NotImplementedError

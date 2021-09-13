@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import base64
 import datetime
 import functools
 import hashlib
@@ -9,31 +10,47 @@ import secrets
 import tempfile
 import typing
 from abc import ABC
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from os import fdopen
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Mapping, Optional
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+)
 
+import aiobotocore
 import bmc
 import botocore.exceptions
 import google.cloud.exceptions
 from aiobotocore.client import AioBaseClient
+from aiobotocore.credentials import AioCredentials
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import (
     AccessPolicy,
     BlobSasPermissions,
     ContainerSasPermissions,
+    PublicAccess,
     generate_blob_sas,
     generate_container_sas,
 )
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
+from bmc._utils import Command
 from google.api_core.iam import Policy
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
+from google.oauth2._service_account_async import Credentials as SACredentials
 from googleapiclient.errors import HttpError as GoogleHttpError
 from yarl import URL
 
 from platform_buckets_api.config import BucketsProviderType
-from platform_buckets_api.storage import ProviderBucket, ProviderRole
+from platform_buckets_api.storage import ImportedBucket, ProviderBucket, ProviderRole
 
 
 class ProviderError(Exception):
@@ -62,7 +79,58 @@ class BucketPermission:
     bucket_name: str
 
 
-class BucketProvider(abc.ABC):
+class UserBucketOperations(abc.ABC):
+    @abc.abstractmethod
+    async def set_public_access(
+        self,
+        bucket_name: str,
+        public_access: bool,
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        pass
+
+    @staticmethod
+    @asynccontextmanager
+    async def get_for_imported_bucket(
+        bucket: ImportedBucket,
+    ) -> AsyncIterator["UserBucketOperations"]:
+        provider_type = bucket.provider_bucket.provider_type
+        if provider_type == BucketsProviderType.AWS:
+            session = aiobotocore.get_session()
+            session._credentials = AioCredentials(
+                access_key=bucket.credentials["access_key_id"],
+                secret_key=bucket.credentials["secret_access_key"],
+            )
+            async with session.create_client(
+                "s3",
+                endpoint_url=bucket.credentials.get("endpoint_url"),
+                region_name=bucket.credentials.get("region_name"),
+            ) as client:
+                yield AWSUserBucketOperations(client)
+        elif provider_type == BucketsProviderType.AZURE:
+            async with BlobServiceClient(
+                account_url=bucket.credentials["storage_endpoint"],
+                credential=bucket.credentials["credential"],
+            ) as client:
+                yield AzureUserBucketOperations(client)
+        elif provider_type == BucketsProviderType.GCP:
+            key_raw = bucket.credentials["key_data"]
+            key_json = json.loads(base64.b64decode(key_raw).decode())
+            client = GCSClient(
+                project=key_json["project_id"],
+                credentials=SACredentials.from_service_account_info(key_json),
+            )
+            yield client
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, client.close)
+
+
+class BucketProvider(UserBucketOperations, abc.ABC):
     @abc.abstractmethod
     async def create_bucket(self, name: str) -> ProviderBucket:
         pass
@@ -95,11 +163,32 @@ class BucketProvider(abc.ABC):
     async def delete_role(self, role: ProviderRole) -> None:
         pass
 
-    @abc.abstractmethod
+
+class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
+    def __init__(self, s3_client: AioBaseClient):
+        self._s3_client = s3_client
+
     async def sign_url_for_blob(
         self, bucket_name: str, key: str, expires_in_sec: int = 3600
     ) -> URL:
-        pass
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("S3 do not support signed urls for more then 7 days")
+        return URL(
+            await self._s3_client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": bucket_name, "Key": key},
+                ExpiresIn=expires_in_sec,
+            )
+        )
+
+
+class AWSUserBucketOperations(AWSLikeUserBucketOperations, ABC):
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        resp = await self._s3_client.put_bucket_acl(
+            ACL="public-read" if public_access else "private",
+            Bucket=bucket_name,
+        )
+        print(resp)
 
 
 class AWSLikeBucketProvider(BucketProvider, ABC):
@@ -216,21 +305,8 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
             "Statement": statements,
         }
 
-    async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
-    ) -> URL:
-        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
-            raise ValueError("S3 do not support signed urls for more then 7 days")
-        return URL(
-            await self._s3_client.generate_presigned_url(
-                ClientMethod="get_object",
-                Params={"Bucket": bucket_name, "Key": key},
-                ExpiresIn=expires_in_sec,
-            )
-        )
 
-
-class AWSBucketProvider(AWSLikeBucketProvider):
+class AWSBucketProvider(AWSLikeBucketProvider, AWSUserBucketOperations):
     def __init__(
         self,
         s3_client: AioBaseClient,
@@ -316,9 +392,9 @@ class BMCWrapper:
         self._password = password
         self._target: Optional[str] = None
 
-    def _make_wrapper(self, method: str) -> Callable[..., Awaitable[Any]]:
-        real_func = getattr(bmc, method)
-
+    def _make_wrapper(
+        self, real_func: Callable[..., Any]
+    ) -> Callable[..., Awaitable[Any]]:
         async def _wrapper(*args: Any, **kwargs: Any) -> Any:
             if self._target:
                 kwargs.setdefault("target", self._target)
@@ -331,14 +407,20 @@ class BMCWrapper:
         return _wrapper
 
     def __getattr__(self, item: str) -> Callable[..., Awaitable[Any]]:
-        return self._make_wrapper(item)
+        real_func = getattr(bmc, item)
+        return self._make_wrapper(real_func)
 
     async def admin_user_list(self, *args: Any, **kwargs: Any) -> Any:
-        resp = await self._make_wrapper("admin_user_list")(*args, **kwargs)
+        resp = await self._make_wrapper(bmc.admin_user_list)(*args, **kwargs)
         # Fix list not always returns list
         if not isinstance(resp.content, list):
             resp.content = [resp.content]
         return resp
+
+    async def policy_set(self, *, permission: str, bucket_name: str) -> Any:
+        cmd = Command("mc {flags} policy set {permission} {target}")
+        target = f"{self._target}/{bucket_name}"
+        return await self._make_wrapper(cmd)(permission=permission, target=target)
 
     async def __aenter__(self) -> "BMCWrapper":
         _target = "alias_" + secrets.token_hex(10)
@@ -355,7 +437,19 @@ class BMCWrapper:
         self._target = None
 
 
-class MinioBucketProvider(AWSLikeBucketProvider):
+class MinioUserBucketOperations(AWSLikeUserBucketOperations, ABC):
+    def __init__(self, s3_client: AioBaseClient, mc: BMCWrapper):
+        super().__init__(s3_client)
+        self._mc = mc
+
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        await self._mc.policy_set(
+            permission="download" if public_access else "private",
+            bucket_name=bucket_name,
+        )
+
+
+class MinioBucketProvider(AWSLikeBucketProvider, MinioUserBucketOperations):
     def __init__(
         self,
         s3_client: AioBaseClient,
@@ -425,10 +519,46 @@ def _container_policies_as_dict(policies: List[Any]) -> Dict[str, Any]:
     return {entry.id: entry.access_policy for entry in policies}
 
 
-class AzureBucketProvider(BucketProvider):
-    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
-        self._storage_endpoint = storage_endpoint
+class AzureUserBucketOperations(UserBucketOperations):
+    def __init__(self, blob_client: BlobServiceClient):
         self._blob_client = blob_client
+
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        container_client = self._blob_client.get_container_client(bucket_name)
+        policies = _container_policies_as_dict(
+            (await container_client.get_container_access_policy())["signed_identifiers"]
+        )
+        await container_client.set_container_access_policy(
+            signed_identifiers=policies,
+            public_access=PublicAccess.Container,
+        )
+
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            seconds=expires_in_sec
+        )
+        token: str = generate_blob_sas(
+            account_name=self._blob_client.account_name,
+            blob_name=key,
+            container_name=bucket_name,
+            account_key=self._blob_client.credential.account_key,
+            permission=BlobSasPermissions.from_string("r"),
+            expiry=expiry,
+        )
+        return URL(
+            BlobClient.from_blob_url(
+                self._blob_client.get_blob_client(bucket_name, key).url,
+                credential=token,
+            ).url
+        )
+
+
+class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
+    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
+        super().__init__(blob_client)
+        self._storage_endpoint = storage_endpoint
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         try:
@@ -478,24 +608,6 @@ class AzureBucketProvider(BucketProvider):
             "expiry": expiry.isoformat(),
         }
 
-    async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
-    ) -> URL:
-        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-            seconds=expires_in_sec
-        )
-        token: str = generate_blob_sas(
-            account_name=self._blob_client.account_name,
-            blob_name=key,
-            container_name=bucket_name,
-            account_key=self._blob_client.credential.account_key,
-            permission=BlobSasPermissions.from_string("r"),
-            expiry=expiry,
-        )
-        return URL(
-            BlobClient(self._storage_endpoint, bucket_name, key, credential=token).url
-        )
-
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
     ) -> ProviderRole:
@@ -512,9 +624,8 @@ class AzureBucketProvider(BucketProvider):
         container_client = self._blob_client.get_container_client(
             permission.bucket_name
         )
-        policies = _container_policies_as_dict(
-            (await container_client.get_container_access_policy())["signed_identifiers"]
-        )
+        access_policy = await container_client.get_container_access_policy()
+        policies = _container_policies_as_dict(access_policy["signed_identifiers"])
         if len(policies) == 5:
             raise ValueError(
                 f"Azure container {permission.bucket_name} already has 5 SAP entries, "
@@ -528,7 +639,10 @@ class AzureBucketProvider(BucketProvider):
             expiry=datetime.datetime.utcnow()
             + datetime.timedelta(days=365 * 100),  # Permanent
         )
-        await container_client.set_container_access_policy(signed_identifiers=policies)
+        await container_client.set_container_access_policy(
+            signed_identifiers=policies,
+            public_access=access_policy["public_access"],
+        )
         sas_token = generate_container_sas(
             container_client.account_name,
             container_client.container_name,
@@ -595,7 +709,46 @@ def run_in_executor(func: Callable[..., R]) -> Callable[..., Awaitable[R]]:
     return _wrapper
 
 
-class GoogleBucketProvider(BucketProvider):
+class GoogleUserBucketOperations(UserBucketOperations):
+    def __init__(
+        self,
+        gcs_client: GCSClient,
+    ):
+        self._gcs_client = gcs_client
+
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        await self._set_public_access(bucket_name, public_access)
+
+    @run_in_executor
+    def _set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        bucket = self._gcs_client.bucket(bucket_name)
+
+        policy = bucket.get_iam_policy(requested_policy_version=3)
+        public_read_entry = {
+            "role": "roles/storage.objectViewer",
+            "members": {"allUsers"},
+        }
+        policy.bindings = [
+            entry for entry in policy.bindings if entry != public_read_entry
+        ]
+        if public_access:
+            policy.bindings.append(public_read_entry)
+
+        bucket.set_iam_policy(policy)
+
+    async def sign_url_for_blob(
+        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("GCP do not support signed urls for more then 7 days")
+        return URL(
+            self._gcs_client.bucket(bucket_name)
+            .blob(key)
+            .generate_signed_url(expiration=datetime.timedelta(seconds=expires_in_sec))
+        )
+
+
+class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
     def __init__(
         self,
         gcs_client: GCSClient,
@@ -603,7 +756,7 @@ class GoogleBucketProvider(BucketProvider):
         iam_client_2: IAMCredentialsAsyncClient,
         sa_prefix: str = "bucket-api-",
     ):
-        self._gcs_client = gcs_client
+        super().__init__(gcs_client)
         self._iam_client = iam_client
         self._iam_client_2 = iam_client_2
         self._sa_prefix = sa_prefix
@@ -805,14 +958,3 @@ class GoogleBucketProvider(BucketProvider):
 
     async def delete_role(self, role: ProviderRole) -> None:
         await self._delete_sa(self._make_sa_full_name(role.name))
-
-    async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
-    ) -> URL:
-        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
-            raise ValueError("GCP do not support signed urls for more then 7 days")
-        return URL(
-            self._gcs_client.bucket(bucket_name)
-            .blob(key)
-            .generate_signed_url(expiration=datetime.timedelta(seconds=expires_in_sec))
-        )

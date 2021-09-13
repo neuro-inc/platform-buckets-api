@@ -2,6 +2,7 @@ from functools import partial
 
 import pytest
 from aiobotocore.client import AioBaseClient
+from yarl import URL
 
 from platform_buckets_api.providers import BMCWrapper, MinioBucketProvider
 from tests.integration.test_aws_provider import AwsBasicBucketClient, aws_bucket_exists
@@ -31,4 +32,7 @@ class TestMinioProvider(TestProviderBase):
             make_client=AwsBasicBucketClient.create,
             get_admin=lambda bucket: AwsBasicBucketClient(minio_s3, bucket.name),
             role_exists=partial(minio_role_exists, bmc_wrapper),
+            get_public_url=lambda bucket_name, key: URL(
+                minio_s3.meta.endpoint_url + f"/{bucket_name}/{key}"
+            ),
         )
