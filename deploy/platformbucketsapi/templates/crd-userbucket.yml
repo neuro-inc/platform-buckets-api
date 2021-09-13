@@ -32,6 +32,8 @@ spec:
               type: boolean
             credentials:
               type: object
+            public:
+              type: boolean
   scope: Namespaced
   names:
     kind: UserBucket

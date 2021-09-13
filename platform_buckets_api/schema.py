@@ -86,6 +86,11 @@ class Bucket(Schema):
     )
     created_at = fields.DateTime(required=True)
     imported = fields.Boolean(required=True)
+    public = fields.Boolean(required=True)
+
+
+class PatchBucket(Schema):
+    public = fields.Boolean(required=False, allow_none=True)
 
 
 class BucketCredentials(Schema):

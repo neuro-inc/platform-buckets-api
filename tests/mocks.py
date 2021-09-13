@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict, Iterable, List, Mapping, Set
 
 from yarl import URL
@@ -14,6 +15,7 @@ class MockBucketProvider(BucketProvider):
         self.created_buckets: List[ProviderBucket] = []
         self.deleted_buckets: List[str] = []
         self.role_to_permissions: Dict[str, Set[BucketPermission]] = {}
+        self.public_state: Dict[str, bool] = defaultdict(lambda: False)
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         bucket = ProviderBucket(
@@ -57,4 +59,4 @@ class MockBucketProvider(BucketProvider):
         raise NotImplementedError
 
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
-        raise NotImplementedError
+        self.public_state[bucket_name] = public_access

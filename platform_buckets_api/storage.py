@@ -65,6 +65,7 @@ class BaseBucket(abc.ABC):
     owner: str
     created_at: datetime
     provider_bucket: ProviderBucket
+    public: bool
     imported: ClassVar[bool]
 
 
@@ -101,6 +102,10 @@ class BucketsStorage(abc.ABC):
 
     @abc.abstractmethod
     async def delete_bucket(self, id: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def update_bucket(self, bucket: BucketType) -> None:
         pass
 
 
@@ -172,6 +177,13 @@ class InMemoryBucketsStorage(BucketsStorage):
 
     async def delete_bucket(self, id: str) -> None:
         self._buckets = [bucket for bucket in self._buckets if bucket.id != id]
+
+    async def update_bucket(self, bucket: BucketType) -> None:
+        for index in range(len(self._buckets)):
+            if self._buckets[index].id == bucket.id:
+                self._buckets[index] = bucket
+                return
+        raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exists")
 
 
 class InMemoryCredentialsStorage(CredentialsStorage):

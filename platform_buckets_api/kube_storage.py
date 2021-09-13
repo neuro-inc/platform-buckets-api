@@ -1,6 +1,10 @@
 from typing import AsyncIterator, Optional
 
-from platform_buckets_api.kube_client import KubeClient, ResourceExists
+from platform_buckets_api.kube_client import (
+    KubeClient,
+    ResourceExists,
+    ResourceNotFound,
+)
 from platform_buckets_api.storage import (
     BucketsStorage,
     BucketType,
@@ -57,6 +61,12 @@ class K8SBucketsStorage(BucketsStorage):
         except NotExistsError:
             return
         await self._kube_client.remove_user_bucket(bucket)
+
+    async def update_bucket(self, bucket: BucketType) -> None:
+        try:
+            await self._kube_client.update_user_bucket(bucket)
+        except ResourceNotFound:
+            raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exists")
 
 
 class K8SCredentialsStorage(CredentialsStorage):

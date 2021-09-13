@@ -2,6 +2,7 @@ import hashlib
 import logging
 import secrets
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import AsyncIterator, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
@@ -75,6 +76,7 @@ class BucketsService:
             owner=owner,
             provider_bucket=provider_bucket,
             created_at=utc_now(),
+            public=False,
         )
         try:
             await self._storage.create_bucket(bucket)
@@ -101,6 +103,7 @@ class BucketsService:
             ),
             created_at=utc_now(),
             credentials=credentials,
+            public=False,
         )
         await self._storage.create_bucket(bucket)
         return bucket
@@ -138,12 +141,18 @@ class BucketsService:
                 expires_in_sec=expires_in_sec,
             )
 
-    async def set_public_access(self, bucket: BaseBucket, public_access: bool) -> None:
+    async def set_public_access(
+        self, bucket: BaseBucket, public_access: bool
+    ) -> BaseBucket:
         async with self._get_operations(bucket) as operations:
             await operations.set_public_access(
                 bucket_name=bucket.provider_bucket.name,
                 public_access=public_access,
             )
+        bucket = replace(bucket, public=public_access)
+        assert isinstance(bucket, (UserBucket, ImportedBucket))
+        await self._storage.update_bucket(bucket)
+        return bucket
 
     @asyncgeneratorcontextmanager
     async def get_user_buckets(self, owner: str) -> AsyncIterator[BaseBucket]:
