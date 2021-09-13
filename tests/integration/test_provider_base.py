@@ -5,6 +5,7 @@ from typing import AsyncContextManager, Awaitable, Callable, List, Mapping
 
 import pytest
 from aiohttp import ClientSession
+from yarl import URL
 
 from platform_buckets_api.providers import (
     BucketExistsError,
@@ -58,6 +59,7 @@ class ProviderTestOption:
     ]
     get_admin: Callable[[ProviderBucket], BasicBucketClient]
     role_exists: Callable[[str], Awaitable[bool]]
+    get_public_url: Callable[[str, str], URL]
 
 
 # Access checkers
@@ -187,6 +189,26 @@ class TestProviderBase:
             async with session.get(url) as resp:
                 data = await resp.read()
                 assert data == b"test data"
+
+    async def test_public_access_to_bucket(
+        self, provider_option: ProviderTestOption
+    ) -> None:
+        if provider_option.type == "aws":
+            pytest.skip("Moto fails with 500")
+        bucket = await provider_option.provider.create_bucket(_make_bucket_name())
+        admin_client = provider_option.get_admin(bucket)
+        await admin_client.put_object("blob1", b"blob data 1")
+        await admin_client.put_object("blob2", b"blob data 2")
+        await provider_option.provider.set_public_access(bucket.name, True)
+        async with ClientSession() as session:
+            url = provider_option.get_public_url(bucket.name, "blob1")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 1"
+            url = provider_option.get_public_url(bucket.name, "blob2")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 2"
 
     @pytest.fixture()
     async def sample_role_permissions(

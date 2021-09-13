@@ -72,6 +72,7 @@ class TestPermissionsService:
             owner="test-user",
             created_at=utc_now(),
             provider_bucket=None,  # type: ignore
+            public=False,
         )
 
     def test_create_permissions(

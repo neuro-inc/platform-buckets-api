@@ -164,6 +164,22 @@ class TestBucketsService:
         with pytest.raises(NotExistsError):
             await service.get_bucket(bucket.id)
 
+    async def test_set_public_state_calls_provider(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
+        await service.set_public_access(bucket, True)
+        assert mock_provider.public_state[bucket.provider_bucket.name]
+
+    async def test_change_public_state(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(owner="test-user", name="test-bucket")
+        await service.set_public_access(bucket, True)
+        assert (await service.get_bucket(bucket.id)).public
+        await service.set_public_access(bucket, False)
+        assert not (await service.get_bucket(bucket.id)).public
+
 
 class TestPersistentCredentialsService:
     @pytest.fixture

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Optional
 from uuid import uuid4
 
@@ -125,7 +126,9 @@ class TestBucketsStorage:
     ) -> BucketsStorage:
         return in_memory_buckets_storage
 
-    def _make_bucket(self, username: str, name: Optional[str]) -> UserBucket:
+    def _make_bucket(
+        self, username: str, name: Optional[str], public: bool = False
+    ) -> UserBucket:
         return UserBucket(
             id=f"bucket-{uuid4()}",
             owner=username,
@@ -135,10 +138,14 @@ class TestBucketsStorage:
                 provider_type=BucketsProviderType.AWS,
                 name=f"{name}--{username}",
             ),
+            public=public,
         )
 
     def _make_imported_bucket(
-        self, username: str, name: Optional[str]
+        self,
+        username: str,
+        name: Optional[str],
+        public: bool = False,
     ) -> ImportedBucket:
         return ImportedBucket(
             id=f"bucket-{uuid4()}",
@@ -150,12 +157,13 @@ class TestBucketsStorage:
                 name=f"{name}--{username}",
             ),
             credentials={"key": "value"},
+            public=public,
         )
 
     async def test_buckets_create_list(self, storage: BucketsStorage) -> None:
         bucket1 = self._make_bucket("user1", "test")
         bucket2 = self._make_bucket("user2", None)
-        bucket3 = self._make_bucket("user2", None)
+        bucket3 = self._make_bucket("user2", None, True)
         bucket4 = self._make_imported_bucket("user2", None)
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
@@ -209,3 +217,15 @@ class TestBucketsStorage:
         async with storage.list_buckets() as it:
             buckets = {bucket async for bucket in it}
         assert buckets == set()
+
+    async def test_bucket_update(self, storage: BucketsStorage) -> None:
+        bucket1 = self._make_bucket("user1", "test1", public=False)
+        bucket2 = self._make_bucket("user1", "test2", public=False)
+        await storage.create_bucket(bucket1)
+        await storage.create_bucket(bucket2)
+        bucket1 = replace(bucket1, public=True)
+        await storage.update_bucket(bucket1)
+        bucket_get = await storage.get_bucket(bucket1.id)
+        assert bucket1 == bucket_get
+        bucket_get = await storage.get_bucket(bucket2.id)
+        assert bucket2 == bucket_get

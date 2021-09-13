@@ -5,6 +5,7 @@ from typing import AsyncIterator, List, Mapping
 
 import pytest
 from azure.storage.blob.aio import BlobServiceClient
+from yarl import URL
 
 from platform_buckets_api.providers import (
     AzureBucketProvider,
@@ -118,4 +119,7 @@ class TestAzureProvider(TestProviderBase):
                 azure_blob_client, bucket.name
             ),
             role_exists=partial(azure_role_exists, azure_blob_client),
+            get_public_url=lambda bucket, key: URL(
+                azure_blob_client.get_blob_client(bucket, key).url
+            ),
         )

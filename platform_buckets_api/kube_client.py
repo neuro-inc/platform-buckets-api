@@ -120,6 +120,7 @@ class BucketCRDMapper:
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
             ),
+            public=payload["spec"].get("public", False),
         )
         if payload["spec"].get("imported", False):
             return ImportedBucket(
@@ -155,6 +156,7 @@ class BucketCRDMapper:
                 "provider_type": entry.provider_bucket.provider_type.value,
                 "provider_name": entry.provider_bucket.name,
                 "created_at": datetime_dump(entry.created_at),
+                "public": entry.public,
             },
         }
         if isinstance(entry, ImportedBucket):
@@ -400,4 +402,14 @@ class KubeClient:
         name = BucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
         url = self._generate_user_bucket_url(name)
         payload = await self._request(method="DELETE", url=url)
+        self._raise_for_status(payload)
+
+    async def update_user_bucket(self, bucket: BucketType) -> None:
+        data = BucketCRDMapper.to_primitive(bucket)
+        name = data["metadata"]["name"]
+        url = self._generate_user_bucket_url(name)
+        payload = await self._request(method="GET", url=url)
+        self._raise_for_status(payload)
+        data["metadata"]["resourceVersion"] = payload["metadata"]["resourceVersion"]
+        payload = await self._request(method="PUT", url=url, json=data)
         self._raise_for_status(payload)

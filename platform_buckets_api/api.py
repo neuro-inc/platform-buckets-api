@@ -79,6 +79,7 @@ from .schema import (
     BucketCredentials,
     ClientErrorSchema,
     ImportBucketRequest,
+    PatchBucket,
     PersistentBucketsCredentials,
     PersistentBucketsCredentialsRequest,
     SignedUrl,
@@ -172,6 +173,7 @@ class BucketsApiHandler:
                 aiohttp.web.post(
                     "/{bucket_id_or_name}/sign_blob_url", self.sign_blob_url
                 ),
+                aiohttp.web.patch("/{bucket_id_or_name}", self.patch_bucket),
                 aiohttp.web.delete("/{bucket_id_or_name}", self.delete_bucket),
             ]
         )
@@ -210,7 +212,9 @@ class BucketsApiHandler:
             },
         },
     )
-    @request_schema(Bucket(partial=["provider", "owner", "created_at", "imported"]))
+    @request_schema(
+        Bucket(partial=["provider", "owner", "created_at", "imported", "public"])
+    )
     async def create_bucket(
         self,
         request: aiohttp.web.Request,
@@ -219,7 +223,9 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
-        schema = Bucket(partial=["provider", "owner", "created_at", "imported"])
+        schema = Bucket(
+            partial=["provider", "owner", "created_at", "imported", "public"]
+        )
         data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
@@ -360,6 +366,36 @@ class BucketsApiHandler:
         )
         await self.service.delete_bucket(bucket.id)
         raise HTTPNoContent
+
+    @docs(
+        tags=["buckets"],
+        summary="Update bucket by id or name",
+        responses={
+            HTTPNoContent.status_code: {
+                "description": "Bucket updated",
+                "schema": Bucket(),
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket with such id or name",
+            },
+        },
+    )
+    @request_schema(PatchBucket())
+    async def patch_bucket(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        data = PatchBucket().load(await request.json())
+        bucket = await self._resolve_bucket(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_bucket_write_perms(bucket)
+        )
+        if "public" in data and data["public"] != bucket.public:
+            bucket = await self.service.set_public_access(bucket, data["public"])
+        return aiohttp.web.json_response(
+            data=Bucket().dump(bucket),
+            status=HTTPOk.status_code,
+        )
 
     @docs(
         tags=["buckets"],

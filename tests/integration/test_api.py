@@ -351,6 +351,31 @@ class TestApi:
             payload = await resp.json()
             assert URL(payload["url"])
 
+    async def test_make_bucket_public_non_public(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test-bucket", regular_user)
+        async with client.patch(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user.headers,
+            json={"public": True},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["public"]
+        async with client.patch(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user.headers,
+            json={"public": False},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert not payload["public"]
+
     async def test_create_bucket_duplicate(
         self,
         buckets_api: BucketsApiEndpoints,
