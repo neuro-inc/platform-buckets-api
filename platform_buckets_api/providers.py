@@ -125,7 +125,7 @@ class UserBucketOperations(abc.ABC):
                 project=key_json["project_id"],
                 credentials=SACredentials.from_service_account_info(key_json),
             )
-            yield client
+            yield GoogleUserBucketOperations(client)
             loop = asyncio.get_event_loop()
             loop.run_in_executor(None, client.close)
 
