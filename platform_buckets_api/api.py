@@ -466,12 +466,9 @@ class BucketsApiHandler:
         )
         schema = SignedUrlRequest()
         data = schema.load(await request.json())
-        if isinstance(bucket, UserBucket):
-            url = await self.service.sign_url_for_blob(
-                bucket, data["key"], data["expires_in_sec"]
-            )
-        else:
-            raise ValueError("Cannot generate signed url for imported bucket")
+        url = await self.service.sign_url_for_blob(
+            bucket, data["key"], data["expires_in_sec"]
+        )
         return aiohttp.web.json_response(
             data={"url": str(url)},
             status=HTTPOk.status_code,
