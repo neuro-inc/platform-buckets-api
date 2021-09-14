@@ -759,10 +759,14 @@ class GoogleUserBucketOperations(UserBucketOperations):
         bucket = self._gcs_client.bucket(bucket_name)
 
         if public_access:
-            bucket.public_access_prevention = PUBLIC_ACCESS_PREVENTION_UNSPECIFIED
+            bucket.iam_configuration.public_access_prevention = (
+                PUBLIC_ACCESS_PREVENTION_UNSPECIFIED
+            )
             bucket.patch()
         else:
-            bucket.public_access_prevention = PUBLIC_ACCESS_PREVENTION_ENFORCED
+            bucket.iam_configuration.public_access_prevention = (
+                PUBLIC_ACCESS_PREVENTION_ENFORCED
+            )
             bucket.patch()
 
         policy = bucket.get_iam_policy(requested_policy_version=3)
