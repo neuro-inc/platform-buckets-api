@@ -45,6 +45,10 @@ from bmc._utils import Command
 from google.api_core.iam import Policy
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
+from google.cloud.storage.constants import (
+    PUBLIC_ACCESS_PREVENTION_ENFORCED,
+    PUBLIC_ACCESS_PREVENTION_UNSPECIFIED,
+)
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError as GoogleHttpError
 from yarl import URL
@@ -753,6 +757,13 @@ class GoogleUserBucketOperations(UserBucketOperations):
     @run_in_executor
     def _set_public_access(self, bucket_name: str, public_access: bool) -> None:
         bucket = self._gcs_client.bucket(bucket_name)
+
+        if public_access:
+            bucket.public_access_prevention = PUBLIC_ACCESS_PREVENTION_UNSPECIFIED
+            bucket.patch()
+        else:
+            bucket.public_access_prevention = PUBLIC_ACCESS_PREVENTION_ENFORCED
+            bucket.patch()
 
         policy = bucket.get_iam_policy(requested_policy_version=3)
         public_read_entry = {
