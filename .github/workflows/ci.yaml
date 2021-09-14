@@ -85,7 +85,7 @@ jobs:
           GCLOUD_SA_KEY_JSON_B64: ${{ secrets.GCLOUD_SA_KEY_JSON_B64 }}
         run: make test_integration
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.0.3
+        uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: .coverage-integration.xml
