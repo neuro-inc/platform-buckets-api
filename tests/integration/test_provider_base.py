@@ -1,6 +1,7 @@
 import abc
 import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import AsyncContextManager, Awaitable, Callable, List, Mapping
 
 import pytest
@@ -13,8 +14,9 @@ from platform_buckets_api.providers import (
     BucketPermission,
     BucketProvider,
     RoleExistsError,
+    UserBucketOperations,
 )
-from platform_buckets_api.storage import ProviderBucket
+from platform_buckets_api.storage import ImportedBucket, ProviderBucket
 
 
 pytestmark = pytest.mark.asyncio
@@ -60,6 +62,7 @@ class ProviderTestOption:
     get_admin: Callable[[ProviderBucket], BasicBucketClient]
     role_exists: Callable[[str], Awaitable[bool]]
     get_public_url: Callable[[str, str], URL]
+    credentials_for_imported: Mapping[str, str]
 
 
 # Access checkers
@@ -200,6 +203,42 @@ class TestProviderBase:
         await admin_client.put_object("blob1", b"blob data 1")
         await admin_client.put_object("blob2", b"blob data 2")
         await provider_option.provider.set_public_access(bucket.name, True)
+        async with ClientSession() as session:
+            url = provider_option.get_public_url(bucket.name, "blob1")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 1"
+            url = provider_option.get_public_url(bucket.name, "blob2")
+            async with session.get(url) as resp:
+                data = await resp.read()
+                assert data == b"blob data 2"
+
+    async def test_bucket_make_public_for_imported_bucket(
+        self, provider_option: ProviderTestOption
+    ) -> None:
+        if provider_option.type == "aws":
+            pytest.skip("Moto fails with 500")
+        if provider_option.type == "minio":
+            pytest.skip("Minio has custom API")
+
+        name = _make_bucket_name()
+        bucket = await provider_option.provider.create_bucket(name)
+        admin_client = provider_option.get_admin(bucket)
+        await admin_client.put_object("blob1", b"blob data 1")
+        await admin_client.put_object("blob2", b"blob data 2")
+
+        async with UserBucketOperations.get_for_imported_bucket(
+            ImportedBucket(
+                id="not-important",
+                created_at=datetime.now(timezone.utc),
+                owner="user",
+                name="not-important",
+                public=False,
+                provider_bucket=bucket,
+                credentials=provider_option.credentials_for_imported,
+            )
+        ) as operations:
+            await operations.set_public_access(bucket.name, True)
         async with ClientSession() as session:
             url = provider_option.get_public_url(bucket.name, "blob1")
             async with session.get(url) as resp:

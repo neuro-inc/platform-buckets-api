@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, List, Mapping
+from typing import AsyncIterator, List, Mapping, Tuple
 
 import pytest
 from azure.storage.blob.aio import BlobServiceClient
@@ -79,21 +79,28 @@ ACCOUNT_CREDENTIAL_ENV = "AZURE_STORAGE_CREDENTIAL"
 
 
 @pytest.fixture()
-async def azure_blob_client() -> AsyncIterator[BlobServiceClient]:
-    async def _cleanup_containers(client: BlobServiceClient) -> None:
-        async for container in client.list_containers():
-            if container.name.startswith(BUCKET_NAME_PREFIX):
-                await client.delete_container(container.name)
-
+async def azure_raw_credentials() -> Tuple[str, str]:
     if ACCOUNT_URL_ENV not in os.environ or ACCOUNT_CREDENTIAL_ENV not in os.environ:
         pytest.skip(
             f"Skipping Azure provider tests. Please set {ACCOUNT_URL_ENV}"
             f" and {ACCOUNT_CREDENTIAL_ENV} environ variables to enable tests"
         )
 
+    return os.environ[ACCOUNT_URL_ENV], os.environ[ACCOUNT_CREDENTIAL_ENV]
+
+
+@pytest.fixture()
+async def azure_blob_client(
+    azure_raw_credentials: Tuple[str, str]
+) -> AsyncIterator[BlobServiceClient]:
+    async def _cleanup_containers(client: BlobServiceClient) -> None:
+        async for container in client.list_containers():
+            if container.name.startswith(BUCKET_NAME_PREFIX):
+                await client.delete_container(container.name)
+
     async with BlobServiceClient(
-        account_url=os.environ[ACCOUNT_URL_ENV],
-        credential=os.environ[ACCOUNT_CREDENTIAL_ENV],
+        account_url=azure_raw_credentials[0],
+        credential=azure_raw_credentials[1],
     ) as client:
         await _cleanup_containers(client)
         yield client
@@ -105,7 +112,9 @@ class TestAzureProvider(TestProviderBase):
 
     @pytest.fixture()
     async def provider_option(
-        self, azure_blob_client: BlobServiceClient
+        self,
+        azure_blob_client: BlobServiceClient,
+        azure_raw_credentials: Tuple[str, str],
     ) -> ProviderTestOption:
         return ProviderTestOption(
             type="azure",
@@ -122,4 +131,8 @@ class TestAzureProvider(TestProviderBase):
             get_public_url=lambda bucket, key: URL(
                 azure_blob_client.get_blob_client(bucket, key).url
             ),
+            credentials_for_imported={
+                "storage_endpoint": azure_raw_credentials[0],
+                "credential": azure_raw_credentials[1],
+            },
         )

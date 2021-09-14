@@ -45,7 +45,7 @@ from bmc._utils import Command
 from google.api_core.iam import Policy
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
-from google.oauth2._service_account_async import Credentials as SACredentials
+from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError as GoogleHttpError
 from yarl import URL
 

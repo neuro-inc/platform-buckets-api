@@ -10,7 +10,6 @@ from typing import Any, AsyncIterator, List, Mapping
 import google.cloud.exceptions
 import googleapiclient.discovery
 import pytest
-from aiohttp import ClientSession
 from google.api_core.exceptions import Forbidden
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Bucket, Client as GCSClient
@@ -124,14 +123,18 @@ KEY_JSON_ENV = "GCLOUD_SA_KEY_JSON_B64"
 
 
 @pytest.fixture()
-def gcloud_key_json() -> Mapping[str, str]:
+def gcloud_key_raw() -> str:
     if KEY_JSON_ENV not in os.environ:
         pytest.skip(
             f"Skipping GCS provider tests. Please set {KEY_JSON_ENV}"
             f" environ variables to enable tests"
         )
-    raw = os.environ[KEY_JSON_ENV]
-    return json.loads(base64.b64decode(raw).decode())
+    return os.environ[KEY_JSON_ENV]
+
+
+@pytest.fixture()
+def gcloud_key_json(gcloud_key_raw: str) -> Mapping[str, str]:
+    return json.loads(base64.b64decode(gcloud_key_raw).decode())
 
 
 @pytest.fixture()
@@ -223,6 +226,7 @@ class TestGoogleProvider(TestProviderBase):
         iam_client: Any,
         iam_client_2: IAMCredentialsAsyncClient,
         project_id: str,
+        gcloud_key_raw: str,
     ) -> ProviderTestOption:
         return ProviderTestOption(
             type="gcs",
@@ -240,6 +244,9 @@ class TestGoogleProvider(TestProviderBase):
                 f"https://storage.googleapis.com/"
                 f"storage/v1/b/{bucket}/o/{key}?alt=media"
             ),
+            credentials_for_imported={
+                "key_data": gcloud_key_raw,
+            },
         )
 
     async def test_bucket_delete_no_hanging_sa(
@@ -251,23 +258,3 @@ class TestGoogleProvider(TestProviderBase):
         await asyncio.sleep(5)  # Allow GCP to delete accounts
         accounts = await run_in_executor(_list_all_accounts)(iam_client, project_id)
         assert all(bucket.name not in account["displayName"] for account in accounts)
-
-    async def test_public_access_to_bucket(
-        self, provider_option: ProviderTestOption
-    ) -> None:
-        if provider_option.type == "aws":
-            pytest.skip("Moto fails with 500")
-        bucket = await provider_option.provider.create_bucket(_make_bucket_name())
-        admin_client = provider_option.get_admin(bucket)
-        await admin_client.put_object("blob1", b"blob data 1")
-        await admin_client.put_object("blob2", b"blob data 2")
-        await provider_option.provider.set_public_access(bucket.name, True)
-        async with ClientSession() as session:
-            url = provider_option.get_public_url(bucket.name, "blob1")
-            async with session.get(url) as resp:
-                data = await resp.read()
-                assert data == b"blob data 1"
-            url = provider_option.get_public_url(bucket.name, "blob2")
-            async with session.get(url) as resp:
-                data = await resp.read()
-                assert data == b"blob data 2"

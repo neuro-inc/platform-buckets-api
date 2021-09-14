@@ -9,6 +9,7 @@ from yarl import URL
 
 from platform_buckets_api.providers import AWSBucketProvider
 from platform_buckets_api.storage import ProviderBucket
+from tests.integration.conftest import MotoConfig
 from tests.integration.test_provider_base import (
     BasicBucketClient,
     ProviderTestOption,
@@ -86,6 +87,7 @@ class TestAWSProvider(TestProviderBase):
         iam: AioBaseClient,
         sts: AioBaseClient,
         s3_role: str,
+        moto_server: MotoConfig,
     ) -> ProviderTestOption:
         return ProviderTestOption(
             type="aws",
@@ -97,4 +99,9 @@ class TestAWSProvider(TestProviderBase):
             get_public_url=lambda bucket_name, key: URL(
                 s3.meta.endpoint_url + f"/{bucket_name}/{key}"
             ),
+            credentials_for_imported={
+                "endpoint_url": str(moto_server.url),
+                "access_key_id": moto_server.admin_access_key_id,
+                "secret_access_key": moto_server.admin_secret_access_key,
+            },
         )

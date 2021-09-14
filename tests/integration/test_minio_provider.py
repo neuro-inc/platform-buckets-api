@@ -23,7 +23,11 @@ class TestMinioProvider(TestProviderBase):
 
     @pytest.fixture()
     async def provider_option(
-        self, minio_s3: AioBaseClient, minio_sts: AioBaseClient, bmc_wrapper: BMCWrapper
+        self,
+        minio_s3: AioBaseClient,
+        minio_sts: AioBaseClient,
+        bmc_wrapper: BMCWrapper,
+        minio_server: URL,
     ) -> ProviderTestOption:
         return ProviderTestOption(
             type="minio",
@@ -35,4 +39,10 @@ class TestMinioProvider(TestProviderBase):
             get_public_url=lambda bucket_name, key: URL(
                 minio_s3.meta.endpoint_url + f"/{bucket_name}/{key}"
             ),
+            credentials_for_imported={
+                "endpoint_url": str(minio_server),
+                "access_key_id": "access_key",
+                "secret_access_key": "secret_key",
+                "region_name": "region-1",
+            },
         )
