@@ -197,7 +197,7 @@ class TestProviderBase:
         self, provider_option: ProviderTestOption
     ) -> None:
         if provider_option.type == "aws":
-            pytest.skip("Moto fails with 500")
+            pytest.skip("Moto has bad support of this operation")
         bucket = await provider_option.provider.create_bucket(_make_bucket_name())
         admin_client = provider_option.get_admin(bucket)
         await admin_client.put_object("blob1", b"blob data 1")
@@ -218,8 +218,6 @@ class TestProviderBase:
     ) -> None:
         if provider_option.type == "aws":
             pytest.skip("Moto fails with 500")
-        if provider_option.type == "minio":
-            pytest.skip("Minio has custom API")
 
         name = _make_bucket_name()
         bucket = await provider_option.provider.create_bucket(name)

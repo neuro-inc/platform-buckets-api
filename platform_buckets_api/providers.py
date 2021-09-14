@@ -111,7 +111,7 @@ class UserBucketOperations(abc.ABC):
                 endpoint_url=bucket.credentials.get("endpoint_url"),
                 region_name=bucket.credentials.get("region_name"),
             ) as client:
-                yield AWSUserBucketOperations(client)
+                yield AWSLikeUserBucketOperations(client)
         elif provider_type == BucketsProviderType.AZURE:
             async with BlobServiceClient(
                 account_url=bucket.credentials["storage_endpoint"],
@@ -181,13 +181,57 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
             )
         )
 
-
-class AWSUserBucketOperations(AWSLikeUserBucketOperations, ABC):
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
-        await self._s3_client.put_bucket_acl(
-            ACL="public-read" if public_access else "private",
-            Bucket=bucket_name,
-        )
+        policy: Dict[str, Any]
+        policy_exists = False
+        try:
+            policy_raw = (
+                await self._s3_client.get_bucket_policy(
+                    Bucket=bucket_name,
+                )
+            )["Policy"]
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] != "NoSuchBucketPolicy":
+                raise
+            policy = {"Version": "2012-10-17", "Statement": []}
+        else:
+            policy_exists = True
+            policy = json.loads(policy_raw)
+
+        policy["Statement"] = [
+            statement
+            for statement in policy["Statement"]
+            if "neuro-public-access" not in statement["Sid"]
+        ]
+        if public_access:
+            policy["Statement"] += [
+                {
+                    "Sid": "neuro-public-access-get-objects",
+                    "Action": [
+                        "s3:GetObject",
+                    ],
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:s3:::{bucket_name}/*",
+                    "Principal": "*",
+                },
+                {
+                    "Sid": "neuro-public-access-get-objects",
+                    "Action": [
+                        "s3:ListBucket",
+                    ],
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:s3:::{bucket_name}",
+                    "Principal": "*",
+                },
+            ]
+        if policy["Statement"]:
+            await self._s3_client.put_bucket_policy(
+                Bucket=bucket_name, Policy=json.dumps(policy)
+            )
+        elif policy_exists:
+            await self._s3_client.delete_bucket_policy(
+                Bucket=bucket_name,
+            )
 
 
 class AWSLikeBucketProvider(BucketProvider, ABC):
@@ -305,7 +349,7 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
         }
 
 
-class AWSBucketProvider(AWSLikeBucketProvider, AWSUserBucketOperations):
+class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
     def __init__(
         self,
         s3_client: AioBaseClient,
@@ -436,19 +480,7 @@ class BMCWrapper:
         self._target = None
 
 
-class MinioUserBucketOperations(AWSLikeUserBucketOperations, ABC):
-    def __init__(self, s3_client: AioBaseClient, mc: BMCWrapper):
-        super().__init__(s3_client)
-        self._mc = mc
-
-    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
-        await self._mc.policy_set(
-            permission="download" if public_access else "private",
-            bucket_name=bucket_name,
-        )
-
-
-class MinioBucketProvider(AWSLikeBucketProvider, MinioUserBucketOperations):
+class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
     def __init__(
         self,
         s3_client: AioBaseClient,
