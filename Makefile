@@ -28,8 +28,6 @@ HELM_CHART = platformbucketsapi
 
 PYTEST_FLAGS=
 
-export PIP_EXTRA_INDEX_URL ?= $(shell python pip_extra_index_url.py)
-
 include k8s.mk
 
 setup:
@@ -56,7 +54,6 @@ test_integration:
 docker_build:
 	python setup.py sdist
 	docker build \
-		--build-arg PIP_EXTRA_INDEX_URL \
 		--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz \
 		-t $(IMAGE) .
 
