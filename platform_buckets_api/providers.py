@@ -184,11 +184,10 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
 
 class AWSUserBucketOperations(AWSLikeUserBucketOperations, ABC):
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
-        resp = await self._s3_client.put_bucket_acl(
+        await self._s3_client.put_bucket_acl(
             ACL="public-read" if public_access else "private",
             Bucket=bucket_name,
         )
-        print(resp)
 
 
 class AWSLikeBucketProvider(BucketProvider, ABC):
