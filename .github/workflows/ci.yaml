@@ -1,10 +1,9 @@
-
 name: CI
 
 on:
   push:
     branches: [master]
-    tags: ['v*.*.*']
+    tags: [v*.*.*]
   pull_request:
     branches: [master]
   pull_request_target:
@@ -20,73 +19,74 @@ jobs:
     env:
       CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
     steps:
-      - name: Checkout commit
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Install python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8.10"
-      - name: Cache packages
-        uses: actions/cache@v2.1.6
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-py-3.8.10-${{ hashFiles('requirements/*.txt') }}-${{ hashFiles('setup.py') }}
-      - name: Install dependencies
-        run: make setup
-      - name: Install MC (minio client)
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -q install -y wget
-          wget https://dl.min.io/client/mc/release/linux-amd64/mc
-          sudo chmod +x mc
-          sudo mv mc /usr/bin/mc
-      - name: Lint
-        run: make lint
-      - name: Run unit tests
-        run: make test_unit
-      - name: Configure AWS credentials
-        if: env.CLOUD_PROVIDER == 'aws'
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Login to AWS ECR
-        if: env.CLOUD_PROVIDER == 'aws'
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Configure Azure credentials
-        if: env.CLOUD_PROVIDER == 'azure'
-        uses: azure/login@v1
-        with:
-          creds: ${{secrets.AZURE_CREDENTIALS}}
-      - name: Login to Azure ACR
-        if: env.CLOUD_PROVIDER == 'azure'
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
-          username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
-          password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
-      - name: Setup minikube
-        run: |
-          make install_k8s
-          make start_k8s
-          make apply_configuration_k8s
-          make test_k8s
-      - name: Run integration tests
-        env:
-          AZURE_STORAGE_ACCOUNT_URL: ${{ secrets.AZURE_STORAGE_ACCOUNT_URL }}
-          AZURE_STORAGE_CREDENTIAL: ${{ secrets.AZURE_STORAGE_CREDENTIAL }}
-          GCLOUD_SA_KEY_JSON_B64: ${{ secrets.GCLOUD_SA_KEY_JSON_B64 }}
-        run: make test_integration
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.1.0
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: .coverage-integration.xml
-          flags: integration
-          name: codecov-integration
+    - name: Checkout commit
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Install python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8.10
+    - name: Cache packages
+      uses: actions/cache@v2.1.6
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-py-3.8.10-${{ hashFiles('requirements/*.txt') }}-${{
+          hashFiles('setup.py') }}
+    - name: Install dependencies
+      run: make setup
+    - name: Install MC (minio client)
+      run: |
+        sudo apt-get -q update
+        sudo apt-get -q install -y wget
+        wget https://dl.min.io/client/mc/release/linux-amd64/mc
+        sudo chmod +x mc
+        sudo mv mc /usr/bin/mc
+    - name: Lint
+      run: make lint
+    - name: Run unit tests
+      run: make test_unit
+    - name: Configure AWS credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    - name: Login to AWS ECR
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Configure Azure credentials
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: azure/login@v1
+      with:
+        creds: ${{secrets.AZURE_CREDENTIALS}}
+    - name: Login to Azure ACR
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
+        username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
+        password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
+    - name: Setup minikube
+      run: |
+        make install_k8s
+        make start_k8s
+        make apply_configuration_k8s
+        make test_k8s
+    - name: Run integration tests
+      env:
+        AZURE_STORAGE_ACCOUNT_URL: ${{ secrets.AZURE_STORAGE_ACCOUNT_URL }}
+        AZURE_STORAGE_CREDENTIAL: ${{ secrets.AZURE_STORAGE_CREDENTIAL }}
+        GCLOUD_SA_KEY_JSON_B64: ${{ secrets.GCLOUD_SA_KEY_JSON_B64 }}
+      run: make test_integration
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v2.1.0
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: .coverage-integration.xml
+        flags: integration
+        name: codecov-integration
   deploy_dev:
     name: Deploy on dev
     runs-on: ubuntu-latest
@@ -106,47 +106,48 @@ jobs:
       HELM_VERSION: ${{ secrets.HELM_VERSION }}
       CLOUD_PROVIDER: ${{ secrets.CLOUD_PROVIDER_DEV }}
     steps:
-      - name: Checkout commit
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Install python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8.10
-      - name: Configure AWS credentials
-        if: env.CLOUD_PROVIDER == 'aws'
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Login to AWS ECR
-        if: env.CLOUD_PROVIDER == 'aws'
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Configure Azure credentials
-        if: env.CLOUD_PROVIDER == 'azure'
-        uses: azure/login@v1
-        with:
-          creds: ${{secrets.AZURE_CREDENTIALS}}
-      - name: Login to Azure ACR
-        if: env.CLOUD_PROVIDER == 'azure'
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
-          username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
-          password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
-      - name: Set tag
-        run: echo "TAG=$GITHUB_SHA" >> $GITHUB_ENV
-      - name: Push image to registry
-        run: make docker_push
-      - name: Update kube config
-        run: make ${{ env.CLOUD_PROVIDER }}_k8s_login
-      - name: Install helm
-        run: make helm_install
-      - name: Deploy to kubernetes
-        run: make helm_deploy
+    - name: Checkout commit
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Install python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8.10
+    - name: Configure AWS credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    - name: Login to AWS ECR
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Configure Azure credentials
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: azure/login@v1
+      with:
+        creds: ${{secrets.AZURE_CREDENTIALS}}
+    - name: Login to Azure ACR
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.AZURE_DEV_ACR_SERVER }}
+        username: ${{ secrets.AZURE_DEV_ACR_USERNAME }}
+        password: ${{ secrets.AZURE_DEV_ACR_PASSWORD }}
+    - name: Set tag
+      run: echo "TAG=$GITHUB_SHA" >> $GITHUB_ENV
+    - name: Push image to registry
+      run: make docker_push
+    - name: Update kube config
+      run: make ${{ env.CLOUD_PROVIDER }}_k8s_login
+    - name: Install helm
+      run: make helm_install
+    - name: Deploy to kubernetes
+      run: make helm_deploy
 
+    concurrency: deploy_dev
   release:
     name: Release package
     runs-on: ubuntu-latest
