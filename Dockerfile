@@ -20,6 +20,8 @@ RUN pip install --user $DIST_FILENAME
 
 FROM python:3.8.10-buster as service
 
+LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-buckets-api"
+
 WORKDIR /app
 
 COPY --from=installer /root/.local/ /root/.local/
