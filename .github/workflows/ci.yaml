@@ -43,7 +43,9 @@ jobs:
         sudo chmod +x mc
         sudo mv mc /usr/bin/mc
     - name: Lint
-      run: make lint
+      run: |
+        echo "::add-matcher::.github/actionlint-matcher.json"
+        make lint
     - name: Run unit tests
       run: make test_unit
     - name: Configure AWS credentials
