@@ -15,7 +15,7 @@ install_requires = (
     "aiohttp-apispec==2.2.1",
     "aiobotocore==1.4.1",
     "bmc==0.0.3",
-    "azure-storage-blob==12.8.1",
+    "azure-storage-blob==12.9.0",
     "google-cloud-storage==1.42.2",
     "google-cloud-iam==2.3.1",
     "google-api-python-client==2.21.0",
