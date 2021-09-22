@@ -10,7 +10,7 @@ install_requires = (
     "neuro-logging==21.8.4.1",
     "aiohttp-cors==0.7.0",
     "aiozipkin==1.1.0",
-    "sentry-sdk==1.3.1",
+    "sentry-sdk==1.4.0",
     "marshmallow==3.13.0",
     "aiohttp-apispec==2.2.1",
     "aiobotocore==1.4.1",
