@@ -99,6 +99,9 @@ class EnvironConfigFactory:
                 s3_role_arn=self._environ["NP_AWS_S3_ROLE_ARN"],
                 access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID") or None,
                 secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY") or None,
+                endpoint_url=URL(self._environ["NP_AWS_ENDPOINT_URL"])
+                if "NP_AWS_ENDPOINT_URL" in self._environ
+                else None,
                 region_name=self._environ.get("NP_AWS_REGION_NAME")
                 or AWSProviderConfig.region_name,
             )

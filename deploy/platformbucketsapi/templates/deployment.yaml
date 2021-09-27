@@ -90,6 +90,10 @@ spec:
         - name: NP_AWS_REGION_NAME
           value: {{ .Values.bucketProvider.aws.regionName }}
 {{- end}}
+{{- if .Values.bucketProvider.aws.endpointUrl }}
+        - name: NP_AWS_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.aws.endpointUrl }}
+{{- end}}
         {{- end }}
         # Minio provider
         {{- if eq .Values.bucketProvider.type "minio" }}
