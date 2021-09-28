@@ -11,6 +11,7 @@ from platform_buckets_api.config import (
     AzureProviderConfig,
     Config,
     CORSConfig,
+    EMCECSProviderConfig,
     GCPProviderConfig,
     KubeClientAuthType,
     KubeConfig,
@@ -145,3 +146,22 @@ def test_create_gcs() -> None:
     }
     config = EnvironConfigFactory(environ).create_bucket_provider()
     assert config == GCPProviderConfig(key_json={"key": "value"})
+
+
+def test_create_emc_ecs() -> None:
+    environ: Dict[str, Any] = {
+        "NP_BUCKET_PROVIDER_TYPE": "emc_ecs",
+        "NP_EMC_ECS_ACCESS_KEY_ID": "key-id",
+        "NP_EMC_ECS_SECRET_ACCESS_KEY": "key-secret",
+        "NP_EMC_ECS_S3_ROLE_URN": "role-urn",
+        "NP_EMC_ECS_S3_ENDPOINT_URL": "https://emc-ecs.s3",
+        "NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL": "https://emc-ecs.management",
+    }
+    config = EnvironConfigFactory(environ).create_bucket_provider()
+    assert config == EMCECSProviderConfig(
+        access_key_id="key-id",
+        secret_access_key="key-secret",
+        s3_role_urn="role-urn",
+        s3_endpoint_url=URL("https://emc-ecs.s3"),
+        management_endpoint_url=URL("https://emc-ecs.management"),
+    )

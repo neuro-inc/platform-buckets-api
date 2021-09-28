@@ -56,6 +56,7 @@ from .config import (
     AzureProviderConfig,
     Config,
     CORSConfig,
+    EMCECSProviderConfig,
     GCPProviderConfig,
     KubeConfig,
     MinioProviderConfig,
@@ -889,6 +890,44 @@ async def create_app(
                         gcs_client=gcs_client,
                         iam_client=iam_client,
                         iam_client_2=iam_client_2,
+                    )
+                elif isinstance(config.bucket_provider, EMCECSProviderConfig):
+                    session = aiobotocore.get_session()
+                    client_kwargs = dict(
+                        aws_secret_access_key=config.bucket_provider.secret_access_key,
+                        aws_access_key_id=config.bucket_provider.access_key_id,
+                    )
+                    s3_client = await exit_stack.enter_async_context(
+                        session.create_client(
+                            "s3",
+                            endpoint_url=str(config.bucket_provider.s3_endpoint_url),
+                            **client_kwargs,
+                        )
+                    )
+                    iam_client = await exit_stack.enter_async_context(
+                        session.create_client(
+                            "iam",
+                            endpoint_url=str(
+                                config.bucket_provider.management_endpoint_url / "iam"
+                            ),
+                            **client_kwargs,
+                        )
+                    )
+                    sts_client = await exit_stack.enter_async_context(
+                        session.create_client(
+                            "sts",
+                            endpoint_url=str(
+                                config.bucket_provider.management_endpoint_url / "sts"
+                            ),
+                            **client_kwargs,
+                        )
+                    )
+                    bucket_provider = AWSBucketProvider(
+                        s3_client=s3_client,
+                        iam_client=iam_client,
+                        sts_client=sts_client,
+                        s3_role_arn=config.bucket_provider.s3_role_urn,
+                        permissions_boundary="urn:ecs:iam:::policy/ECSS3FullAccess",
                     )
                 else:
                     raise Exception(

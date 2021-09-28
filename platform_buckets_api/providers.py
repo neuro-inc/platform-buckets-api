@@ -361,9 +361,11 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         sts_client: AioBaseClient,
         s3_role_arn: str,
         session_duration_s: int = 3600,
+        permissions_boundary: str = "arn:aws:iam::aws:policy/AmazonS3FullAccess",
     ):
         super().__init__(s3_client, sts_client, s3_role_arn, session_duration_s)
         self._iam_client = iam_client
+        self._permissions_boundary = permissions_boundary
 
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
@@ -371,7 +373,7 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         try:
             await self._iam_client.create_user(
                 UserName=username,
-                PermissionsBoundary="arn:aws:iam::aws:policy/AmazonS3FullAccess",
+                PermissionsBoundary=self._permissions_boundary,
             )
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)

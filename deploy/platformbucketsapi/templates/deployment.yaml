@@ -108,16 +108,32 @@ spec:
         - name: NP_MINIO_REGION_NAME
           value: {{ .Values.bucketProvider.minio.regionName }}
         {{- end }}
+        # Azure provider
         {{- if eq .Values.bucketProvider.type "azure" }}
         - name: NP_AZURE_STORAGE_ACCOUNT_URL
           value: {{ .Values.bucketProvider.azure.url }}
         - name: NP_AZURE_STORAGE_CREDENTIAL
 {{ toYaml .Values.bucketProvider.azure.credential | indent 10 }}
         {{- end }}
+        # GCP provider
         {{- if eq .Values.bucketProvider.type "gcp" }}
         - name: NP_GCP_SERVICE_ACCOUNT_KEY_JSON_B64
 {{ toYaml .Values.bucketProvider.gcp.SAKeyJsonB64 | indent 10 }}
         {{- end }}
+        # EMC ECS provider
+        {{- if eq .Values.bucketProvider.type "emc_ecs" }}
+        - name: NP_EMC_ECS_S3_ROLE_URN
+          value: {{ .Values.bucketProvider.emc_ecs.s3RoleUrn }}
+        - name: NP_EMC_ECS_ACCESS_KEY_ID
+          {{ toYaml .Values.bucketProvider.emc_ecs.accessKeyId | indent 10 }}
+        - name: NP_EMC_ECS_SECRET_ACCESS_KEY
+          {{ toYaml .Values.bucketProvider.emc_ecs.secretAccessKey | indent 10 }}
+        - name: NP_EMC_ECS_S3_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.emc_ecs.s3EndpointUrl }}
+        - name: NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.emc_ecs.managementEndpointUrl }}
+        {{- end }}
+        # End of providers
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL
           value: {{ .Values.zipkin.url }}

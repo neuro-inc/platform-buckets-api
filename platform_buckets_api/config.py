@@ -43,6 +43,7 @@ class BucketsProviderType(str, enum.Enum):
     MINIO = "minio"
     AZURE = "azure"
     GCP = "gcp"
+    EMC_ECS = "emc_ecs"
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,16 @@ class GCPProviderConfig:
         return SACredentials.from_service_account_info(info=self.key_json)
 
 
+@dataclass(frozen=True)
+class EMCECSProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.EMC_ECS
+    s3_role_urn: str
+    access_key_id: str
+    secret_access_key: str
+    s3_endpoint_url: URL
+    management_endpoint_url: URL
+
+
 class KubeClientAuthType(str, enum.Enum):
     NONE = "none"
     TOKEN = "token"
@@ -112,7 +123,11 @@ class Config:
     cors: CORSConfig
     cluster_name: str
     bucket_provider: Union[
-        AWSProviderConfig, MinioProviderConfig, AzureProviderConfig, GCPProviderConfig
+        AWSProviderConfig,
+        MinioProviderConfig,
+        AzureProviderConfig,
+        GCPProviderConfig,
+        EMCECSProviderConfig,
     ]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None

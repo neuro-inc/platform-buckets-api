@@ -13,6 +13,7 @@ from .config import (
     BucketsProviderType,
     Config,
     CORSConfig,
+    EMCECSProviderConfig,
     GCPProviderConfig,
     KubeClientAuthType,
     KubeConfig,
@@ -91,7 +92,11 @@ class EnvironConfigFactory:
     def create_bucket_provider(
         self,
     ) -> Union[
-        AWSProviderConfig, MinioProviderConfig, AzureProviderConfig, GCPProviderConfig
+        AWSProviderConfig,
+        MinioProviderConfig,
+        AzureProviderConfig,
+        GCPProviderConfig,
+        EMCECSProviderConfig,
     ]:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
@@ -123,6 +128,16 @@ class EnvironConfigFactory:
             key_json = json.loads(base64.b64decode(key_raw).decode())
             return GCPProviderConfig(
                 key_json=key_json,
+            )
+        elif type == BucketsProviderType.EMC_ECS:
+            return EMCECSProviderConfig(
+                s3_role_urn=self._environ["NP_EMC_ECS_S3_ROLE_URN"],
+                access_key_id=self._environ["NP_EMC_ECS_ACCESS_KEY_ID"],
+                secret_access_key=self._environ["NP_EMC_ECS_SECRET_ACCESS_KEY"],
+                s3_endpoint_url=URL(self._environ["NP_EMC_ECS_S3_ENDPOINT_URL"]),
+                management_endpoint_url=URL(
+                    self._environ["NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL"]
+                ),
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")
