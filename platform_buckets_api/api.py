@@ -898,7 +898,7 @@ async def create_app(
                         aws_access_key_id=config.bucket_provider.access_key_id,
                         # This "region" value is ignored by EMC ECS,
                         # but required by botocore
-                        region="any",
+                        region_name="any",
                     )
                     s3_client = await exit_stack.enter_async_context(
                         session.create_client(
