@@ -17,6 +17,7 @@ from tests.integration.test_provider_base import (
     BasicBucketClient,
     ProviderTestOption,
     TestProviderBase,
+    as_admin_cm,
 )
 
 
@@ -124,8 +125,8 @@ class TestAzureProvider(TestProviderBase):
             ),
             bucket_exists=partial(azure_bucket_exists, azure_blob_client),
             make_client=AzureBasicBucketClient.create,
-            get_admin=lambda bucket: AzureBasicBucketClient(
-                azure_blob_client, bucket.name
+            get_admin=as_admin_cm(
+                lambda bucket: AzureBasicBucketClient(azure_blob_client, bucket.name)
             ),
             role_exists=partial(azure_role_exists, azure_blob_client),
             get_public_url=lambda bucket, key: URL(

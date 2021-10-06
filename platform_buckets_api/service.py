@@ -118,7 +118,7 @@ class BucketsService:
         self, bucket: UserBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         return await self._provider.get_bucket_credentials(
-            bucket.provider_bucket.name, write, requester
+            bucket.provider_bucket, write, requester
         )
 
     @asynccontextmanager
@@ -136,7 +136,7 @@ class BucketsService:
     ) -> URL:
         async with self._get_operations(bucket) as operations:
             return await operations.sign_url_for_blob(
-                bucket_name=bucket.provider_bucket.name,
+                bucket=bucket.provider_bucket,
                 key=key,
                 expires_in_sec=expires_in_sec,
             )

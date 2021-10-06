@@ -27,6 +27,7 @@ from tests.integration.test_provider_base import (
     ProviderTestOption,
     TestProviderBase,
     _make_bucket_name,
+    as_admin_cm,
 )
 
 
@@ -238,7 +239,9 @@ class TestGoogleProvider(TestProviderBase):
             ),
             bucket_exists=partial(gcs_bucket_exists, gcs_client),
             make_client=GoogleBasicBucketClient.create,
-            get_admin=lambda bucket: GoogleBasicBucketClient(gcs_client, bucket.name),
+            get_admin=as_admin_cm(
+                lambda bucket: GoogleBasicBucketClient(gcs_client, bucket.name)
+            ),
             role_exists=partial(gcs_role_exists, iam_client, project_id),
             get_public_url=lambda bucket, key: URL(
                 f"https://storage.googleapis.com/"

@@ -44,6 +44,7 @@ class BucketsProviderType(str, enum.Enum):
     AZURE = "azure"
     GCP = "gcp"
     EMC_ECS = "emc_ecs"
+    OPEN_STACK = "open_stack"
 
 
 @dataclass(frozen=True)

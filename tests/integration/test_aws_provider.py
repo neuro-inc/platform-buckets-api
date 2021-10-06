@@ -14,6 +14,7 @@ from tests.integration.test_provider_base import (
     BasicBucketClient,
     ProviderTestOption,
     TestProviderBase,
+    as_admin_cm,
 )
 
 
@@ -94,7 +95,7 @@ class TestAWSProvider(TestProviderBase):
             provider=AWSBucketProvider(s3, iam, sts, s3_role),
             bucket_exists=partial(aws_bucket_exists, s3),
             make_client=AwsBasicBucketClient.create,
-            get_admin=lambda bucket: AwsBasicBucketClient(s3, bucket.name),
+            get_admin=as_admin_cm(lambda bucket: AwsBasicBucketClient(s3, bucket.name)),
             role_exists=partial(aws_role_exists, iam),
             get_public_url=lambda bucket_name, key: URL(
                 s3.meta.endpoint_url + f"/{bucket_name}/{key}"

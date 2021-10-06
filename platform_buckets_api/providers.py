@@ -23,14 +23,17 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
 )
 
 import aiobotocore
+import aiohttp
 import bmc
 import botocore.exceptions
 import google.cloud.exceptions
 from aiobotocore.client import AioBaseClient
 from aiobotocore.credentials import AioCredentials
+from aiohttp import ClientError
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import (
     AccessPolicy,
@@ -94,7 +97,7 @@ class UserBucketOperations(abc.ABC):
 
     @abc.abstractmethod
     async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
         pass
 
@@ -145,7 +148,7 @@ class BucketProvider(UserBucketOperations, abc.ABC):
 
     @abc.abstractmethod
     async def get_bucket_credentials(
-        self, name: str, write: bool, requester: str
+        self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         pass
 
@@ -173,14 +176,14 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
         self._s3_client = s3_client
 
     async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
         if expires_in_sec > datetime.timedelta(days=7).total_seconds():
             raise ValueError("S3 do not support signed urls for more then 7 days")
         return URL(
             await self._s3_client.generate_presigned_url(
                 ClientMethod="get_object",
-                Params={"Bucket": bucket_name, "Key": key},
+                Params={"Bucket": bucket.name, "Key": key},
                 ExpiresIn=expires_in_sec,
             )
         )
@@ -291,19 +294,19 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
         }
 
     async def get_bucket_credentials(
-        self, name: str, write: bool, requester: str
+        self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         policy_doc = self._permissions_to_policy_doc(
             [
                 BucketPermission(
-                    bucket_name=name,
+                    bucket_name=bucket.name,
                     write=write,
                 )
             ]
         )
         res = await self._sts_client.assume_role(
             RoleArn=self._s3_role_arn,
-            RoleSessionName=f"{name}-{requester}"[:58] + secrets.token_hex(3),
+            RoleSessionName=f"{bucket.name}-{requester}"[:58] + secrets.token_hex(3),
             Policy=json.dumps(policy_doc),
             DurationSeconds=self._session_duration_s,
         )
@@ -571,7 +574,7 @@ class AzureUserBucketOperations(UserBucketOperations):
         )
 
     async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
         expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
             seconds=expires_in_sec
@@ -579,14 +582,14 @@ class AzureUserBucketOperations(UserBucketOperations):
         token: str = generate_blob_sas(
             account_name=self._blob_client.account_name,
             blob_name=key,
-            container_name=bucket_name,
+            container_name=bucket.name,
             account_key=self._blob_client.credential.account_key,
             permission=BlobSasPermissions.from_string("r"),
             expiry=expiry,
         )
         return URL(
             BlobClient.from_blob_url(
-                self._blob_client.get_blob_client(bucket_name, key).url,
+                self._blob_client.get_blob_client(bucket.name, key).url,
                 credential=token,
             ).url
         )
@@ -627,14 +630,14 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
             )
 
     async def get_bucket_credentials(
-        self, name: str, write: bool, requester: str
+        self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
             hours=1
         )
         token: str = generate_container_sas(
             account_name=self._blob_client.account_name,
-            container_name=name,
+            container_name=bucket.name,
             account_key=self._blob_client.credential.account_key,
             permission=self._make_sas_permissions(write),
             expiry=expiry,
@@ -785,12 +788,12 @@ class GoogleUserBucketOperations(UserBucketOperations):
         bucket.set_iam_policy(policy)
 
     async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
         if expires_in_sec > datetime.timedelta(days=7).total_seconds():
             raise ValueError("GCP do not support signed urls for more then 7 days")
         return URL(
-            self._gcs_client.bucket(bucket_name)
+            self._gcs_client.bucket(bucket.name)
             .blob(key)
             .generate_signed_url(expiration=datetime.timedelta(seconds=expires_in_sec))
         )
@@ -943,10 +946,12 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
             raise BucketNotExistsError(name)
 
     async def get_bucket_credentials(
-        self, name: str, write: bool, requester: str
+        self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         resp = await self._iam_client_2.generate_access_token(
-            name=self._make_bucket_sa_full_name(name, write=write, placeholder=True),
+            name=self._make_bucket_sa_full_name(
+                bucket.name, write=write, placeholder=True
+            ),
             scope=["https://www.googleapis.com/auth/cloud-platform"],
         )
         return {
@@ -1006,3 +1011,300 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
 
     async def delete_role(self, role: ProviderRole) -> None:
         await self._delete_sa(self._make_sa_full_name(role.name))
+
+
+@dataclass(frozen=True)
+class OpenStackToken:
+    token: str
+    issued_at: datetime.datetime
+    expires_at: datetime.datetime
+    url: URL
+
+
+@dataclass(frozen=True)
+class OpenStackUser:
+    name: str
+    password: str
+    read_only_containers: Sequence[str] = ()
+    read_write_containers: Sequence[str] = ()
+
+
+class OpenStackStorageApi:
+    def __init__(self, account_id: str, password: str, url: URL):
+        self._account_id = account_id
+        self._password = password
+        self._client = aiohttp.ClientSession()
+        self._url = url
+        self._token: Optional[OpenStackToken] = None
+
+    async def __aenter__(self) -> "OpenStackStorageApi":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.close()
+
+    async def close(self) -> None:
+        await self._client.close()
+
+    @property
+    def account_id(self) -> str:
+        return self._account_id
+
+    async def _get_token(self) -> OpenStackToken:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if self._token is None or self._token.expires_at - now < datetime.timedelta(
+            minutes=15
+        ):
+            self._token = await self.fetch_token()
+        return self._token
+
+    async def fetch_token(self) -> OpenStackToken:
+        body = {
+            "auth": {
+                "identity": {
+                    "methods": ["password"],
+                    "password": {
+                        "user": {
+                            "name": self._account_id,
+                            "password": self._password,
+                        }
+                    },
+                }
+            }
+        }
+        async with self._client.post(
+            url=self._url / "v3/auth/tokens", json=body
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+            return OpenStackToken(
+                token=resp.headers["x-subject-token"],
+                expires_at=datetime.datetime.strptime(
+                    data["token"]["expires_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                ),
+                issued_at=datetime.datetime.strptime(
+                    data["token"]["issued_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                ),
+                url=URL(data["token"]["catalog"][0]["endpoints"][0]["url"]),
+            )
+
+    async def list_containers(self) -> List[str]:
+        token = await self._get_token()
+        headers = {"X-Auth-Token": token.token}
+        async with self._client.get(url=token.url, headers=headers) as resp:
+            resp.raise_for_status()
+            return (await resp.text()).split("\n")
+
+    async def create_container(
+        self, container_name: str, meta: Optional[Mapping[str, str]] = None
+    ) -> None:
+        token = await self._get_token()
+        headers = {"X-Auth-Token": token.token}
+        headers.update(
+            {f"X-Container-Meta-{key}": value for key, value in (meta or {}).items()}
+        )
+        async with self._client.put(
+            url=token.url / container_name, headers=headers
+        ) as resp:
+            resp.raise_for_status()
+
+    async def set_container_meta(
+        self, container_name: str, meta: Optional[Mapping[str, str]] = None
+    ) -> None:
+        token = await self._get_token()
+        headers = {"X-Auth-Token": token.token}
+        headers.update(
+            {f"X-Container-Meta-{key}": value for key, value in (meta or {}).items()}
+        )
+        async with self._client.put(
+            url=token.url / container_name, headers=headers
+        ) as resp:
+            resp.raise_for_status()
+
+    async def delete_container(self, container_name: str) -> None:
+        token = await self._get_token()
+        headers = {"X-Auth-Token": token.token}
+        async with self._client.delete(
+            url=token.url / container_name, headers=headers
+        ) as resp:
+            resp.raise_for_status()
+
+    async def list_users(self) -> List[str]:
+        token = await self._get_token()
+        headers = {"X-Auth-Token": token.token}
+        async with self._client.get(
+            url=self._url / "v1/users", headers=headers
+        ) as resp:
+            resp.raise_for_status()
+            return [
+                info.strip().split(" ", 1)[0]
+                for info in (await resp.text()).split("\n")
+            ]
+
+    async def update_or_create_user(self, user: OpenStackUser) -> OpenStackUser:
+        token = await self._get_token()
+        headers = {
+            "X-Auth-Token": token.token,
+            "X-Auth-Key": user.password,
+            "X-User-Active": "on",
+            "X-User-ACL-Containers-R": ",".join(user.read_only_containers),
+            "X-User-ACL-Containers-W": ",".join(user.read_write_containers),
+            "X-User-S3-Password": "yes",
+        }
+        async with self._client.put(
+            url=self._url / "v1/users" / user.name, headers=headers
+        ) as resp:
+            resp.raise_for_status()
+        return user
+
+    async def delete_user(self, username: str) -> None:
+        token = await self._get_token()
+        headers = {
+            "X-Auth-Token": token.token,
+        }
+        async with self._client.delete(
+            url=self._url / "v1/users" / username, headers=headers
+        ) as resp:
+            resp.raise_for_status()
+
+
+class OpenStackBucketProvider(BucketProvider):
+    def __init__(self, api: OpenStackStorageApi, region_name: str, s3_url: str):
+        self._api = api
+        self._region_name = region_name
+        self._s3_url = s3_url
+
+    def _reader_name(self, container_name: str) -> str:
+        return container_name + "-reader"
+
+    def _writer_name(self, container_name: str) -> str:
+        return container_name + "-writer"
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        container_created = False
+        reader_created = False
+        reader = OpenStackUser(
+            name=self._reader_name(name),
+            password=secrets.token_hex(10),
+            read_only_containers=[name],
+        )
+        writer = OpenStackUser(
+            name=self._writer_name(name),
+            password=secrets.token_hex(10),
+            read_write_containers=[name],
+        )
+        try:
+            await self._api.create_container(name)
+            container_created = True
+            await self._api.update_or_create_user(reader)
+            reader_created = True
+            await self._api.update_or_create_user(writer)
+        except Exception:
+            if reader_created:
+                await self._api.delete_user(reader.name)
+            if container_created:
+                await self._api.delete_container(name)
+        return ProviderBucket(
+            name=name,
+            provider_type=BucketsProviderType.OPEN_STACK,
+            metadata={
+                "reader": f"{reader.name}:{reader.password}",
+                "writer": f"{writer.name}:{writer.password}",
+            },
+        )
+
+    async def delete_bucket(self, name: str) -> None:
+        try:
+            await self._api.delete_user(self._reader_name(name))
+        except ClientError:
+            pass  # Can be already deleted
+        try:
+            await self._api.delete_user(self._writer_name(name))
+        except ClientError:
+            pass  # Can be already deleted
+        await self._api.delete_container(name)
+
+    async def get_bucket_credentials(
+        self, bucket: ProviderBucket, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        assert bucket.metadata
+        if write:
+            cred_str = bucket.metadata["writer"]
+        else:
+            cred_str = bucket.metadata["reader"]
+        username, password = cred_str.rsplit(":", 1)
+        return {
+            "region_name": self._region_name,
+            "endpoint_url": str(self._s3_url),
+            "access_key_id": f"{self._api.account_id}_{username}",
+            "secret_access_key": password,
+        }
+
+    async def create_role(
+        self, username: str, initial_permissions: Iterable[BucketPermission]
+    ) -> ProviderRole:
+        password = secrets.token_hex(10)
+        role = ProviderRole(
+            name=username,
+            provider_type=BucketsProviderType.OPEN_STACK,
+            credentials={
+                "region_name": self._region_name,
+                "endpoint_url": str(self._s3_url),
+                "access_key_id": f"{self._api.account_id}_{username}",
+                "secret_access_key": password,
+            },
+        )
+        # Set permissions also creates role
+        await self.set_role_permissions(role, initial_permissions)
+        return role
+
+    async def set_role_permissions(
+        self, role: ProviderRole, permissions: Iterable[BucketPermission]
+    ) -> None:
+        user = OpenStackUser(
+            name=role.name,
+            password=role.credentials["secret_access_key"],
+            read_only_containers=[
+                perm.bucket_name for perm in permissions if not perm.write
+            ],
+            read_write_containers=[
+                perm.bucket_name for perm in permissions if perm.write
+            ],
+        )
+        await self._api.update_or_create_user(user)
+
+    async def delete_role(self, role: ProviderRole) -> None:
+        await self._api.delete_user(role.name)
+
+    async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
+        if public_access:
+            meta = {"Type": "public"}
+        else:
+            meta = {"Type": "private"}
+        await self._api.set_container_meta(bucket_name, meta)
+
+    async def sign_url_for_blob(
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError(
+                "Open Stack do not support signed urls for more then 7 days"
+            )
+        session = aiobotocore.get_session()
+        credentials = await self.get_bucket_credentials(
+            bucket, write=False, requester="sign_url"
+        )
+        client_kwargs = dict(
+            region_name=credentials["region_name"],
+            endpoint_url=credentials["endpoint_url"],
+            aws_secret_access_key=credentials["secret_access_key"],
+            aws_access_key_id=credentials["access_key_id"],
+        )
+        async with session.create_client("s3", **client_kwargs) as s3_client:
+            return URL(
+                await s3_client.generate_presigned_url(
+                    ClientMethod="get_object",
+                    Params={"Bucket": bucket.name, "Key": key},
+                    ExpiresIn=expires_in_sec,
+                )
+            )

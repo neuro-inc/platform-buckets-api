@@ -46,6 +46,7 @@ class ProviderRole:
 class ProviderBucket:
     provider_type: BucketsProviderType
     name: str
+    metadata: Optional[Mapping[str, str]] = None
 
 
 @dataclass(frozen=True)

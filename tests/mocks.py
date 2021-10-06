@@ -29,7 +29,7 @@ class MockBucketProvider(BucketProvider):
         self.deleted_buckets.append(name)
 
     async def get_bucket_credentials(
-        self, name: str, write: bool, requester: str
+        self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         return {"token": "value"}
 
@@ -54,7 +54,7 @@ class MockBucketProvider(BucketProvider):
         self.role_to_permissions[role.name] = set(permissions)
 
     async def sign_url_for_blob(
-        self, bucket_name: str, key: str, expires_in_sec: int = 3600
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
         raise NotImplementedError
 
