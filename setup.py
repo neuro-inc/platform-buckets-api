@@ -18,7 +18,7 @@ install_requires = (
     "azure-storage-blob==12.8.1",
     "google-cloud-storage==1.42.3",
     "google-cloud-iam==2.3.2",
-    "google-api-python-client==2.23.0",
+    "google-api-python-client==2.24.0",
 )
 
 setup(
