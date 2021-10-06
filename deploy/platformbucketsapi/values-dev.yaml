@@ -1,19 +1,7 @@
 bucketProvider:
-  type: "open_stack"  # "aws" or "minio"
-  open_stack:
-    accountId:
-      valueFrom:
-        secretKeyRef:
-          name: os-obj-storage
-          key: accountId
-    password:
-      valueFrom:
-        secretKeyRef:
-          name: os-obj-storage
-          key: password
-    endpointUrl: https://api.selcdn.ru
-    s3EndpointUrl: https://s3.selcdn.ru
-    regionName: ru-1
+  type: "aws"  # "aws" or "minio"
+  aws:
+    s3RoleArn: arn:aws:iam::771188043543:role/bucker-api-users-role
 
 annotations:
   iam.amazonaws.com/role: arn:aws:iam::771188043543:role/buckets-366c09e4841fcc83df56b8f070c34716
