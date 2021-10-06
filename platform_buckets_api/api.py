@@ -60,6 +60,7 @@ from .config import (
     GCPProviderConfig,
     KubeConfig,
     MinioProviderConfig,
+    OpenStackProviderConfig,
     PlatformAuthConfig,
 )
 from .config_factory import EnvironConfigFactory
@@ -74,6 +75,8 @@ from .providers import (
     BucketProvider,
     GoogleBucketProvider,
     MinioBucketProvider,
+    OpenStackBucketProvider,
+    OpenStackStorageApi,
 )
 from .schema import (
     Bucket,
@@ -931,6 +934,17 @@ async def create_app(
                         sts_client=sts_client,
                         s3_role_arn=config.bucket_provider.s3_role_urn,
                         permissions_boundary="urn:ecs:iam:::policy/ECSS3FullAccess",
+                    )
+                elif isinstance(config.bucket_provider, OpenStackProviderConfig):
+                    os_api = OpenStackStorageApi(
+                        account_id=config.bucket_provider.account_id,
+                        password=config.bucket_provider.password,
+                        url=config.bucket_provider.endpoint_url,
+                    )
+                    bucket_provider = OpenStackBucketProvider(
+                        api=os_api,
+                        region_name=config.bucket_provider.region_name,
+                        s3_url=config.bucket_provider.s3_endpoint_url,
                     )
                 else:
                     raise Exception(

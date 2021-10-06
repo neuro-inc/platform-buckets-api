@@ -1169,7 +1169,7 @@ class OpenStackStorageApi:
 
 
 class OpenStackBucketProvider(BucketProvider):
-    def __init__(self, api: OpenStackStorageApi, region_name: str, s3_url: str):
+    def __init__(self, api: OpenStackStorageApi, region_name: str, s3_url: URL):
         self._api = api
         self._region_name = region_name
         self._s3_url = s3_url

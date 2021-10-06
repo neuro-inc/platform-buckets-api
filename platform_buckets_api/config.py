@@ -94,6 +94,16 @@ class EMCECSProviderConfig:
     management_endpoint_url: URL
 
 
+@dataclass(frozen=True)
+class OpenStackProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.OPEN_STACK
+    account_id: str
+    password: str
+    region_name: str
+    endpoint_url: URL
+    s3_endpoint_url: URL
+
+
 class KubeClientAuthType(str, enum.Enum):
     NONE = "none"
     TOKEN = "token"
@@ -129,6 +139,7 @@ class Config:
         AzureProviderConfig,
         GCPProviderConfig,
         EMCECSProviderConfig,
+        OpenStackProviderConfig,
     ]
     enable_docs: bool = False
     zipkin: Optional[ZipkinConfig] = None

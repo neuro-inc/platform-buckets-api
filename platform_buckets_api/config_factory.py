@@ -18,6 +18,7 @@ from .config import (
     KubeClientAuthType,
     KubeConfig,
     MinioProviderConfig,
+    OpenStackProviderConfig,
     PlatformAuthConfig,
     SentryConfig,
     ServerConfig,
@@ -97,6 +98,7 @@ class EnvironConfigFactory:
         AzureProviderConfig,
         GCPProviderConfig,
         EMCECSProviderConfig,
+        OpenStackProviderConfig,
     ]:
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
@@ -138,6 +140,14 @@ class EnvironConfigFactory:
                 management_endpoint_url=URL(
                     self._environ["NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL"]
                 ),
+            )
+        elif type == BucketsProviderType.OPEN_STACK:
+            return OpenStackProviderConfig(
+                account_id=self._environ["NP_OS_ACCOUNT_ID"],
+                password=self._environ["NP_OS_PASSWORD"],
+                endpoint_url=URL(self._environ["NP_OS_ENDPOINT_URL"]),
+                s3_endpoint_url=URL(self._environ["NP_OS_S3_ENDPOINT_URL"]),
+                region_name=self._environ["NP_OS_REGION_NAME"],
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type}")

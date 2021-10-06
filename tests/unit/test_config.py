@@ -16,6 +16,7 @@ from platform_buckets_api.config import (
     KubeClientAuthType,
     KubeConfig,
     MinioProviderConfig,
+    OpenStackProviderConfig,
     PlatformAuthConfig,
     SentryConfig,
     ServerConfig,
@@ -164,4 +165,23 @@ def test_create_emc_ecs() -> None:
         s3_role_urn="role-urn",
         s3_endpoint_url=URL("https://emc-ecs.s3"),
         management_endpoint_url=URL("https://emc-ecs.management"),
+    )
+
+
+def test_create_open_stack() -> None:
+    environ: Dict[str, Any] = {
+        "NP_BUCKET_PROVIDER_TYPE": "open_stack",
+        "NP_OS_ACCOUNT_ID": "key-id",
+        "NP_OS_PASSWORD": "password",
+        "NP_OS_ENDPOINT_URL": "https://os.management",
+        "NP_OS_S3_ENDPOINT_URL": "https://os.s3",
+        "NP_OS_REGION_NAME": "region",
+    }
+    config = EnvironConfigFactory(environ).create_bucket_provider()
+    assert config == OpenStackProviderConfig(
+        account_id="key-id",
+        password="password",
+        endpoint_url=URL("https://os.management"),
+        s3_endpoint_url=URL("https://os.s3"),
+        region_name="region",
     )

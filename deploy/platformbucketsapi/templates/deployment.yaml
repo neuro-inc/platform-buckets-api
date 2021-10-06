@@ -133,6 +133,19 @@ spec:
         - name: NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL
           value: {{ .Values.bucketProvider.emc_ecs.managementEndpointUrl }}
         {{- end }}
+        # Open Stack provider
+        {{- if eq .Values.bucketProvider.type "open_stack" }}
+        - name: NP_OS_ACCOUNT_ID
+          {{ toYaml .Values.bucketProvider.open_stack.accountId | indent 10 }}
+        - name: NP_OS_PASSWORD
+          {{ toYaml .Values.bucketProvider.open_stack.password | indent 10 }}
+        - name: NP_OS_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.open_stack.endpointUrl }}
+        - name: NP_OS_S3_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.open_stack.s3EndpointUrl }}
+        - name: NP_OS_REGION_NAME
+          value: {{ .Values.bucketProvider.open_stack.regionName }}
+        {{- end }}
         # End of providers
         {{- if .Values.zipkin }}
         - name: NP_ZIPKIN_URL
