@@ -119,6 +119,7 @@ class BucketCRDMapper:
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
+                metadata=payload["spec"].get("metadata"),
             ),
             public=payload["spec"].get("public", False),
         )
@@ -157,6 +158,7 @@ class BucketCRDMapper:
                 "provider_name": entry.provider_bucket.name,
                 "created_at": datetime_dump(entry.created_at),
                 "public": entry.public,
+                "metadata": entry.provider_bucket.metadata,
             },
         }
         if isinstance(entry, ImportedBucket):

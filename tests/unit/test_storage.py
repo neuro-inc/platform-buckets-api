@@ -127,7 +127,11 @@ class TestBucketsStorage:
         return in_memory_buckets_storage
 
     def _make_bucket(
-        self, username: str, name: Optional[str], public: bool = False
+        self,
+        username: str,
+        name: Optional[str],
+        public: bool = False,
+        with_meta: bool = True,
     ) -> UserBucket:
         return UserBucket(
             id=f"bucket-{uuid4()}",
@@ -137,6 +141,7 @@ class TestBucketsStorage:
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
                 name=f"{name}--{username}",
+                metadata={"key": "value"} if with_meta else None,
             ),
             public=public,
         )
@@ -161,7 +166,7 @@ class TestBucketsStorage:
         )
 
     async def test_buckets_create_list(self, storage: BucketsStorage) -> None:
-        bucket1 = self._make_bucket("user1", "test")
+        bucket1 = self._make_bucket("user1", "test", with_meta=False)
         bucket2 = self._make_bucket("user2", None)
         bucket3 = self._make_bucket("user2", None, True)
         bucket4 = self._make_imported_bucket("user2", None)
