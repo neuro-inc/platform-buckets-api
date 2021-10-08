@@ -14,6 +14,7 @@ from aiohttp.web_exceptions import (
     HTTPNoContent,
     HTTPNotFound,
     HTTPUnauthorized,
+    HTTPUnprocessableEntity,
 )
 from neuro_auth_client import AuthClient, Permission
 from yarl import URL
@@ -73,6 +74,15 @@ class BucketsApiEndpoints:
 @pytest.fixture
 async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
     app = await create_app(config)
+    async with create_local_app_server(app, port=8080) as address:
+        yield BucketsApiEndpoints(address=address)
+
+
+@pytest.fixture
+async def buckets_api_creation_disabled(
+    config_creation_disabled: Config,
+) -> AsyncIterator[BucketsApiEndpoints]:
+    app = await create_app(config_creation_disabled)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
 
@@ -279,6 +289,23 @@ class TestApi:
         assert payload["owner"] == regular_user.name
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
+    async def test_create_bucket_when_disabled(
+        self,
+        buckets_api_creation_disabled: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+    ) -> None:
+        async with client.post(
+            buckets_api_creation_disabled.buckets_url,
+            headers=regular_user.headers,
+            json={
+                "name": "anything",
+            },
+        ) as resp:
+            assert resp.status == HTTPUnprocessableEntity.status_code, await resp.text()
+            error = await resp.json()
+            assert error["code"] == "disabled"
 
     async def test_import_bucket(
         self,
@@ -693,6 +720,25 @@ class TestApi:
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
         assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
+
+    async def test_create_credentials_when_disabled(
+        self,
+        buckets_api_creation_disabled: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+    ) -> None:
+        async with client.post(
+            buckets_api_creation_disabled.credentials_url,
+            headers=regular_user.headers,
+            json={
+                "name": "any",
+                "bucket_ids": ["1", "2", "3"],
+                "read_only": False,
+            },
+        ) as resp:
+            assert resp.status == HTTPUnprocessableEntity.status_code, await resp.text()
+            error = await resp.json()
+            assert error["code"] == "disabled"
 
     async def test_create_credentials_read_only(
         self,

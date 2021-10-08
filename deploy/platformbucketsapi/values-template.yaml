@@ -68,3 +68,4 @@ platform:
 
 corsOrigins:
 enableDocs: false
+disableCreation: false

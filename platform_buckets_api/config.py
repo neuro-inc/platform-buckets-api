@@ -142,5 +142,6 @@ class Config:
         OpenStackProviderConfig,
     ]
     enable_docs: bool = False
+    disable_creation: bool = False
     zipkin: Optional[ZipkinConfig] = None
     sentry: Optional[SentryConfig] = None

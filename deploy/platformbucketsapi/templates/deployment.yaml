@@ -165,6 +165,10 @@ spec:
         - name: NP_BUCKETS_API_ENABLE_DOCS
           value: "true"
         {{- end }}
+        {{- if .Values.disableCreation }}
+        - name: NP_BUCKETS_API_DISABLE_CREATION
+          value: "true"
+        {{- end }}
 
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}

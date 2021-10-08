@@ -33,6 +33,7 @@ from aiohttp.web_exceptions import (
     HTTPNoContent,
     HTTPNotFound,
     HTTPOk,
+    HTTPUnprocessableEntity,
 )
 from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
 from aiohttp_security import check_authorized
@@ -190,6 +191,10 @@ class BucketsApiHandler:
     def permissions_service(self) -> PermissionsService:
         return self._app["permissions_service"]
 
+    @property
+    def disable_creation(self) -> bool:
+        return self._app["disable_creation"]
+
     async def _resolve_bucket(self, request: Request) -> BaseBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
         try:
@@ -214,6 +219,10 @@ class BucketsApiHandler:
                 "description": "Bucket with such name exists",
                 "schema": ClientErrorSchema(),
             },
+            HTTPUnprocessableEntity.status_code: {
+                "description": "Bucket creation is disabled",
+                "schema": ClientErrorSchema(),
+            },
         },
     )
     @request_schema(
@@ -227,6 +236,17 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_create_bucket_perms(user)
         )
+        if self.disable_creation:
+            return json_response(
+                {
+                    "code": "disabled",
+                    "description": (
+                        "Bucket creation is disabled, please use import instead"
+                    ),
+                },
+                status=HTTPUnprocessableEntity.status_code,
+            )
+
         schema = Bucket(
             partial=["provider", "owner", "created_at", "imported", "public"]
         )
@@ -506,6 +526,10 @@ class PersistentCredentialsApiHandler:
     def permissions_service(self) -> PermissionsService:
         return self._app["permissions_service"]
 
+    @property
+    def disable_creation(self) -> bool:
+        return self._app["disable_creation"]
+
     async def _resolve_credentials(self, request: Request) -> PersistentCredentials:
         id_or_name = request.match_info["credential_id_or_name"]
         try:
@@ -557,7 +581,11 @@ class PersistentCredentialsApiHandler:
                 "schema": PersistentBucketsCredentials(),
             },
             HTTPConflict.status_code: {
-                "description": "Bucket with such name exists",
+                "description": "Credentials with such name exists",
+                "schema": ClientErrorSchema(),
+            },
+            HTTPUnprocessableEntity.status_code: {
+                "description": "Credentials creation is disabled",
                 "schema": ClientErrorSchema(),
             },
         },
@@ -568,6 +596,14 @@ class PersistentCredentialsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         username = await check_authorized(request)
+        if self.disable_creation:
+            return json_response(
+                {
+                    "code": "disabled",
+                    "description": "Credentials creation is disabled.",
+                },
+                status=HTTPUnprocessableEntity.status_code,
+            )
         schema = PersistentBucketsCredentialsRequest()
         data = schema.load(await request.json())
         for bucket_id in data["bucket_ids"]:
@@ -971,6 +1007,7 @@ async def create_app(
                 permissions_service=permissions_service,
             )
             app["buckets_app"]["service"] = buckets_service
+            app["buckets_app"]["disable_creation"] = config.disable_creation
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
@@ -981,6 +1018,7 @@ async def create_app(
             )
             app["credentials_app"]["buckets_service"] = buckets_service
             app["credentials_app"]["credentials_service"] = credentials_service
+            app["credentials_app"]["disable_creation"] = config.disable_creation
 
             yield
 

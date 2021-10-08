@@ -37,6 +37,9 @@ class EnvironConfigFactory:
 
         cluster_name = self._environ.get("NP_CLUSTER_NAME", "")
         enable_docs = self._environ.get("NP_BUCKETS_API_ENABLE_DOCS", "false") == "true"
+        disable_creation = (
+            self._environ.get("NP_BUCKETS_API_DISABLE_CREATION", "false") == "true"
+        )
         return Config(
             server=self._create_server(),
             platform_auth=self._create_platform_auth(),
@@ -45,6 +48,7 @@ class EnvironConfigFactory:
             zipkin=self.create_zipkin(),
             sentry=self.create_sentry(),
             enable_docs=enable_docs,
+            disable_creation=disable_creation,
             cluster_name=cluster_name,
             bucket_provider=self.create_bucket_provider(),
         )

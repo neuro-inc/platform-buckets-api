@@ -51,6 +51,7 @@ def test_create(cert_authority_path: str, token_path: str) -> None:
         "NP_BUCKETS_API_PLATFORM_AUTH_TOKEN": "platform-auth-token",
         "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
         "NP_BUCKETS_API_ENABLE_DOCS": "true",
+        "NP_BUCKETS_API_DISABLE_CREATION": "true",
         "NP_ZIPKIN_URL": "http://zipkin:9411",
         "NP_SENTRY_DSN": "https://test.com",
         "NP_SENTRY_CLUSTER_NAME": "test",
@@ -96,6 +97,7 @@ def test_create(cert_authority_path: str, token_path: str) -> None:
         zipkin=ZipkinConfig(url=URL("http://zipkin:9411")),
         sentry=SentryConfig(dsn=URL("https://test.com"), cluster_name="test"),
         enable_docs=True,
+        disable_creation=True,
         cluster_name="test-cluster",
         bucket_provider=AWSProviderConfig(
             access_key_id="key-id",

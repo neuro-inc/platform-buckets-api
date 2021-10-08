@@ -130,6 +130,13 @@ def config(
     raise Exception(f"Unknown bucket provider {request.param}.")
 
 
+@pytest.fixture()
+def config_creation_disabled(
+    config_factory: Callable[..., Config],
+) -> Config:
+    return config_factory(disable_creation=True)
+
+
 @dataclass(frozen=True)
 class ApiAddress:
     host: str
