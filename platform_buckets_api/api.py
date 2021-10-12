@@ -35,12 +35,19 @@ from aiohttp.web_exceptions import (
     HTTPOk,
     HTTPUnprocessableEntity,
 )
-from aiohttp_apispec import docs, request_schema, response_schema, setup_aiohttp_apispec
+from aiohttp_apispec import (
+    docs,
+    querystring_schema,
+    request_schema,
+    response_schema,
+    setup_aiohttp_apispec,
+)
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
+from marshmallow import Schema, fields
 from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
@@ -200,9 +207,12 @@ class BucketsApiHandler:
         try:
             bucket = await self.service.get_bucket(id_or_name)
         except NotExistsError:
+            owner_qv = request.query.get("owner")
             user = await _get_untrusted_user(request)
             try:
-                bucket = await self.service.get_bucket_by_name(id_or_name, user.name)
+                bucket = await self.service.get_bucket_by_name(
+                    id_or_name, owner_qv or user.name
+                )
             except NotExistsError:
                 raise HTTPNotFound(text=f"Bucket {id_or_name} not found")
         return bucket
@@ -327,6 +337,7 @@ class BucketsApiHandler:
             },
         },
     )
+    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
     async def get_bucket(
         self,
         request: aiohttp.web.Request,
@@ -380,6 +391,7 @@ class BucketsApiHandler:
             },
         },
     )
+    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
     async def delete_bucket(
         self,
         request: aiohttp.web.Request,
@@ -404,6 +416,7 @@ class BucketsApiHandler:
             },
         },
     )
+    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
     @request_schema(PatchBucket())
     async def patch_bucket(
         self,
@@ -434,6 +447,7 @@ class BucketsApiHandler:
             },
         },
     )
+    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
     async def make_tmp_credentials(
         self,
         request: aiohttp.web.Request,
@@ -480,6 +494,7 @@ class BucketsApiHandler:
         },
     )
     @request_schema(SignedUrlRequest())
+    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
     async def sign_blob_url(
         self,
         request: aiohttp.web.Request,

@@ -664,6 +664,26 @@ class TestApi:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert len(await resp.json()) == 2
 
+    async def test_can_get_shared_bucket_by_name(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp1 = await make_bucket("test-bucket1", regular_user)
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp1["id"]
+        )
+        async with client.get(
+            buckets_api.bucket_url(create_resp1["id"]),
+            params={"owner": regular_user.name},
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+
     async def test_can_delete_only_shared_for_write_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
