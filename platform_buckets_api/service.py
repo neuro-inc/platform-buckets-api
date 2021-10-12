@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import secrets
+import string
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from typing import AsyncIterator, Iterable, List, Mapping, Optional
@@ -45,7 +46,10 @@ def make_owner_prefix(owner: str) -> str:
 def make_bucket_name(name: Optional[str], owner: str) -> str:
     res = make_owner_prefix(owner) + f"-{owner}"
     if name is not None:
-        res += f"-{name}"
+        allowed_chars = string.ascii_lowercase + string.digits + "-"
+        name = "".join(char for char in name if char in allowed_chars)
+        if name:
+            res += f"-{name}"
     return res[:45] + secrets.token_hex(6)
 
 
