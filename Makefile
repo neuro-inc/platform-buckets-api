@@ -31,7 +31,7 @@ PYTEST_FLAGS=
 include k8s.mk
 
 setup:
-	pip install -U pip
+	pip install -U pip<21.3
 	pip install -r requirements/test.txt
 	pre-commit install
 
