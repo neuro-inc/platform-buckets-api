@@ -372,7 +372,6 @@ class TestApi:
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
-        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
         import_bucket: BucketFactory,
     ) -> None:
         create_resp = await import_bucket("test-bucket", regular_user)
