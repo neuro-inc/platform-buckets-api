@@ -52,9 +52,11 @@ test_integration:
 	pytest -vv --maxfail=3 --cov=platform_buckets_api --cov-report xml:.coverage-integration.xml tests/integration
 
 docker_build:
-	python -c "import setuptools; setuptools.setup()" sdist
+	rm -rf build dist
+	pip install -U build
+	python -m build
 	docker build \
-		--build-arg DIST_FILENAME=`python -c "import setuptools; setuptools.setup()" --fullname`.tar.gz \
+		--build-arg PYTHON_BASE=slim-buster \
 		-t $(IMAGE) .
 
 gke_login: docker_build

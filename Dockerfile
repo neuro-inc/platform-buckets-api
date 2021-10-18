@@ -1,24 +1,22 @@
-FROM python:3.8.10-buster AS installer
+ARG PYTHON_VERSION=3.8.12
+ARG PYTHON_BASE=buster
 
-# Separate step for requirements to speed up docker builds
-COPY platform_buckets_api.egg-info/requires.txt requires.txt
-RUN python -c 'from pkg_resources import Distribution, PathMetadata;\
-dist = Distribution(metadata=PathMetadata(".", "."));\
-print("\n".join(str(r) for r in dist.requires()));\
-' > requirements.txt
-RUN pip install --user -r requirements.txt
+FROM python:${PYTHON_VERSION} AS installer
+
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy to tmp folder to don't pollute home dir
+RUN mkdir -p /tmp/dist
+COPY dist /tmp/dist
+
+RUN ls /tmp/dist
+RUN pip install --user --find-links /tmp/dist platform-buckets-api
 
 RUN apt-get -q update && apt-get -q install -y wget
 RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc
 RUN chmod +x mc
 
-ARG DIST_FILENAME
-
-# Install service itself
-COPY dist/${DIST_FILENAME} ${DIST_FILENAME}
-RUN pip install --user $DIST_FILENAME
-
-FROM python:3.8.10-buster as service
+FROM python:${PYTHON_VERSION}-${PYTHON_BASE} as service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-buckets-api"
 
