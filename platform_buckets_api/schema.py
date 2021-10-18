@@ -95,7 +95,7 @@ class PatchBucket(Schema):
 
 class BucketCredentials(Schema):
     bucket_id = fields.String(required=True)
-    readonly = fields.Boolean(required=True)
+    read_only = fields.Boolean(required=True)
     provider = ProviderTypeField(
         required=True,
         validate=validate.OneOf(

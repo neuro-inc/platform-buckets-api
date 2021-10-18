@@ -340,7 +340,7 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
-            assert not payload["readonly"]
+            assert not payload["read_only"]
             assert "test-bucket" in payload["credentials"]["bucket_name"]
 
     async def test_make_bucket_tmp_credentials_readonly(
@@ -364,7 +364,7 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
-            assert payload["readonly"]
+            assert payload["read_only"]
             assert "test-bucket" in payload["credentials"]["bucket_name"]
 
     async def test_imported_bucket_tmp_credentials(
@@ -383,7 +383,7 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
-            assert not payload["readonly"]
+            assert not payload["read_only"]
             assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
             assert payload["credentials"]["key"] == "key-for-test-bucket"
 
@@ -408,7 +408,7 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
-            assert payload["readonly"]
+            assert payload["read_only"]
             assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
             assert payload["credentials"]["key"] == "key-for-test-bucket"
 

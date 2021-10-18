@@ -472,7 +472,7 @@ class BucketsApiHandler:
             data={
                 "bucket_id": bucket.id,
                 "provider": bucket.provider_bucket.provider_type,
-                "readonly": not checker.can_write(bucket),
+                "read_only": not checker.can_write(bucket),
                 "credentials": {
                     "bucket_name": bucket.provider_bucket.name,
                     **credentials,
@@ -579,6 +579,7 @@ class PersistentCredentialsApiHandler:
                 {
                     "bucket_id": bucket.id,
                     "provider": bucket.provider_bucket.provider_type,
+                    "read_only": credentials.read_only
                     "credentials": {
                         "bucket_name": bucket.provider_bucket.name,
                         **credentials.role.credentials,
