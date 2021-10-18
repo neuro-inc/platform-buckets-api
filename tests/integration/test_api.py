@@ -340,6 +340,31 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
+            assert not payload["readonly"]
+            assert "test-bucket" in payload["credentials"]["bucket_name"]
+
+    async def test_make_bucket_tmp_credentials_readonly(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket("test-bucket", regular_user)
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp["id"]
+        )
+        async with client.post(
+            buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["bucket_id"] == create_resp["id"]
+            assert payload["provider"] == create_resp["provider"]
+            assert payload["readonly"]
             assert "test-bucket" in payload["credentials"]["bucket_name"]
 
     async def test_imported_bucket_tmp_credentials(
@@ -347,6 +372,7 @@ class TestApi:
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
+        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
         import_bucket: BucketFactory,
     ) -> None:
         create_resp = await import_bucket("test-bucket", regular_user)
@@ -358,6 +384,32 @@ class TestApi:
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
+            assert not payload["readonly"]
+            assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
+            assert payload["credentials"]["key"] == "key-for-test-bucket"
+
+    async def test_imported_bucket_tmp_credentials_readonly(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        regular_user2: _User,
+        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        import_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await import_bucket("test-bucket", regular_user)
+        await grant_bucket_permission(
+            regular_user2, regular_user.name, create_resp["id"]
+        )
+        async with client.post(
+            buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
+            headers=regular_user2.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload["bucket_id"] == create_resp["id"]
+            assert payload["provider"] == create_resp["provider"]
+            assert payload["readonly"]
             assert payload["credentials"]["bucket_name"] == "in-provider-test-bucket"
             assert payload["credentials"]["key"] == "key-for-test-bucket"
 
