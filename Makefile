@@ -31,12 +31,12 @@ PYTEST_FLAGS=
 include k8s.mk
 
 setup:
-	pip install -U pip==21.2.1
-	pip install -r requirements/test.txt
+	pip install -U pip
+	pip install -e .[dev]
 	pre-commit install
 
 lint: format
-	mypy platform_buckets_api tests setup.py
+	mypy platform_buckets_api tests
 
 format:
 ifdef CI_LINT_RUN
@@ -52,9 +52,9 @@ test_integration:
 	pytest -vv --maxfail=3 --cov=platform_buckets_api --cov-report xml:.coverage-integration.xml tests/integration
 
 docker_build:
-	python setup.py sdist
+	python -c "import setuptools; setuptools.setup()" sdist
 	docker build \
-		--build-arg DIST_FILENAME=`python setup.py --fullname`.tar.gz \
+		--build-arg DIST_FILENAME=`python -c "import setuptools; setuptools.setup()" --fullname`.tar.gz \
 		-t $(IMAGE) .
 
 gke_login: docker_build
