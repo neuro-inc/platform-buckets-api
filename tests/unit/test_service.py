@@ -221,7 +221,6 @@ class TestPersistentCredentialsService:
         return PersistentCredentialsService(
             storage=in_memory_credentials_storage,
             bucket_provider=mock_provider,
-            permissions_service=mock_permissions_service,
             buckets_service=buckets_service,
         )
 
@@ -341,7 +340,6 @@ class TestPersistentCredentialsService:
         buckets_service: BucketsService,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        mock_permissions_service: MockPermissionsService,
     ) -> None:
         bucket1 = await buckets_service.create_bucket(
             owner="test-user", name="test-bucket-1"
@@ -359,8 +357,6 @@ class TestPersistentCredentialsService:
             owner="test-user3", name="test-bucket-3-2"
         )
         all_buckets = [bucket1, bucket2_1, bucket2_2, bucket3_1, bucket3_2]
-        user_1_buckets = [bucket1]
-        user_2_buckets = [bucket2_1, bucket2_2]
         all_buckets_ids = [bucket.id for bucket in all_buckets]
 
         def _check_access(
@@ -373,35 +369,8 @@ class TestPersistentCredentialsService:
                     return True
             return False
 
-        mock_permissions_service.can_read_bucket_ids = [bucket3_1.id, bucket3_2.id]
-        mock_permissions_service.can_write_bucket_ids = [bucket3_2.id]
-
         credentials = await service.create_credentials(
             name=None, owner="test-user", bucket_ids=all_buckets_ids
         )
         perms = mock_provider.role_to_permissions[credentials.role.name]
-        assert all(
-            _check_access(perms, bucket, write=True) for bucket in user_1_buckets
-        )
-        assert _check_access(perms, bucket3_1, write=False)
-        assert not _check_access(perms, bucket3_1, write=True)
-        assert _check_access(perms, bucket3_2, write=True)
-        assert all(
-            not _check_access(perms, bucket, write=False) for bucket in user_2_buckets
-        )
-
-        credentials = await service.create_credentials(
-            name=None, owner="test-user", bucket_ids=all_buckets_ids, read_only=True
-        )
-        perms = mock_provider.role_to_permissions[credentials.role.name]
-        assert all(
-            not _check_access(perms, bucket, write=True) for bucket in all_buckets
-        )
-        assert all(
-            _check_access(perms, bucket, write=False) for bucket in user_1_buckets
-        )
-        assert _check_access(perms, bucket3_1, write=False)
-        assert _check_access(perms, bucket3_2, write=False)
-        assert all(
-            not _check_access(perms, bucket, write=False) for bucket in user_2_buckets
-        )
+        assert all(_check_access(perms, bucket, write=True) for bucket in all_buckets)

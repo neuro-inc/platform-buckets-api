@@ -625,9 +625,14 @@ class PersistentCredentialsApiHandler:
         data = schema.load(await request.json())
         for bucket_id in data["bucket_ids"]:
             bucket = await self.buckets_service.get_bucket(bucket_id)
-            await check_any_permissions(
-                request, self.permissions_service.get_bucket_read_perms(bucket)
-            )
+            if data["read_only"]:
+                await check_any_permissions(
+                    request, self.permissions_service.get_bucket_read_perms(bucket)
+                )
+            else:
+                await check_any_permissions(
+                    request, self.permissions_service.get_bucket_write_perms(bucket)
+                )
             if bucket.imported:
                 raise ValueError(
                     "Cannot create credential for imported "
@@ -1030,7 +1035,6 @@ async def create_app(
             credentials_service = PersistentCredentialsService(
                 storage=K8SCredentialsStorage(kube_client),
                 bucket_provider=bucket_provider,
-                permissions_service=permissions_service,
                 buckets_service=buckets_service,
             )
             app["credentials_app"]["buckets_service"] = buckets_service
