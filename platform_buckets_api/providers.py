@@ -360,6 +360,17 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
 
 
 class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
+    CORS_CONFIG = {
+        "CORSRules": [
+            {
+                "AllowedHeaders": ["*"],
+                "AllowedMethods": ["HEAD", "GET", "PUT", "POST", "DELETE"],
+                "AllowedOrigins": ["*"],
+                "ExposeHeaders": ["ETag"],
+            },
+        ]
+    }
+
     def __init__(
         self,
         s3_client: AioBaseClient,
@@ -372,6 +383,20 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         super().__init__(s3_client, sts_client, s3_role_arn, session_duration_s)
         self._iam_client = iam_client
         self._permissions_boundary = permissions_boundary
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        bucket = await super().create_bucket(name)
+        try:
+            await self._s3_client.put_bucket_cors(
+                Bucket=name,
+                CORSConfiguration=self.CORS_CONFIG,
+            )
+        except Exception:
+            await self._s3_client.delete_bucket(
+                Bucket=name,
+            )
+            raise
+        return bucket
 
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
