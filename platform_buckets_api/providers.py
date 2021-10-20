@@ -18,6 +18,7 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    ClassVar,
     Dict,
     Iterable,
     List,
@@ -242,6 +243,8 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
 
 
 class AWSLikeBucketProvider(BucketProvider, ABC):
+    provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
+
     def __init__(
         self,
         s3_client: AioBaseClient,
@@ -276,7 +279,7 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
             raise BucketExistsError
         return ProviderBucket(
             name=name,
-            provider_type=BucketsProviderType.AWS,
+            provider_type=self.provider_type,
         )
 
     async def delete_bucket(self, name: str) -> None:
@@ -490,6 +493,8 @@ class BMCWrapper:
 
 
 class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
+    provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.MINIO
+
     def __init__(
         self,
         s3_client: AioBaseClient,
