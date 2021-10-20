@@ -108,7 +108,7 @@ class UserBucketOperations(abc.ABC):
         bucket: ImportedBucket,
     ) -> AsyncIterator["UserBucketOperations"]:
         provider_type = bucket.provider_bucket.provider_type
-        if provider_type == BucketsProviderType.AWS:
+        if provider_type in (BucketsProviderType.AWS, BucketsProviderType.MINIO):
             session = aiobotocore.get_session()
             session._credentials = AioCredentials(
                 access_key=bucket.credentials["access_key_id"],

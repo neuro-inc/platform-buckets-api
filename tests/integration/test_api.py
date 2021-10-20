@@ -285,7 +285,7 @@ class TestApi:
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test-bucket"
-        assert payload["provider"] == "aws"
+        assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
