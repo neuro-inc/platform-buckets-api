@@ -23,9 +23,7 @@ spec:
     spec:
       containers:
       - name: platformbucketsapi
-
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -173,20 +171,3 @@ spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}
       {{- end }}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: platformbucketsapi
-  annotations:
-    traefik.ingress.kubernetes.io/affinity: "true"
-    traefik.ingress.kubernetes.io/session-cookie-name: NEURO_BUCKETS_API_SESSION
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: {{ .Values.port }}
-    targetPort: tcp-web
-  selector:
-    service: platformbucketsapi
