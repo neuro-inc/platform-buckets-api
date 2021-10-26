@@ -1,5 +1,3 @@
-NP_BUCKETS_API_K8S_NS: platform-jobs
-
 bucketProvider: {}
 #  type: "aws"  # "aws" or "minio" or "azure" or "gcp" or "emc_ecs" or "open_stack"
 #  aws:
@@ -38,6 +36,7 @@ image:
   repository: $IMAGE_REPO
   tag: $IMAGE_TAG
 imagePullSecrets: []
+
 port: 8080
 
 replicas: 2
@@ -60,12 +59,14 @@ sentry: {}
 
 annotations: {}
 
-authUrl: http://platformauthapi:8080
-
 platform:
   clusterName: ""
+  authUrl: http://platformauthapi:8080
   token: {}
 
-corsOrigins:
+bucketNamespace: platform-jobs
+
+cors:
+  origins: []
 enableDocs: false
 disableCreation: false

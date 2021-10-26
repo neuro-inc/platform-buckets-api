@@ -10,7 +10,7 @@ ingress:
   enabled: true
 
   extraAnnotations:
-    external-dns.platform.neuromation.io: 'true'
+    external-dns.platform.neuromation.io: "true"
   hosts: [dev.neu.ro]
 
 sentry:
@@ -26,6 +26,12 @@ platform:
         name: platformservices-secret
         key: compute_token
 
-corsOrigins: https://neu.ro,https://master--neuro-web.netlify.app,http://localhost:8000
+bucketNamespace: platform-jobs
+
+cors:
+  origins:
+    - https://neu.ro
+    - https://master--neuro-web.netlify.app
+    - http://localhost:8000
 
 enableDocs: true
