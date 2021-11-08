@@ -3,10 +3,10 @@
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-
-  name: platformbucketsapi
+  name: {{ include "platformBuckets.fullname" . }}
+  labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
+    service: buckets
   annotations:
-
     kubernetes.io/ingress.class: traefik
     traefik.frontend.rule.type: PathPrefix
 {{- if .Values.ingress.extraAnnotations }}
@@ -16,16 +16,15 @@ spec:
   rules:
   {{- range .Values.ingress.hosts }}
   - host: {{ . | quote }}
-
     http:
       paths:
       - path: /api/v1/buckets
         backend:
-          serviceName: platformbucketsapi
+          serviceName: {{ include "platformBuckets.fullname" $ }}
           servicePort: http
       - path: /api/docs/v1/buckets
         backend:
-          serviceName: platformbucketsapi
+          serviceName: {{ include "platformBuckets.fullname" $ }}
           servicePort: http
 
   {{- end }}

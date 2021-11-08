@@ -4,29 +4,25 @@ AWS_REGION ?= us-east-1
 AZURE_RG_NAME ?= dev
 AZURE_ACR_NAME ?= crc570d91c95c6aac0ea80afb1019a0c6f
 
-ARTIFACTORY_DOCKER_REPO ?= neuro-docker-local-public.jfrog.io
-ARTIFACTORY_HELM_REPO ?= https://neuro.jfrog.io/artifactory/helm-local-public
-ARTIFACTORY_HELM_VIRTUAL_REPO ?= https://neuro.jfrog.io/artifactory/helm-virtual-public
-
-HELM_ENV ?= dev
+GITHUB_OWNER ?= neuro-inc
 
 TAG ?= latest
 
-IMAGE_NAME ?= platformbucketsapi
-IMAGE ?= $(IMAGE_NAME):$(TAG)
+IMAGE_REPO_gke    = $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
+IMAGE_REPO_aws    = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO_azure  = $(AZURE_ACR_NAME).azurecr.io
+IMAGE_REPO_github = ghcr.io/$(GITHUB_OWNER)
 
-CLOUD_IMAGE_REPO_gke   ?= $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)/$(IMAGE_NAME)
-CLOUD_IMAGE_REPO_aws   ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
-CLOUD_IMAGE_REPO_azure ?= $(AZURE_ACR_NAME).azurecr.io/$(IMAGE_NAME)
-CLOUD_IMAGE_REPO       ?= $(CLOUD_IMAGE_REPO_$(CLOUD_PROVIDER))
-CLOUD_IMAGE            ?= $(CLOUD_IMAGE_REPO):$(TAG)
+IMAGE_REGISTRY ?= aws
 
-ARTIFACTORY_IMAGE_REPO = $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME)
-ARTIFACTORY_IMAGE      = $(ARTIFACTORY_IMAGE_REPO):$(TAG)
+IMAGE_NAME      = platformbucketsapi
+IMAGE_REPO_BASE = $(IMAGE_REPO_$(IMAGE_REGISTRY))
+IMAGE_REPO      = $(IMAGE_REPO_BASE)/$(IMAGE_NAME)
 
-HELM_CHART = platformbucketsapi
-
-PYTEST_FLAGS=
+HELM_ENV           ?= dev
+HELM_CHART          = platform-buckets
+HELM_CHART_VERSION ?= 1.0.0
+HELM_APP_VERSION   ?= 1.0.0
 
 include k8s.mk
 
@@ -57,7 +53,14 @@ docker_build:
 	python -m build
 	docker build \
 		--build-arg PYTHON_BASE=slim-buster \
-		-t $(IMAGE) .
+		-t $(IMAGE_NAME):latest .
+
+docker_push: docker_build
+	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):$(TAG)
+	docker push $(IMAGE_REPO):$(TAG)
+
+	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):latest
+	docker push $(IMAGE_REPO):latest
 
 gke_login: docker_build
 	sudo /opt/google-cloud-sdk/bin/gcloud --quiet components update --version 204.0.0
@@ -76,42 +79,17 @@ aws_k8s_login:
 azure_k8s_login:
 	az aks get-credentials --resource-group $(AZURE_RG_NAME) --name $(CLUSTER_NAME)
 
-docker_push: docker_build
-	docker tag $(IMAGE) $(CLOUD_IMAGE)
-	docker push $(CLOUD_IMAGE)
-
-artifactory_docker_push: docker_build
-	docker tag $(IMAGE) $(ARTIFACTORY_IMAGE)
-	docker push $(ARTIFACTORY_IMAGE)
-
-helm_install:
-	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v $(HELM_VERSION)
-	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin --version 1.0.2
-	@helm repo add neuro $(ARTIFACTORY_HELM_VIRTUAL_REPO) \
-		--username ${ARTIFACTORY_USERNAME} \
-		--password ${ARTIFACTORY_PASSWORD}
-
-_helm_fetch:
-	rm -rf temp_deploy
-	mkdir -p temp_deploy/$(HELM_CHART)
-	cp -Rf deploy/$(HELM_CHART) temp_deploy/
-	find temp_deploy/$(HELM_CHART) -type f -name 'values*' -delete
-	helm dependency update temp_deploy/$(HELM_CHART)
-
-_helm_expand_vars:
-	export IMAGE_REPO=$(ARTIFACTORY_IMAGE_REPO); \
+helm_create_chart:
+	export IMAGE_REPO=$(IMAGE_REPO); \
 	export IMAGE_TAG=$(TAG); \
-	export DOCKER_SERVER=$(ARTIFACTORY_DOCKER_REPO); \
-	cat deploy/$(HELM_CHART)/values-template.yaml | envsubst > temp_deploy/$(HELM_CHART)/values.yaml
+	export CHART_VERSION=$(HELM_CHART_VERSION); \
+	export APP_VERSION=$(HELM_APP_VERSION); \
+	VALUES=$$(cat charts/$(HELM_CHART)/values.yaml | envsubst); \
+	echo "$$VALUES" > charts/$(HELM_CHART)/values.yaml; \
+	CHART=$$(cat charts/$(HELM_CHART)/Chart.yaml | envsubst); \
+	echo "$$CHART" > charts/$(HELM_CHART)/Chart.yaml
 
-helm_deploy: _helm_fetch _helm_expand_vars
-	helm upgrade $(HELM_CHART) temp_deploy/$(HELM_CHART) \
-		-f deploy/$(HELM_CHART)/values-$(HELM_ENV).yaml \
-		--set "image.repository=$(CLOUD_IMAGE_REPO)" \
+helm_deploy: helm_create_chart
+	helm upgrade $(HELM_CHART) charts/$(HELM_CHART) \
+		-f charts/$(HELM_CHART)/values-$(HELM_ENV).yaml \
 		--namespace platform --install --wait --timeout 600s
-
-artifactory_helm_push: _helm_fetch _helm_expand_vars
-	helm package --app-version=$(TAG) --version=$(TAG) temp_deploy/$(HELM_CHART)
-	helm push-artifactory $(HELM_CHART)-$(TAG).tgz $(ARTIFACTORY_HELM_REPO) \
-		--username $(ARTIFACTORY_USERNAME) \
-		--password $(ARTIFACTORY_PASSWORD)

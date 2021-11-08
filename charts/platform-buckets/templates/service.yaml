@@ -1,7 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: platformbucketsapi
+  name: {{ include "platformBuckets.fullname" . }}
+  labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
+    service: buckets
   annotations:
     traefik.ingress.kubernetes.io/affinity: "true"
     traefik.ingress.kubernetes.io/session-cookie-name: NEURO_BUCKETS_API_SESSION
@@ -12,4 +14,6 @@ spec:
     port: {{ .Values.port }}
     targetPort: tcp-web
   selector:
-    service: platformbucketsapi
+    app: {{ include "platformBuckets.name" . }}
+    release: {{ .Release.Name }}
+    service: buckets
