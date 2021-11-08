@@ -497,6 +497,10 @@ class BMCWrapper:
             resp.content = [resp.content]
         return resp
 
+    async def admin_policy_unset(self, *, name: str, user: str) -> Any:
+        cmd = Command("mc {flags} admin policy unset {target} {name} user={user}")
+        return await self._make_wrapper(cmd)(name=name, user=user)
+
     async def policy_set(self, *, permission: str, bucket_name: str) -> Any:
         cmd = Command("mc {flags} policy set {permission} {target}")
         target = f"{self._target}/{bucket_name}"
@@ -567,6 +571,7 @@ class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         policy_name = f"{role.name}-policy"
         if not policy_doc["Statement"]:
             try:
+                await self._mc.admin_policy_unset(name=policy_name, user=role.name)
                 await self._mc.admin_policy_remove(name=policy_name)
             except botocore.exceptions.ClientError:
                 pass  # Used doesn't have any policy
