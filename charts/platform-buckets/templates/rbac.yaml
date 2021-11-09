@@ -4,7 +4,7 @@ metadata:
   name: {{ include "platformBuckets.fullname" . }}
   namespace: {{ .Values.bucketNamespace }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    service: buckets
+    service: platform-buckets
 rules:
 - apiGroups:
   - "neuromation.io"
@@ -23,7 +23,7 @@ metadata:
   name: {{ include "platformBuckets.fullname" . }}
   namespace: {{ .Values.bucketNamespace }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    service: buckets
+    service: platform-buckets
 subjects:
 - kind: ServiceAccount
   name: default

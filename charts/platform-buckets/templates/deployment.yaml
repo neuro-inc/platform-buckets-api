@@ -3,14 +3,14 @@ kind: Deployment
 metadata:
   name: {{ include "platformBuckets.fullname" . }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    service: buckets
+    service: platform-buckets
 spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       app: {{ include "platformBuckets.name" . }}
       release: {{ .Release.Name }}
-      service: buckets
+      service: platform-buckets
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -21,13 +21,13 @@ spec:
       labels:
         app: {{ include "platformBuckets.name" . }}
         release: {{ .Release.Name }}
-        service: buckets
+        service: platform-buckets
       {{- with .Values.annotations }}
       annotations: {{ toYaml . | nindent 8 }}
       {{- end }}
     spec:
       containers:
-      - name: buckets
+      - name: platform-buckets
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: Always
         livenessProbe:

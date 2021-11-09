@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ include "platformBuckets.fullname" . }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    service: buckets
+    service: platform-buckets
   annotations:
     traefik.ingress.kubernetes.io/affinity: "true"
     traefik.ingress.kubernetes.io/session-cookie-name: NEURO_BUCKETS_API_SESSION
@@ -16,4 +16,4 @@ spec:
   selector:
     app: {{ include "platformBuckets.name" . }}
     release: {{ .Release.Name }}
-    service: buckets
+    service: platform-buckets

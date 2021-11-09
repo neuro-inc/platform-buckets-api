@@ -5,7 +5,7 @@ kind: Ingress
 metadata:
   name: {{ include "platformBuckets.fullname" . }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    service: buckets
+    service: platform-buckets
   annotations:
     kubernetes.io/ingress.class: traefik
     traefik.frontend.rule.type: PathPrefix
