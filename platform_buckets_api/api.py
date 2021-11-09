@@ -13,7 +13,7 @@ from typing import (
     Optional,
 )
 
-import aiobotocore
+import aiobotocore.session
 import aiohttp
 import aiohttp.web
 import aiohttp_cors
@@ -874,7 +874,7 @@ async def create_app(
                 bucket_provider = _bucket_provider
             if _bucket_provider is None:
                 if isinstance(config.bucket_provider, AWSProviderConfig):
-                    session = aiobotocore.get_session()
+                    session = aiobotocore.session.get_session()
                     client_kwargs = dict(
                         region_name=config.bucket_provider.region_name,
                         aws_secret_access_key=config.bucket_provider.secret_access_key,
@@ -900,7 +900,7 @@ async def create_app(
                         s3_role_arn=config.bucket_provider.s3_role_arn,
                     )
                 elif isinstance(config.bucket_provider, MinioProviderConfig):
-                    session = aiobotocore.get_session()
+                    session = aiobotocore.session.get_session()
                     client_kwargs = dict(
                         region_name=config.bucket_provider.region_name,
                         aws_secret_access_key=config.bucket_provider.secret_access_key,
@@ -953,7 +953,7 @@ async def create_app(
                         iam_client_2=iam_client_2,
                     )
                 elif isinstance(config.bucket_provider, EMCECSProviderConfig):
-                    session = aiobotocore.get_session()
+                    session = aiobotocore.session.get_session()
                     client_kwargs = dict(
                         aws_secret_access_key=config.bucket_provider.secret_access_key,
                         aws_access_key_id=config.bucket_provider.access_key_id,

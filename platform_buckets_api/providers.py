@@ -27,7 +27,7 @@ from typing import (
     Sequence,
 )
 
-import aiobotocore
+import aiobotocore.session
 import aiohttp
 import bmc
 import botocore.exceptions
@@ -109,7 +109,7 @@ class UserBucketOperations(abc.ABC):
     ) -> AsyncIterator["UserBucketOperations"]:
         provider_type = bucket.provider_bucket.provider_type
         if provider_type in (BucketsProviderType.AWS, BucketsProviderType.MINIO):
-            session = aiobotocore.get_session()
+            session = aiobotocore.session.get_session()
             session._credentials = AioCredentials(
                 access_key=bucket.credentials["access_key_id"],
                 secret_key=bucket.credentials["secret_access_key"],
@@ -1325,7 +1325,7 @@ class OpenStackBucketProvider(BucketProvider):
             raise ValueError(
                 "Open Stack do not support signed urls for more then 7 days"
             )
-        session = aiobotocore.get_session()
+        session = aiobotocore.session.get_session()
         credentials = await self.get_bucket_credentials(
             bucket, write=False, requester="sign_url"
         )

@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import AsyncIterator, Iterator
 
-import aiobotocore
+import aiobotocore.session
 import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
@@ -107,7 +107,7 @@ async def minio_server(_minio_server: URL) -> AsyncIterator[URL]:
 
 @pytest.fixture()
 async def minio_s3(minio_server: URL) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
 
     async def _drop_buckets(s3: AioBaseClient) -> None:
         for bucket in (await s3.list_buckets())["Buckets"]:
@@ -133,7 +133,7 @@ async def minio_s3(minio_server: URL) -> AsyncIterator[AioBaseClient]:
 
 @pytest.fixture()
 async def minio_sts(minio_server: URL) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
 
     async with session.create_client(
         "sts",

@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Any, AsyncIterator, Mapping
 
-import aiobotocore
+import aiobotocore.session
 import pytest
 from aiobotocore.client import AioBaseClient
 from yarl import URL
@@ -36,7 +36,7 @@ async def open_stack_config() -> Mapping[str, Any]:
 async def open_stack_s3(
     open_stack_config: Mapping[str, Any]
 ) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
     async with session.create_client(
         "s3",
         endpoint_url=str(open_stack_config["s3_url"]),

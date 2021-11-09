@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from functools import partial
 from typing import AsyncIterator, List, Mapping
 
-import aiobotocore
+import aiobotocore.session
 import pytest
 from aiobotocore.client import AioBaseClient
 from yarl import URL
@@ -43,7 +43,7 @@ class AwsBasicBucketClient(BasicBucketClient):
     async def create(
         cls, bucket: ProviderBucket, credentials: Mapping[str, str]
     ) -> AsyncIterator["AwsBasicBucketClient"]:
-        session = aiobotocore.get_session()
+        session = aiobotocore.session.get_session()
         async with session.create_client(
             "s3",
             endpoint_url=credentials["endpoint_url"],

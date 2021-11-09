@@ -4,7 +4,7 @@ import logging
 import os
 from typing import AsyncIterator, Iterator
 
-import aiobotocore
+import aiobotocore.session
 import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
@@ -113,7 +113,7 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
             pass
         async with session.post(f"{_moto_server}/moto-api/reset-auth", data=b"4"):
             pass
-    boto_session = aiobotocore.get_session()
+    boto_session = aiobotocore.session.get_session()
     async with boto_session.create_client("iam", endpoint_url=str(_moto_server)) as iam:
         create_user_resp = await iam.create_user(UserName="admin")
         keys = (await iam.create_access_key(UserName="admin"))["AccessKey"]
@@ -137,7 +137,7 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
 
 @pytest.fixture()
 async def s3(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
 
     async with session.create_client(
         "s3",
@@ -150,7 +150,7 @@ async def s3(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
 
 @pytest.fixture()
 async def iam(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
 
     async with session.create_client(
         "iam",
@@ -163,7 +163,7 @@ async def iam(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
 
 @pytest.fixture()
 async def sts(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
-    session = aiobotocore.get_session()
+    session = aiobotocore.session.get_session()
 
     async with session.create_client(
         "sts",
