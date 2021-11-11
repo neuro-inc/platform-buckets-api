@@ -845,6 +845,7 @@ def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
         allow_credentials=True,
         expose_headers="*",
         allow_headers="*",
+        allow_methods="*",
     )
     cors = aiohttp_cors.setup(
         app, defaults={origin: default_options for origin in config.allowed_origins}
