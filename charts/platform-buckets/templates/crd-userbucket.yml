@@ -29,10 +29,12 @@ spec:
                 type: boolean
               credentials:
                 type: object
+                additionalProperties: true
               public:
                 type: boolean
               metadata:
                 type: object
+                additionalProperties: true
                 nullable: true
     additionalPrinterColumns:
     - name: ProviderName

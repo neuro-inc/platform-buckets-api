@@ -34,8 +34,10 @@ spec:
               type: boolean
             credentials:
               type: object
+              additionalProperties: true
             metadata:
               type: object
+              additionalProperties: true
               nullable: true
   scope: Namespaced
   names:
