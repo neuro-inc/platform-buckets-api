@@ -121,9 +121,10 @@ class BucketsService:
     async def make_tmp_credentials(
         self, bucket: UserBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
-        return await self._provider.get_bucket_credentials(
-            bucket.provider_bucket, write, requester
-        )
+        async with self._get_operations(bucket) as operations:
+            return await operations.get_bucket_credentials(
+                bucket.provider_bucket, write, requester
+            )
 
     @asynccontextmanager
     async def _get_operations(

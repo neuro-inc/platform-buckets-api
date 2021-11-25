@@ -137,6 +137,12 @@ class UserBucketOperations(abc.ABC):
             loop = asyncio.get_event_loop()
             loop.run_in_executor(None, client.close)
 
+    @abc.abstractmethod
+    async def get_bucket_credentials(
+        self, bucket: ProviderBucket, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        pass
+
 
 class BucketProvider(UserBucketOperations, abc.ABC):
     @abc.abstractmethod
@@ -145,12 +151,6 @@ class BucketProvider(UserBucketOperations, abc.ABC):
 
     @abc.abstractmethod
     async def delete_bucket(self, name: str) -> None:
-        pass
-
-    @abc.abstractmethod
-    async def get_bucket_credentials(
-        self, bucket: ProviderBucket, write: bool, requester: str
-    ) -> Mapping[str, str]:
         pass
 
     # Long term tokens methods
