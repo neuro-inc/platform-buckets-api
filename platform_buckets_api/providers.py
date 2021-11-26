@@ -595,7 +595,8 @@ def _container_policies_as_dict(policies: List[Any]) -> Dict[str, Any]:
 
 
 class AzureUserBucketOperations(UserBucketOperations):
-    def __init__(self, blob_client: BlobServiceClient):
+    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
+        self._storage_endpoint = storage_endpoint
         self._blob_client = blob_client
 
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
@@ -628,25 +629,6 @@ class AzureUserBucketOperations(UserBucketOperations):
                 credential=token,
             ).url
         )
-
-
-class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
-    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
-        super().__init__(blob_client)
-        self._storage_endpoint = storage_endpoint
-
-    async def create_bucket(self, name: str) -> ProviderBucket:
-        try:
-            await self._blob_client.create_container(name)
-        except ResourceExistsError:
-            raise BucketExistsError(name)
-        return ProviderBucket(name=name, provider_type=BucketsProviderType.AZURE)
-
-    async def delete_bucket(self, name: str) -> None:
-        try:
-            await self._blob_client.delete_container(name)
-        except ResourceNotFoundError:
-            raise BucketNotExistsError(name)
 
     def _make_sas_permissions(self, write: bool) -> ContainerSasPermissions:
         if write:
@@ -682,6 +664,24 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
             "sas_token": token,
             "expiry": expiry.isoformat(),
         }
+
+
+class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
+    def __init__(self, storage_endpoint: str, blob_client: BlobServiceClient):
+        super().__init__(storage_endpoint, blob_client)
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        try:
+            await self._blob_client.create_container(name)
+        except ResourceExistsError:
+            raise BucketExistsError(name)
+        return ProviderBucket(name=name, provider_type=BucketsProviderType.AZURE)
+
+    async def delete_bucket(self, name: str) -> None:
+        try:
+            await self._blob_client.delete_container(name)
+        except ResourceNotFoundError:
+            raise BucketNotExistsError(name)
 
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
@@ -788,8 +788,12 @@ class GoogleUserBucketOperations(UserBucketOperations):
     def __init__(
         self,
         gcs_client: GCSClient,
+        iam_client_2: IAMCredentialsAsyncClient,
+        sa_prefix: str = "bucket-api-",
     ):
         self._gcs_client = gcs_client
+        self._iam_client_2 = iam_client_2
+        self._sa_prefix = sa_prefix
 
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
         await self._set_public_access(bucket_name, public_access)
@@ -833,19 +837,20 @@ class GoogleUserBucketOperations(UserBucketOperations):
             .generate_signed_url(expiration=datetime.timedelta(seconds=expires_in_sec))
         )
 
-
-class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
-    def __init__(
-        self,
-        gcs_client: GCSClient,
-        iam_client: Any,
-        iam_client_2: IAMCredentialsAsyncClient,
-        sa_prefix: str = "bucket-api-",
-    ):
-        super().__init__(gcs_client)
-        self._iam_client = iam_client
-        self._iam_client_2 = iam_client_2
-        self._sa_prefix = sa_prefix
+    async def get_bucket_credentials(
+        self, bucket: ProviderBucket, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        resp = await self._iam_client_2.generate_access_token(
+            name=self._make_bucket_sa_full_name(
+                bucket.name, write=write, placeholder=True
+            ),
+            scope=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        return {
+            "project": self._gcs_client.project,
+            "access_token": resp.access_token,
+            "expire_time": resp.expire_time.isoformat(),
+        }
 
     def _make_bucket_sa_name(self, bucket_name: str, *, write: bool) -> str:
         hasher = hashlib.new("sha256")
@@ -854,9 +859,6 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
 
     def _make_sa_email(self, name: str) -> str:
         return f"{name}@{self._gcs_client.project}.iam.gserviceaccount.com"
-
-    def _make_bucket_sa_email(self, bucket_name: str, *, write: bool) -> str:
-        return self._make_sa_email(self._make_bucket_sa_name(bucket_name, write=write))
 
     def _make_sa_full_name(self, name: str, *, placeholder: bool = False) -> str:
         return (
@@ -871,6 +873,21 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
             name=self._make_bucket_sa_name(bucket_name, write=write),
             placeholder=placeholder,
         )
+
+
+class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
+    def __init__(
+        self,
+        gcs_client: GCSClient,
+        iam_client: Any,
+        iam_client_2: IAMCredentialsAsyncClient,
+        sa_prefix: str = "bucket-api-",
+    ):
+        super().__init__(gcs_client, iam_client_2, sa_prefix)
+        self._iam_client = iam_client
+
+    def _make_bucket_sa_email(self, bucket_name: str, *, write: bool) -> str:
+        return self._make_sa_email(self._make_bucket_sa_name(bucket_name, write=write))
 
     @run_in_executor
     def _create_bucket(self, bucket_name: str) -> None:
@@ -979,21 +996,6 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
             await self._delete_sa(self._make_bucket_sa_full_name(name, write=False))
         except google.cloud.exceptions.NotFound:
             raise BucketNotExistsError(name)
-
-    async def get_bucket_credentials(
-        self, bucket: ProviderBucket, write: bool, requester: str
-    ) -> Mapping[str, str]:
-        resp = await self._iam_client_2.generate_access_token(
-            name=self._make_bucket_sa_full_name(
-                bucket.name, write=write, placeholder=True
-            ),
-            scope=["https://www.googleapis.com/auth/cloud-platform"],
-        )
-        return {
-            "project": self._gcs_client.project,
-            "access_token": resp.access_token,
-            "expire_time": resp.expire_time.isoformat(),
-        }
 
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]

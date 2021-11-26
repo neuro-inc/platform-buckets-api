@@ -119,7 +119,7 @@ class BucketsService:
         return await self._storage.get_bucket_by_name(name, owner)
 
     async def make_tmp_credentials(
-        self, bucket: UserBucket, write: bool, requester: str
+        self, bucket: BaseBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
         async with self._get_operations(bucket) as operations:
             return await operations.get_bucket_credentials(

@@ -98,14 +98,7 @@ from .schema import (
     SignedUrlRequest,
 )
 from .service import BucketsService, PersistentCredentialsService
-from .storage import (
-    BaseBucket,
-    ExistsError,
-    ImportedBucket,
-    NotExistsError,
-    PersistentCredentials,
-    UserBucket,
-)
+from .storage import BaseBucket, ExistsError, NotExistsError, PersistentCredentials
 from .utils import ndjson_error_handler
 
 
@@ -458,16 +451,11 @@ class BucketsApiHandler:
         )
         user = await _get_untrusted_user(request)
         checker = await self.permissions_service.get_perms_checker(user.name)
-        if isinstance(bucket, UserBucket):
-            credentials = await self.service.make_tmp_credentials(
-                bucket,
-                write=checker.can_write(bucket),
-                requester=user.name,
-            )
-        elif isinstance(bucket, ImportedBucket):
-            credentials = bucket.credentials
-        else:
-            assert False, "unreachable"
+        credentials = await self.service.make_tmp_credentials(
+            bucket,
+            write=checker.can_write(bucket),
+            requester=user.name,
+        )
         return aiohttp.web.json_response(
             data={
                 "bucket_id": bucket.id,
