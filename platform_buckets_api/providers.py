@@ -125,7 +125,7 @@ class UserBucketOperations(abc.ABC):
                 account_url=bucket.credentials["storage_endpoint"],
                 credential=bucket.credentials["credential"],
             ) as client:
-                yield AzureUserBucketOperations(client)
+                yield AzureUserBucketOperations(bucket.credentials["storage_endpoint"], client)
         elif provider_type == BucketsProviderType.GCP:
             key_raw = bucket.credentials["key_data"]
             key_json = json.loads(base64.b64decode(key_raw).decode())
