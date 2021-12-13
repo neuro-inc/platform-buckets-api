@@ -243,8 +243,14 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         user = await _get_untrusted_user(request)
+        schema = Bucket(
+            partial=["provider", "owner", "created_at", "imported", "public"]
+        )
+        data = schema.load(await request.json())
+        org_name = data.get("org_name")
+
         await check_any_permissions(
-            request, self.permissions_service.get_create_bucket_perms(user)
+            request, self.permissions_service.get_create_bucket_perms(user, org_name)
         )
         if self.disable_creation:
             return json_response(
@@ -256,14 +262,11 @@ class BucketsApiHandler:
                 },
                 status=HTTPUnprocessableEntity.status_code,
             )
-
-        schema = Bucket(
-            partial=["provider", "owner", "created_at", "imported", "public"]
-        )
-        data = schema.load(await request.json())
         try:
             bucket = await self.service.create_bucket(
-                owner=user.name, name=data.get("name")
+                owner=user.name,
+                name=data.get("name"),
+                org_name=org_name,
             )
         except ExistsError:
             return json_response(
@@ -298,11 +301,13 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         user = await _get_untrusted_user(request)
-        await check_any_permissions(
-            request, self.permissions_service.get_create_bucket_perms(user)
-        )
+
         schema = ImportBucketRequest()
         data = schema.load(await request.json())
+        org_name = data.get("org_name")
+        await check_any_permissions(
+            request, self.permissions_service.get_create_bucket_perms(user, org_name)
+        )
         try:
             bucket = await self.service.import_bucket(
                 owner=user.name,
@@ -310,6 +315,7 @@ class BucketsApiHandler:
                 provider_bucket_name=data["provider_bucket_name"],
                 credentials=data["credentials"],
                 name=data.get("name"),
+                org_name=org_name,
             )
         except ExistsError:
             return json_response(

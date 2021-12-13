@@ -252,6 +252,7 @@ class TestProviderBase:
                 created_at=datetime.now(timezone.utc),
                 owner="user",
                 name="not-important",
+                org_name=None,
                 public=False,
                 provider_bucket=bucket,
                 credentials=provider_option.credentials_for_imported,

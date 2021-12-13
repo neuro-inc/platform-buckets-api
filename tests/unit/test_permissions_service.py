@@ -21,6 +21,7 @@ pytestmark = pytest.mark.asyncio
 class MockAuthClient(AuthClient):
     def __init__(self) -> None:
         self.perm_tree_to_return = ClientSubTreeViewRoot(
+            scheme="blob",
             path="",
             sub_tree=ClientAccessSubTreeView(
                 action="read",
@@ -70,6 +71,21 @@ class TestPermissionsService:
             id="id",
             name="test-bucket",
             owner="test-user",
+            org_name=None,
+            created_at=utc_now(),
+            provider_bucket=None,  # type: ignore
+            public=False,
+        )
+
+    @pytest.fixture
+    def fake_bucket_with_org(
+        self,
+    ) -> UserBucket:
+        return UserBucket(
+            id="id",
+            name="test-bucket",
+            owner="test-user",
+            org_name="test-org",
             created_at=utc_now(),
             provider_bucket=None,  # type: ignore
             public=False,
@@ -78,9 +94,17 @@ class TestPermissionsService:
     def test_create_permissions(
         self, cluster_name: str, service: PermissionsService, fake_user: User
     ) -> None:
-        perms = service.get_create_bucket_perms(fake_user)
+        perms = service.get_create_bucket_perms(fake_user, org_name=None)
         assert len(perms) == 1
         assert perms[0].uri == f"blob://{cluster_name}/{fake_user.name}"
+        assert perms[0].action == "write"
+
+    def test_create_permissions_with_org(
+        self, cluster_name: str, service: PermissionsService, fake_user: User
+    ) -> None:
+        perms = service.get_create_bucket_perms(fake_user, org_name="test-org")
+        assert len(perms) == 1
+        assert perms[0].uri == f"blob://{cluster_name}/test-org/{fake_user.name}"
         assert perms[0].action == "write"
 
     def test_read_permissions(
@@ -123,6 +147,56 @@ class TestPermissionsService:
             in perms
         )
 
+    def test_read_permissions_with_org(
+        self,
+        cluster_name: str,
+        service: PermissionsService,
+        fake_bucket_with_org: UserBucket,
+    ) -> None:
+        perms = service.get_bucket_read_perms(fake_bucket_with_org)
+        assert len(perms) == 2
+        assert (
+            Permission(
+                uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
+                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.id}",
+                action="read",
+            )
+            in perms
+        )
+        assert (
+            Permission(
+                uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
+                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.name}",
+                action="read",
+            )
+            in perms
+        )
+
+    def test_write_permissions_with_org(
+        self,
+        cluster_name: str,
+        service: PermissionsService,
+        fake_bucket_with_org: UserBucket,
+    ) -> None:
+        perms = service.get_bucket_write_perms(fake_bucket_with_org)
+        assert len(perms) == 2
+        assert (
+            Permission(
+                uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
+                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.id}",
+                action="write",
+            )
+            in perms
+        )
+        assert (
+            Permission(
+                uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
+                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.name}",
+                action="write",
+            )
+            in perms
+        )
+
     async def test_checker_1(
         self,
         cluster_name: str,
@@ -132,7 +206,8 @@ class TestPermissionsService:
     ) -> None:
         username = fake_bucket.owner
         mock_auth_client.perm_tree_to_return = ClientSubTreeViewRoot(
-            path=f"/{cluster_name}/",
+            scheme="blob",
+            path=f"/{cluster_name}",
             sub_tree=ClientAccessSubTreeView(
                 action="list",
                 children={
