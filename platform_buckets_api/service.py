@@ -71,13 +71,16 @@ class BucketsService:
         self._permissions_service = permissions_service
         self._provider = bucket_provider
 
-    async def create_bucket(self, owner: str, name: Optional[str] = None) -> UserBucket:
+    async def create_bucket(
+        self, owner: str, org_name: Optional[str], name: Optional[str] = None
+    ) -> UserBucket:
         real_name = make_bucket_name(name, owner)
         provider_bucket = await self._provider.create_bucket(real_name)
         bucket = UserBucket(
             id=f"bucket-{uuid4()}",
             name=name,
             owner=owner,
+            org_name=org_name,
             provider_bucket=provider_bucket,
             created_at=utc_now(),
             public=False,
@@ -95,12 +98,14 @@ class BucketsService:
         provider_bucket_name: str,
         provider_type: BucketsProviderType,
         credentials: Mapping[str, str],
+        org_name: Optional[str],
         name: Optional[str] = None,
     ) -> ImportedBucket:
         bucket = ImportedBucket(
             id=f"bucket-{uuid4()}",
             name=name,
             owner=owner,
+            org_name=org_name,
             provider_bucket=ProviderBucket(
                 name=provider_bucket_name,
                 provider_type=provider_type,

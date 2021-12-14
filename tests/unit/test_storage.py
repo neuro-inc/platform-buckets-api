@@ -137,6 +137,28 @@ class TestBucketsStorage:
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
+            org_name=None,
+            created_at=utc_now(),
+            provider_bucket=ProviderBucket(
+                provider_type=BucketsProviderType.AWS,
+                name=f"{name}--{username}",
+                metadata={"key": "value"} if with_meta else None,
+            ),
+            public=public,
+        )
+
+    def _make_bucket_with_org(
+        self,
+        username: str,
+        name: Optional[str],
+        public: bool = False,
+        with_meta: bool = True,
+    ) -> UserBucket:
+        return UserBucket(
+            id=f"bucket-{uuid4()}",
+            owner=username,
+            name=name,
+            org_name="test-org",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
@@ -156,6 +178,7 @@ class TestBucketsStorage:
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
+            org_name=None,
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
@@ -188,6 +211,12 @@ class TestBucketsStorage:
 
     async def test_buckets_create_get(self, storage: BucketsStorage) -> None:
         bucket = self._make_bucket("user1", "test")
+        await storage.create_bucket(bucket)
+        bucket_get = await storage.get_bucket(bucket.id)
+        assert bucket == bucket_get
+
+    async def test_buckets_create_get_with_org(self, storage: BucketsStorage) -> None:
+        bucket = self._make_bucket_with_org("user1", "test")
         await storage.create_bucket(bucket)
         bucket_get = await storage.get_bucket(bucket.id)
         assert bucket == bucket_get

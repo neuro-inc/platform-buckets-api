@@ -64,6 +64,7 @@ class BaseBucket(abc.ABC):
     id: str
     name: Optional[str]
     owner: str
+    org_name: Optional[str]
     created_at: datetime
     provider_bucket: ProviderBucket
     public: bool

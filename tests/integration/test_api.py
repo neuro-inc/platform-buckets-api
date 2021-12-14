@@ -1,7 +1,16 @@
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+)
 
 import aiohttp
 import pytest
@@ -23,7 +32,7 @@ from platform_buckets_api.api import create_app
 from platform_buckets_api.config import Config
 from platform_buckets_api.utils import utc_now
 
-from .auth import _User
+from .auth import UserFactory, _User
 from .conftest import ApiAddress, create_local_app_server
 
 
@@ -203,19 +212,28 @@ class TestApi:
             assert resp.headers["Access-Control-Allow-Credentials"] == "true"
             assert resp.headers["Access-Control-Allow-Methods"] == "GET"
 
-    BucketFactory = Callable[[Optional[str], _User], Awaitable[Dict[str, Any]]]
+    class BucketFactory(Protocol):
+        async def __call__(
+            self, name: Optional[str], user: _User, org_name: Optional[str] = None
+        ) -> Dict[str, Any]:
+            pass
 
     @pytest.fixture()
     async def make_bucket(
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
-        async def _factory(name: Optional[str], user: _User) -> Dict[str, Any]:
+        async def _factory(
+            name: Optional[str], user: _User, org_name: Optional[str] = None
+        ) -> Dict[str, Any]:
+            payload = {
+                "name": name,
+            }
+            if org_name:
+                payload["org_name"] = org_name
             async with client.post(
                 buckets_api.buckets_url,
                 headers=user.headers,
-                json={
-                    "name": name,
-                },
+                json=payload,
             ) as resp:
                 assert resp.status == HTTPCreated.status_code, await resp.text()
                 return await resp.json()
@@ -226,16 +244,21 @@ class TestApi:
     async def import_bucket(
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
-        async def _factory(name: Optional[str], user: _User) -> Dict[str, Any]:
+        async def _factory(
+            name: Optional[str], user: _User, org_name: Optional[str] = None
+        ) -> Dict[str, Any]:
+            payload = {
+                "name": name,
+                "provider_bucket_name": f"in-provider-{name}",
+                "provider": "aws",
+                "credentials": {"key": f"key-for-{name}"},
+            }
+            if org_name:
+                payload["org_name"] = org_name
             async with client.post(
                 buckets_api.bucket_import_url,
                 headers=user.headers,
-                json={
-                    "name": name,
-                    "provider_bucket_name": f"in-provider-{name}",
-                    "provider": "aws",
-                    "credentials": {"key": f"key-for-{name}"},
-                },
+                json=payload,
             ) as resp:
                 assert resp.status == HTTPCreated.status_code, await resp.text()
                 return await resp.json()
@@ -290,6 +313,25 @@ class TestApi:
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
+    async def test_create_bucket_with_org(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        regular_user = await regular_user_factory(org_name="test-org")
+        before = utc_now()
+        payload = await make_bucket("test-bucket", regular_user, org_name="test-org")
+        after = utc_now()
+        assert "id" in payload
+        assert payload["name"] == "test-bucket"
+        assert payload["provider"] in ("aws", "minio")
+        assert payload["owner"] == regular_user.name
+        assert payload["org_name"] == "test-org"
+        assert not payload["imported"]
+        assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
     async def test_create_bucket_when_disabled(
         self,
         buckets_api_creation_disabled: BucketsApiEndpoints,
@@ -321,6 +363,25 @@ class TestApi:
         assert payload["name"] == "test-bucket"
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
+        assert payload["imported"]
+        assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
+    async def test_import_bucket_with_org(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        import_bucket: BucketFactory,
+    ) -> None:
+        regular_user = await regular_user_factory(org_name="test-org")
+        before = utc_now()
+        payload = await import_bucket("test-bucket", regular_user, org_name="test-org")
+        after = utc_now()
+        assert "id" in payload
+        assert payload["name"] == "test-bucket"
+        assert payload["provider"] == "aws"
+        assert payload["owner"] == regular_user.name
+        assert payload["org_name"] == "test-org"
         assert payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
@@ -489,6 +550,25 @@ class TestApi:
             payload = await resp.json()
             assert payload == create_resp
 
+    async def test_get_bucket_with_org(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        regular_user = await regular_user_factory(org_name="test-org")
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, org_name="test-org"
+        )
+        async with client.get(
+            buckets_api.bucket_url(create_resp["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
     async def test_get_bucket_by_name(
         self,
         buckets_api: BucketsApiEndpoints,
@@ -535,6 +615,29 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert len(payload) == len(buckets_data)
+            for bucket_data in buckets_data:
+                assert bucket_data in payload
+
+    async def test_list_buckets_org_level(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        user1 = await regular_user_factory(org_name="test-org")
+        user2 = await regular_user_factory(org_name="test-org")
+        user3 = await regular_user_factory(org_name="test-org", org_level=True)
+        bucket1 = await make_bucket("bucket-1", user1, org_name="test-org")
+        bucket2 = await make_bucket("bucket-2", user2, org_name="test-org")
+        buckets_data = [bucket1, bucket2]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user3.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()

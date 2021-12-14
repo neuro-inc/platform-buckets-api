@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, Optional
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, Optional, Protocol
 
 import aiohttp
 import pytest
@@ -166,22 +166,43 @@ class _User(User):
         return {AUTHORIZATION: f"Bearer {self.token}"}
 
 
+class UserFactory(Protocol):
+    async def __call__(
+        self,
+        name: Optional[str] = None,
+        org_name: Optional[str] = None,
+        org_level: bool = False,
+    ) -> _User:
+        ...
+
+
 @pytest.fixture
 async def regular_user_factory(
     auth_client: AuthClient,
     token_factory: Callable[[str], str],
     admin_token: str,
     cluster_name: str,
-) -> AsyncIterator[Callable[[Optional[str]], Awaitable[_User]]]:
-    async def _factory(name: Optional[str] = None) -> _User:
+) -> AsyncIterator[UserFactory]:
+    async def _factory(
+        name: Optional[str] = None,
+        org_name: Optional[str] = None,
+        org_level: bool = False,
+    ) -> _User:
         if not name:
             name = f"user-{random_name()}"
         user = User(name=name, clusters=[Cluster(name=cluster_name)])
         await auth_client.add_user(user, token=admin_token)
-        permissions = [
-            Permission(uri=f"blob://{cluster_name}/{name}", action="write"),
-        ]
-        await auth_client.grant_user_permissions(name, permissions, token=admin_token)
+        if org_name is None:
+            permission = Permission(uri=f"blob://{cluster_name}/{name}", action="write")
+        elif org_level:
+            permission = Permission(
+                uri=f"blob://{cluster_name}/{org_name}", action="write"
+            )
+        else:
+            permission = Permission(
+                uri=f"blob://{cluster_name}/{org_name}/{name}", action="write"
+            )
+        await auth_client.grant_user_permissions(name, [permission], token=admin_token)
 
         return _User(name=user.name, token=token_factory(user.name))
 
@@ -189,10 +210,10 @@ async def regular_user_factory(
 
 
 @pytest.fixture
-async def regular_user(regular_user_factory: Callable[[], Awaitable[_User]]) -> _User:
+async def regular_user(regular_user_factory: UserFactory) -> _User:
     return await regular_user_factory()
 
 
 @pytest.fixture
-async def regular_user2(regular_user_factory: Callable[[], Awaitable[_User]]) -> _User:
+async def regular_user2(regular_user_factory: UserFactory) -> _User:
     return await regular_user_factory()

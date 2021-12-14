@@ -1,7 +1,6 @@
-from typing import List
+from typing import List, Optional
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission, User
-from neuro_auth_client.client import check_action_allowed
 
 from platform_buckets_api.storage import BaseBucket
 
@@ -11,28 +10,31 @@ class PermissionsService:
         self._auth_client = auth_client
         self._bucket_cluster_uri = f"blob://{cluster_name}"
 
-    def get_create_bucket_perms(self, user: User) -> List[Permission]:
+    def get_create_bucket_perms(
+        self, user: User, org_name: Optional[str]
+    ) -> List[Permission]:
+        if org_name:
+            return [
+                Permission(
+                    f"{self._bucket_cluster_uri}/{org_name}/{user.name}", "write"
+                )
+            ]
         return [Permission(f"{self._bucket_cluster_uri}/{user.name}", "write")]
 
-    def get_bucket_read_perms(self, bucket: BaseBucket) -> List[Permission]:
+    def _get_bucket_uris(self, bucket: BaseBucket) -> List[str]:
+        base = self._bucket_cluster_uri
+        if bucket.org_name:
+            base = f"{base}/{bucket.org_name}"
         return [
-            Permission(
-                f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.name}", "read"
-            ),
-            Permission(
-                f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.id}", "read"
-            ),
+            f"{base}/{bucket.owner}/{bucket.name}",
+            f"{base}/{bucket.owner}/{bucket.id}",
         ]
 
+    def get_bucket_read_perms(self, bucket: BaseBucket) -> List[Permission]:
+        return [Permission(uri, "read") for uri in self._get_bucket_uris(bucket)]
+
     def get_bucket_write_perms(self, bucket: BaseBucket) -> List[Permission]:
-        return [
-            Permission(
-                f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.name}", "write"
-            ),
-            Permission(
-                f"{self._bucket_cluster_uri}/{bucket.owner}/{bucket.id}", "write"
-            ),
-        ]
+        return [Permission(uri, "write") for uri in self._get_bucket_uris(bucket)]
 
     class Checker:
 
@@ -42,37 +44,15 @@ class PermissionsService:
             self._tree = tree
             self._service = service
 
-        def _has_perm(self, permission: Permission) -> bool:
-            action = permission.action
-            uri = permission.uri
-            if not uri.startswith(self.SCHEME):
-                return False
-            uri = uri[len(self.SCHEME) :]  # noqa
-            if not uri.startswith(self._tree.path):
-                return False
-            uri = uri[len(self._tree.path) :]  # noqa
-            node = self._tree.sub_tree
-            if check_action_allowed(node.action, action):
-                return True
-            parts = uri.split("/")
-            try:
-                for part in parts:
-                    if check_action_allowed(node.action, action):
-                        return True
-                    node = node.children[part]
-                return check_action_allowed(node.action, action)
-            except KeyError:
-                return False
-
         def can_read(self, bucket: BaseBucket) -> bool:
             return any(
-                self._has_perm(perm)
+                self._tree.allows(perm)
                 for perm in self._service.get_bucket_read_perms(bucket)
             )
 
         def can_write(self, bucket: BaseBucket) -> bool:
             return any(
-                self._has_perm(perm)
+                self._tree.allows(perm)
                 for perm in self._service.get_bucket_write_perms(bucket)
             )
 

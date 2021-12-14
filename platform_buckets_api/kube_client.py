@@ -51,6 +51,7 @@ ID_LABEL = "platform.neuromation.io/id"
 OWNER_LABEL = "platform.neuromation.io/owner"
 CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
 BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
+ORG_NAME_LABEL = "platform.neuromation.io/org_name"
 
 
 def _k8s_name_safe(**kwargs: str) -> str:
@@ -115,6 +116,7 @@ class BucketCRDMapper:
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
             owner=payload["metadata"]["labels"][OWNER_LABEL],
+            org_name=payload["metadata"]["labels"].get(ORG_NAME_LABEL),
             created_at=datetime_load(payload["spec"]["created_at"]),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
@@ -146,6 +148,8 @@ class BucketCRDMapper:
         }
         if entry.name:
             labels[BUCKET_NAME_LABEL] = entry.name
+        if entry.org_name:
+            labels[ORG_NAME_LABEL] = entry.org_name
         res: Dict[str, Any] = {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
