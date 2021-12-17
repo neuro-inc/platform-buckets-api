@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import textwrap
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import (
     Any,
@@ -177,6 +178,7 @@ class BucketsApiHandler:
                 aiohttp.web.post("", self.create_bucket),
                 aiohttp.web.post("/import/external", self.import_bucket),
                 aiohttp.web.get("", self.list_buckets),
+                aiohttp.web.get("/find/by_path", self.get_bucket_by_path),
                 aiohttp.web.get("/{bucket_id_or_name}", self.get_bucket),
                 aiohttp.web.post(
                     "/{bucket_id_or_name}/make_tmp_credentials",
@@ -349,6 +351,40 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         bucket = await self._resolve_bucket(request)
+        await check_any_permissions(
+            request, self.permissions_service.get_bucket_read_perms(bucket)
+        )
+        return aiohttp.web.json_response(
+            data=Bucket().dump(bucket),
+            status=HTTPOk.status_code,
+        )
+
+    @docs(
+        tags=["buckets"],
+        summary="Get bucket for given path",
+        description=textwrap.dedent(
+            """\
+        Looks for bucket that corresponds given path, for example,
+        for "org_name/user_name/bucket/some/key" it will find bucket "bucket"
+        and return it.
+        """
+        ),
+        responses={
+            HTTPOk.status_code: {
+                "description": "Bucket found",
+                "schema": Bucket(),
+            },
+            HTTPNotFound.status_code: {
+                "description": "Was unable to found bucket for given path",
+            },
+        },
+    )
+    @querystring_schema(Schema.from_dict({"path": fields.String(required=True)}))
+    async def get_bucket_by_path(
+        self,
+        request: aiohttp.web.Request,
+    ) -> aiohttp.web.Response:
+        bucket = await self.service.get_bucket_by_path(request.query["path"])
         await check_any_permissions(
             request, self.permissions_service.get_bucket_read_perms(bucket)
         )

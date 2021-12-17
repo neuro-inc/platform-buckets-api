@@ -159,6 +159,31 @@ class TestBucketsService:
         )
         assert bucket == bucket_get
 
+    async def test_get_bucket_by_path(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket1 = await service.create_bucket(
+            owner="test-user", name="test-bucket", org_name=None
+        )
+        bucket2 = await service.create_bucket(
+            owner="test-user/sub", name="test-bucket", org_name=None
+        )
+        bucket3 = await service.create_bucket(
+            owner="test-user", name="test-bucket-2", org_name="test-org"
+        )
+        bucket_get = await service.get_bucket_by_path(path="test-user/test-bucket")
+        assert bucket1 == bucket_get
+        bucket_get = await service.get_bucket_by_path(path="test-user/sub/test-bucket")
+        assert bucket2 == bucket_get
+        bucket_get = await service.get_bucket_by_path(
+            path="test-org/test-user/test-bucket-2"
+        )
+        assert bucket3 == bucket_get
+        with pytest.raises(NotExistsError):
+            await service.get_bucket_by_path(path="test-org/test-user/test-bucket")
+        with pytest.raises(NotExistsError):
+            await service.get_bucket_by_path(path="test-org/test-user/test-bucket-2-2")
+
     async def test_get_bucket_list(
         self, service: BucketsService, mock_provider: MockBucketProvider
     ) -> None:

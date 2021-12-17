@@ -63,6 +63,10 @@ class BucketsApiEndpoints:
     def bucket_import_url(self) -> str:
         return f"{self.api_v1_endpoint}/buckets/buckets/import/external"
 
+    @property
+    def bucket_by_path(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/buckets/find/by_path"
+
     def bucket_url(self, name: str) -> str:
         return f"{self.buckets_url}/{name}"
 
@@ -579,6 +583,26 @@ class TestApi:
         create_resp = await make_bucket("test-bucket", regular_user)
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_get_bucket_by_path(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        regular_user = await regular_user_factory(org_name="test-org")
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, org_name="test-org"
+        )
+        async with client.get(
+            buckets_api.bucket_by_path,
+            params={"path": f"test-org/{regular_user.name}/test-bucket"},
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
