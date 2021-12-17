@@ -123,6 +123,24 @@ class BucketsService:
     async def get_bucket_by_name(self, name: str, owner: str) -> BaseBucket:
         return await self._storage.get_bucket_by_name(name, owner)
 
+    async def get_bucket_by_path(self, path: str) -> BaseBucket:
+        async with self._storage.list_buckets() as it:
+            async for bucket in it:
+                bucket_paths = [f"{bucket.owner}/{bucket.id}"]
+                if bucket.name:
+                    bucket_paths.append(f"{bucket.owner}/{bucket.name}")
+                if bucket.org_name:
+                    bucket_paths = [
+                        f"{bucket.org_name}/{bucket_path}"
+                        for bucket_path in bucket_paths
+                    ]
+                for bucket_path in bucket_paths:
+                    if path.startswith(bucket_path) and (
+                        path == bucket_path or path[len(bucket_path)] == "/"
+                    ):
+                        return bucket
+            raise NotExistsError(f"Bucket for path {path} not found")
+
     async def make_tmp_credentials(
         self, bucket: UserBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
