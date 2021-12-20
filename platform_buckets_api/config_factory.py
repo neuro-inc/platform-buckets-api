@@ -33,8 +33,14 @@ class EnvironConfigFactory:
     def __init__(self, environ: Optional[Dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
 
-    def create(self) -> Config:
+    def _get_url(self, name: str) -> Optional[URL]:
+        value = self._environ[name]
+        if value == "-":
+            return None
+        else:
+            return URL(value)
 
+    def create(self) -> Config:
         cluster_name = self._environ.get("NP_CLUSTER_NAME", "")
         enable_docs = self._environ.get("NP_BUCKETS_API_ENABLE_DOCS", "false") == "true"
         disable_creation = (
@@ -59,7 +65,7 @@ class EnvironConfigFactory:
         return ServerConfig(host=host, port=port)
 
     def _create_platform_auth(self) -> PlatformAuthConfig:
-        url = URL(self._environ["NP_BUCKETS_API_PLATFORM_AUTH_URL"])
+        url = self._get_url("NP_BUCKETS_API_PLATFORM_AUTH_URL")
         token = self._environ["NP_BUCKETS_API_PLATFORM_AUTH_TOKEN"]
         return PlatformAuthConfig(url=url, token=token)
 

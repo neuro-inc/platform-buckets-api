@@ -43,7 +43,37 @@ def token_path(tmp_path: Path) -> str:
     return str(token_path)
 
 
-def test_create(cert_authority_path: str, token_path: str) -> None:
+def test_create_default(cert_authority_path: str, token_path: str) -> None:
+    environ: Dict[str, Any] = {
+        "NP_BUCKETS_API_PLATFORM_AUTH_URL": "-",
+        "NP_BUCKETS_API_PLATFORM_AUTH_TOKEN": "",
+        "NP_BUCKET_PROVIDER_TYPE": "aws",
+        "NP_AWS_ACCESS_KEY_ID": "key-id",
+        "NP_AWS_SECRET_ACCESS_KEY": "key-secret",
+        "NP_AWS_REGION_NAME": "us-east-2",
+        "NP_AWS_S3_ROLE_ARN": "role-arn-here",
+        "NP_BUCKETS_API_K8S_API_URL": "https://localhost:8443",
+    }
+    config = EnvironConfigFactory(environ).create()
+    assert config == Config(
+        server=ServerConfig(host="0.0.0.0", port=8080),
+        platform_auth=PlatformAuthConfig(url=None, token=""),
+        cors=CORSConfig(),
+        kube=KubeConfig(
+            endpoint_url="https://localhost:8443",
+            auth_type=KubeClientAuthType.CERTIFICATE,
+        ),
+        cluster_name="",
+        bucket_provider=AWSProviderConfig(
+            access_key_id="key-id",
+            secret_access_key="key-secret",
+            region_name="us-east-2",
+            s3_role_arn="role-arn-here",
+        ),
+    )
+
+
+def test_create_custom(cert_authority_path: str, token_path: str) -> None:
     environ: Dict[str, Any] = {
         "NP_BUCKETS_API_HOST": "0.0.0.0",
         "NP_BUCKETS_API_PORT": 8080,
@@ -72,7 +102,6 @@ def test_create(cert_authority_path: str, token_path: str) -> None:
         "NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT": "222",
         "NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT": "555",
         "NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE": "333",
-        "NP_BUCKETS_API_K8S_STORAGE_CLASS": "some-class",
     }
     config = EnvironConfigFactory(environ).create()
     assert config == Config(

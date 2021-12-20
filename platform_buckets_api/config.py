@@ -14,7 +14,7 @@ class ServerConfig:
 
 @dataclass(frozen=True)
 class PlatformAuthConfig:
-    url: URL
+    url: Optional[URL]
     token: str = field(repr=False)
 
 
