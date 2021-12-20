@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="session")
 def minio_container_image() -> str:
-    return "minio/minio:latest"
+    return "minio/minio:RELEASE.2021-12-10T23-03-39Z"
 
 
 @pytest.fixture(scope="session")
