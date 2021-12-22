@@ -1,7 +1,7 @@
 import base64
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from yarl import URL
@@ -44,7 +44,7 @@ def token_path(tmp_path: Path) -> str:
 
 
 def test_create_default(cert_authority_path: str, token_path: str) -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKETS_API_PLATFORM_AUTH_URL": "-",
         "NP_BUCKETS_API_PLATFORM_AUTH_TOKEN": "",
         "NP_BUCKET_PROVIDER_TYPE": "aws",
@@ -74,7 +74,7 @@ def test_create_default(cert_authority_path: str, token_path: str) -> None:
 
 
 def test_create_custom(cert_authority_path: str, token_path: str) -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKETS_API_HOST": "0.0.0.0",
         "NP_BUCKETS_API_PORT": 8080,
         "NP_BUCKETS_API_PLATFORM_AUTH_URL": "http://platformauthapi/api/v1",
@@ -138,7 +138,7 @@ def test_create_custom(cert_authority_path: str, token_path: str) -> None:
 
 
 def test_create_minio() -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKET_PROVIDER_TYPE": "minio",
         "NP_MINIO_ACCESS_KEY_ID": "key-id",
         "NP_MINIO_SECRET_ACCESS_KEY": "key-secret",
@@ -157,7 +157,7 @@ def test_create_minio() -> None:
 
 
 def test_create_azure() -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKET_PROVIDER_TYPE": "azure",
         "NP_AZURE_STORAGE_ACCOUNT_URL": "https://some.url.windows.com/",
         "NP_AZURE_STORAGE_CREDENTIAL": "secret",
@@ -170,7 +170,7 @@ def test_create_azure() -> None:
 
 
 def test_create_gcs() -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKET_PROVIDER_TYPE": "gcp",
         "NP_GCP_SERVICE_ACCOUNT_KEY_JSON_B64": base64.b64encode(
             json.dumps({"key": "value"}).encode()
@@ -181,7 +181,7 @@ def test_create_gcs() -> None:
 
 
 def test_create_emc_ecs() -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKET_PROVIDER_TYPE": "emc_ecs",
         "NP_EMC_ECS_ACCESS_KEY_ID": "key-id",
         "NP_EMC_ECS_SECRET_ACCESS_KEY": "key-secret",
@@ -200,7 +200,7 @@ def test_create_emc_ecs() -> None:
 
 
 def test_create_open_stack() -> None:
-    environ: Dict[str, Any] = {
+    environ: dict[str, Any] = {
         "NP_BUCKET_PROVIDER_TYPE": "open_stack",
         "NP_OS_ACCOUNT_ID": "key-id",
         "NP_OS_PASSWORD": "password",

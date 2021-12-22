@@ -1,4 +1,5 @@
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Optional
 
 from platform_buckets_api.kube_client import (
     KubeClient,

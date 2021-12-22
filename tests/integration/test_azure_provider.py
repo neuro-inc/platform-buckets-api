@@ -1,7 +1,7 @@
 import os
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, List, Mapping, Tuple
 
 import pytest
 from azure.storage.blob.aio import BlobServiceClient
@@ -60,7 +60,7 @@ class AzureBasicBucketClient(BasicBucketClient):
         downloader = await blob_client.download_blob()
         return await downloader.readall()
 
-    async def list_objects(self) -> List[str]:
+    async def list_objects(self) -> list[str]:
         keys = []
         async for blob in self._container_client.list_blobs():
             keys.append(blob.name)
@@ -80,7 +80,7 @@ ACCOUNT_CREDENTIAL_ENV = "AZURE_STORAGE_CREDENTIAL"
 
 
 @pytest.fixture()
-async def azure_raw_credentials() -> Tuple[str, str]:
+async def azure_raw_credentials() -> tuple[str, str]:
     if ACCOUNT_URL_ENV not in os.environ or ACCOUNT_CREDENTIAL_ENV not in os.environ:
         pytest.skip(
             f"Skipping Azure provider tests. Please set {ACCOUNT_URL_ENV}"
@@ -92,7 +92,7 @@ async def azure_raw_credentials() -> Tuple[str, str]:
 
 @pytest.fixture()
 async def azure_blob_client(
-    azure_raw_credentials: Tuple[str, str]
+    azure_raw_credentials: tuple[str, str]
 ) -> AsyncIterator[BlobServiceClient]:
     async def _cleanup_containers(client: BlobServiceClient) -> None:
         async for container in client.list_containers():
@@ -115,7 +115,7 @@ class TestAzureProvider(TestProviderBase):
     async def provider_option(
         self,
         azure_blob_client: BlobServiceClient,
-        azure_raw_credentials: Tuple[str, str],
+        azure_raw_credentials: tuple[str, str],
     ) -> ProviderTestOption:
         return ProviderTestOption(
             type="azure",

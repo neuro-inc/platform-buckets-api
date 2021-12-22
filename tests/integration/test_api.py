@@ -1,16 +1,8 @@
 import json
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import (
-    Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Protocol,
-)
+from typing import Any, Optional, Protocol
 
 import aiohttp
 import pytest
@@ -219,7 +211,7 @@ class TestApi:
     class BucketFactory(Protocol):
         async def __call__(
             self, name: Optional[str], user: _User, org_name: Optional[str] = None
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             pass
 
     @pytest.fixture()
@@ -228,7 +220,7 @@ class TestApi:
     ) -> BucketFactory:
         async def _factory(
             name: Optional[str], user: _User, org_name: Optional[str] = None
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             payload = {
                 "name": name,
             }
@@ -250,7 +242,7 @@ class TestApi:
     ) -> BucketFactory:
         async def _factory(
             name: Optional[str], user: _User, org_name: Optional[str] = None
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             payload = {
                 "name": name,
                 "provider_bucket_name": f"in-provider-{name}",
@@ -270,10 +262,10 @@ class TestApi:
         return _factory
 
     CredentialsFactory = Callable[
-        [Optional[str], _User, List[str]], Awaitable[Dict[str, Any]]
+        [Optional[str], _User, list[str]], Awaitable[dict[str, Any]]
     ]
     CredentialsFactoryWithReadOnly = Callable[
-        [Optional[str], _User, List[str], bool], Awaitable[Dict[str, Any]]
+        [Optional[str], _User, list[str], bool], Awaitable[dict[str, Any]]
     ]
 
     @pytest.fixture()
@@ -283,9 +275,9 @@ class TestApi:
         async def _factory(
             name: Optional[str],
             user: _User,
-            bucket_ids: List[str],
+            bucket_ids: list[str],
             read_only: bool = False,
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             async with client.post(
                 buckets_api.credentials_url,
                 headers=user.headers,

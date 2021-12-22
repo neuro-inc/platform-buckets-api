@@ -1,6 +1,6 @@
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, List, Mapping
 
 import aiobotocore.session
 import pytest
@@ -59,7 +59,7 @@ class AwsBasicBucketClient(BasicBucketClient):
         async with response["Body"] as stream:
             return await stream.read()
 
-    async def list_objects(self) -> List[str]:
+    async def list_objects(self) -> list[str]:
         keys = []
         paginator = self._client.get_paginator("list_objects")
         async for result in paginator.paginate(Bucket=self._bucket_name):

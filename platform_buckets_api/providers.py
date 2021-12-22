@@ -10,22 +10,18 @@ import secrets
 import tempfile
 import typing
 from abc import ABC
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from os import fdopen
-from typing import (
-    Any,
+from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
-    ClassVar,
-    Dict,
     Iterable,
-    List,
     Mapping,
-    Optional,
     Sequence,
 )
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from os import fdopen
+from typing import Any, ClassVar, Optional
 
 import aiobotocore.session
 import aiohttp
@@ -190,7 +186,7 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
         )
 
     async def set_public_access(self, bucket_name: str, public_access: bool) -> None:
-        policy: Dict[str, Any]
+        policy: dict[str, Any]
         policy_exists = False
         try:
             policy_raw = (
@@ -590,7 +586,7 @@ class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         await self._mc.admin_user_remove(username=role.name)
 
 
-def _container_policies_as_dict(policies: List[Any]) -> Dict[str, Any]:
+def _container_policies_as_dict(policies: list[Any]) -> dict[str, Any]:
     return {entry.id: entry.access_policy for entry in policies}
 
 
@@ -1123,7 +1119,7 @@ class OpenStackStorageApi:
                 url=URL(data["token"]["catalog"][0]["endpoints"][0]["url"]),
             )
 
-    async def list_containers(self) -> List[str]:
+    async def list_containers(self) -> list[str]:
         token = await self._get_token()
         headers = {"X-Auth-Token": token.token}
         async with self._client.get(url=token.url, headers=headers) as resp:
@@ -1164,7 +1160,7 @@ class OpenStackStorageApi:
         ) as resp:
             resp.raise_for_status()
 
-    async def list_users(self) -> List[str]:
+    async def list_users(self) -> list[str]:
         token = await self._get_token()
         headers = {"X-Auth-Token": token.token}
         async with self._client.get(

@@ -2,8 +2,9 @@ import base64
 import json
 import logging
 import os
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Union
+from typing import Optional, Union
 
 from yarl import URL
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class EnvironConfigFactory:
-    def __init__(self, environ: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, environ: Optional[dict[str, str]] = None) -> None:
         self._environ = environ or os.environ
 
     def _get_url(self, name: str) -> Optional[URL]:

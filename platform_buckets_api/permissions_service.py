@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission, User
 
@@ -12,7 +12,7 @@ class PermissionsService:
 
     def get_create_bucket_perms(
         self, user: User, org_name: Optional[str]
-    ) -> List[Permission]:
+    ) -> list[Permission]:
         if org_name:
             return [
                 Permission(
@@ -21,7 +21,7 @@ class PermissionsService:
             ]
         return [Permission(f"{self._bucket_cluster_uri}/{user.name}", "write")]
 
-    def _get_bucket_uris(self, bucket: BaseBucket) -> List[str]:
+    def _get_bucket_uris(self, bucket: BaseBucket) -> list[str]:
         base = self._bucket_cluster_uri
         if bucket.org_name:
             base = f"{base}/{bucket.org_name}"
@@ -30,10 +30,10 @@ class PermissionsService:
             f"{base}/{bucket.owner}/{bucket.id}",
         ]
 
-    def get_bucket_read_perms(self, bucket: BaseBucket) -> List[Permission]:
+    def get_bucket_read_perms(self, bucket: BaseBucket) -> list[Permission]:
         return [Permission(uri, "read") for uri in self._get_bucket_uris(bucket)]
 
-    def get_bucket_write_perms(self, bucket: BaseBucket) -> List[Permission]:
+    def get_bucket_write_perms(self, bucket: BaseBucket) -> list[Permission]:
         return [Permission(uri, "write") for uri in self._get_bucket_uris(bucket)]
 
     class Checker:

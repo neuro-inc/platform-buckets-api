@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, Iterable, List, Mapping, Set
+from collections.abc import Iterable, Mapping
 
 from yarl import URL
 
@@ -10,12 +10,12 @@ from platform_buckets_api.storage import ProviderBucket, ProviderRole
 
 class MockBucketProvider(BucketProvider):
     def __init__(self) -> None:
-        self.created_roles: List[ProviderRole] = []
-        self.deleted_roles: List[str] = []
-        self.created_buckets: List[ProviderBucket] = []
-        self.deleted_buckets: List[str] = []
-        self.role_to_permissions: Dict[str, Set[BucketPermission]] = {}
-        self.public_state: Dict[str, bool] = defaultdict(lambda: False)
+        self.created_roles: list[ProviderRole] = []
+        self.deleted_roles: list[str] = []
+        self.created_buckets: list[ProviderBucket] = []
+        self.deleted_buckets: list[str] = []
+        self.role_to_permissions: dict[str, set[BucketPermission]] = {}
+        self.public_state: dict[str, bool] = defaultdict(lambda: False)
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         bucket = ProviderBucket(

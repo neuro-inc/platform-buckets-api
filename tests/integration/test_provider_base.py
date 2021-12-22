@@ -1,16 +1,9 @@
 import abc
 import secrets
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import (
-    AsyncContextManager,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    List,
-    Mapping,
-)
 
 import pytest
 from aiohttp import ClientSession
@@ -51,7 +44,7 @@ class BasicBucketClient(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def list_objects(self) -> List[str]:
+    async def list_objects(self) -> list[str]:
         pass
 
     @abc.abstractmethod
@@ -65,9 +58,12 @@ class ProviderTestOption:
     provider: BucketProvider
     bucket_exists: Callable[[str], Awaitable[bool]]
     make_client: Callable[
-        [ProviderBucket, Mapping[str, str]], AsyncContextManager[BasicBucketClient]
+        [ProviderBucket, Mapping[str, str]],
+        AbstractAsyncContextManager[BasicBucketClient],
     ]
-    get_admin: Callable[[ProviderBucket], AsyncContextManager[BasicBucketClient]]
+    get_admin: Callable[
+        [ProviderBucket], AbstractAsyncContextManager[BasicBucketClient]
+    ]
     role_exists: Callable[[str], Awaitable[bool]]
     get_public_url: Callable[[str, str], URL]
     credentials_for_imported: Mapping[str, str]
@@ -75,7 +71,7 @@ class ProviderTestOption:
 
 def as_admin_cm(
     creator_func: Callable[[ProviderBucket], BasicBucketClient]
-) -> Callable[[ProviderBucket], AsyncContextManager[BasicBucketClient]]:
+) -> Callable[[ProviderBucket], AbstractAsyncContextManager[BasicBucketClient]]:
     @asynccontextmanager
     async def creator(bucket: ProviderBucket) -> AsyncIterator[BasicBucketClient]:
         yield creator_func(bucket)
@@ -272,7 +268,7 @@ class TestProviderBase:
     @pytest.fixture()
     async def sample_role_permissions(
         self, provider_option: ProviderTestOption
-    ) -> List[BucketPermission]:
+    ) -> list[BucketPermission]:
         bucket_name = _make_bucket_name()
         await provider_option.provider.create_bucket(bucket_name)
         return [
@@ -285,7 +281,7 @@ class TestProviderBase:
     async def test_role_create(
         self,
         provider_option: ProviderTestOption,
-        sample_role_permissions: List[BucketPermission],
+        sample_role_permissions: list[BucketPermission],
     ) -> None:
         name = _make_role_name()
         role = await provider_option.provider.create_role(name, sample_role_permissions)
@@ -295,7 +291,7 @@ class TestProviderBase:
     async def test_role_create_multiple(
         self,
         provider_option: ProviderTestOption,
-        sample_role_permissions: List[BucketPermission],
+        sample_role_permissions: list[BucketPermission],
     ) -> None:
         name1, name2 = _make_role_name(), _make_role_name()
         role1 = await provider_option.provider.create_role(
@@ -310,7 +306,7 @@ class TestProviderBase:
     async def test_role_duplicate(
         self,
         provider_option: ProviderTestOption,
-        sample_role_permissions: List[BucketPermission],
+        sample_role_permissions: list[BucketPermission],
     ) -> None:
         name = _make_role_name()
         await provider_option.provider.create_role(name, sample_role_permissions)
@@ -320,7 +316,7 @@ class TestProviderBase:
     async def test_role_delete(
         self,
         provider_option: ProviderTestOption,
-        sample_role_permissions: List[BucketPermission],
+        sample_role_permissions: list[BucketPermission],
     ) -> None:
         name = _make_role_name()
         role = await provider_option.provider.create_role(name, sample_role_permissions)

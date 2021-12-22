@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import aiobotocore.session
 import aiohttp

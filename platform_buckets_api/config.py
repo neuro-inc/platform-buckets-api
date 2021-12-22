@@ -1,6 +1,7 @@
 import enum
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import ClassVar, Mapping, Optional, Sequence, Union
+from typing import ClassVar, Optional, Union
 
 from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL

@@ -3,7 +3,7 @@ import json
 import logging
 import ssl
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 import aiohttp
@@ -63,7 +63,7 @@ def _k8s_name_safe(**kwargs: str) -> str:
 
 class PersistentCredentialsCRDMapper:
     @staticmethod
-    def from_primitive(payload: Dict[str, Any]) -> PersistentCredentials:
+    def from_primitive(payload: dict[str, Any]) -> PersistentCredentials:
         return PersistentCredentials(
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(CREDENTIALS_NAME_LABEL),
@@ -78,7 +78,7 @@ class PersistentCredentialsCRDMapper:
         )
 
     @staticmethod
-    def to_primitive(entry: PersistentCredentials) -> Dict[str, Any]:
+    def to_primitive(entry: PersistentCredentials) -> dict[str, Any]:
         if entry.name:
             name = (
                 "persistent-bucket-credentials-"
@@ -111,7 +111,7 @@ class PersistentCredentialsCRDMapper:
 
 class BucketCRDMapper:
     @staticmethod
-    def from_primitive(payload: Dict[str, Any]) -> BucketType:
+    def from_primitive(payload: dict[str, Any]) -> BucketType:
         common_kwargs = dict(
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
@@ -136,7 +136,7 @@ class BucketCRDMapper:
             )
 
     @staticmethod
-    def to_primitive(entry: BucketType) -> Dict[str, Any]:
+    def to_primitive(entry: BucketType) -> dict[str, Any]:
         # Use this strange key as name to enable uniqueness of owner/name pair
         if entry.name:
             name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, name=entry.name)}"
@@ -150,7 +150,7 @@ class BucketCRDMapper:
             labels[BUCKET_NAME_LABEL] = entry.name
         if entry.org_name:
             labels[ORG_NAME_LABEL] = entry.org_name
-        res: Dict[str, Any] = {
+        res: dict[str, Any] = {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
             "metadata": {
@@ -188,7 +188,7 @@ class KubeClient:
         read_timeout_s: int = 100,
         watch_timeout_s: int = 1800,
         conn_pool_size: int = 100,
-        trace_configs: Optional[List[aiohttp.TraceConfig]] = None,
+        trace_configs: Optional[list[aiohttp.TraceConfig]] = None,
     ) -> None:
         self._base_url = base_url
         self._namespace = namespace
@@ -300,14 +300,14 @@ class KubeClient:
     def _generate_user_bucket_url(self, name: str) -> str:
         return f"{self._user_buckets_url}/{name}"
 
-    async def _request(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         assert self._client, "client is not initialized"
         async with self._client.request(*args, **kwargs) as response:
             # TODO (A Danshyn 05/21/18): check status code etc
             payload = await response.json()
             return payload
 
-    def _raise_for_status(self, payload: Dict[str, Any]) -> None:
+    def _raise_for_status(self, payload: dict[str, Any]) -> None:
         kind = payload["kind"]
         if kind == "Status":
             if payload.get("status") == "Success":
@@ -341,7 +341,7 @@ class KubeClient:
         id: Optional[str] = None,
         owner: Optional[str] = None,
         name: Optional[str] = None,
-    ) -> List[PersistentCredentials]:
+    ) -> list[PersistentCredentials]:
         url = self._persistent_bucket_credentials_url
         label_selectors = []
         params = []
@@ -381,7 +381,7 @@ class KubeClient:
         id: Optional[str] = None,
         owner: Optional[str] = None,
         name: Optional[str] = None,
-    ) -> List[BucketType]:
+    ) -> list[BucketType]:
         url = self._user_buckets_url
         label_selectors = []
         params = []

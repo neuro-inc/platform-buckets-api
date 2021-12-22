@@ -3,9 +3,10 @@ import base64
 import json
 import os
 import time
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Any, AsyncIterator, List, Mapping
+from typing import Any
 
 import google.cloud.exceptions
 import googleapiclient.discovery
@@ -108,7 +109,7 @@ class GoogleBasicBucketClient(BasicBucketClient):
         return self._bucket_client.blob(key).download_as_bytes()
 
     @run_in_executor
-    def list_objects(self) -> List[str]:  # type: ignore
+    def list_objects(self) -> list[str]:  # type: ignore
         return [entry.name for entry in self._client.list_blobs(self._bucket_name)]
 
     @run_in_executor
@@ -168,7 +169,7 @@ async def gcs_client(
     client.close()
 
 
-def _list_all_accounts(iam: Any, project_id: str) -> List[Mapping[str, Any]]:
+def _list_all_accounts(iam: Any, project_id: str) -> list[Mapping[str, Any]]:
     accounts = []
     req = iam.projects().serviceAccounts().list(name=f"projects/{project_id}")
     while req:

@@ -1,7 +1,4 @@
-ARG PYTHON_VERSION=3.8.12
-ARG PYTHON_BASE=buster
-
-FROM python:${PYTHON_VERSION} AS installer
+FROM python:3.9.9-slim-bullseye AS installer
 
 ENV PATH=/root/.local/bin:$PATH
 
@@ -16,7 +13,7 @@ RUN apt-get -q update && apt-get -q install -y wget
 RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc
 RUN chmod +x mc
 
-FROM python:${PYTHON_VERSION}-${PYTHON_BASE} as service
+FROM python:3.9.9-slim-bullseye as service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-buckets-api"
 
