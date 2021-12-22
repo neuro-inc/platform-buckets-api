@@ -2,9 +2,10 @@ import hashlib
 import logging
 import secrets
 import string
+from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from typing import AsyncIterator, Iterable, List, Mapping, Optional
+from typing import Optional
 from uuid import uuid4
 
 from yarl import URL
@@ -264,8 +265,8 @@ class PersistentCredentialsService:
 
     async def _make_permissions_list(
         self, bucket_ids: Iterable[str], read_only: bool
-    ) -> List[BucketPermission]:
-        permissions: List[BucketPermission] = []
+    ) -> list[BucketPermission]:
+        permissions: list[BucketPermission] = []
         for bucket_id in bucket_ids:
             bucket = await self._buckets_service.get_bucket(bucket_id)
             permissions.append(

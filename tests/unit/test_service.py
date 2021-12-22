@@ -1,4 +1,4 @@
-from typing import Iterable, List
+from collections.abc import Iterable
 
 import pytest
 
@@ -21,8 +21,8 @@ pytestmark = pytest.mark.asyncio
 
 class MockPermissionsService(PermissionsService):
     def __init__(self) -> None:
-        self.can_read_bucket_ids: List[str] = []
-        self.can_write_bucket_ids: List[str] = []
+        self.can_read_bucket_ids: list[str] = []
+        self.can_write_bucket_ids: list[str] = []
 
     class Checker:
         def __init__(self, service: "MockPermissionsService", owner: str):
@@ -260,7 +260,7 @@ class TestPersistentCredentialsService:
     async def bucket_ids(
         self,
         buckets_service: BucketsService,
-    ) -> List[str]:
+    ) -> list[str]:
         return [
             (await buckets_service.create_bucket("test-user", org_name=None)).id
             for _ in range(3)
@@ -284,7 +284,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
             owner="usr", name="creds", bucket_ids=bucket_ids
@@ -299,7 +299,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         await service.create_credentials(
             owner="test-user", name="test-credentials", bucket_ids=bucket_ids
@@ -316,7 +316,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials1 = await service.create_credentials(
             owner="test-user", name="test-credentials-1", bucket_ids=bucket_ids
@@ -333,7 +333,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
             owner="test-user", name="test-credentials", bucket_ids=bucket_ids
@@ -345,7 +345,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
             owner="test-user", name="test-credentials", bucket_ids=bucket_ids
@@ -360,7 +360,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials1 = await service.create_credentials(
             owner="test-user", name="test-credentials1", bucket_ids=bucket_ids
@@ -382,7 +382,7 @@ class TestPersistentCredentialsService:
         self,
         service: PersistentCredentialsService,
         mock_provider: MockBucketProvider,
-        bucket_ids: List[str],
+        bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
             owner="test-user", name="test-credentials", bucket_ids=bucket_ids

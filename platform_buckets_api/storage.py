@@ -1,15 +1,9 @@
 import abc
+from collections.abc import AsyncIterator, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import (
-    AsyncContextManager,
-    AsyncIterator,
-    ClassVar,
-    List,
-    Mapping,
-    Optional,
-    Union,
-)
+from typing import ClassVar, Optional, Union
 
 from platform_buckets_api.config import BucketsProviderType
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
@@ -54,7 +48,7 @@ class PersistentCredentials:
     id: str
     name: Optional[str]
     owner: str
-    bucket_ids: List[str]
+    bucket_ids: list[str]
     role: ProviderRole
     read_only: bool = False
 
@@ -87,7 +81,7 @@ BucketType = Union[UserBucket, ImportedBucket]
 
 class BucketsStorage(abc.ABC):
     @abc.abstractmethod
-    def list_buckets(self) -> AsyncContextManager[AsyncIterator[BucketType]]:
+    def list_buckets(self) -> AbstractAsyncContextManager[AsyncIterator[BucketType]]:
         pass
 
     @abc.abstractmethod
@@ -115,7 +109,7 @@ class CredentialsStorage(abc.ABC):
     @abc.abstractmethod
     def list_credentials(
         self, owner: Optional[str] = None
-    ) -> AsyncContextManager[AsyncIterator[PersistentCredentials]]:
+    ) -> AbstractAsyncContextManager[AsyncIterator[PersistentCredentials]]:
         pass
 
     @abc.abstractmethod
@@ -139,7 +133,7 @@ class CredentialsStorage(abc.ABC):
 
 class InMemoryBucketsStorage(BucketsStorage):
     def __init__(self) -> None:
-        self._buckets: List[BucketType] = []
+        self._buckets: list[BucketType] = []
 
     @asyncgeneratorcontextmanager
     async def list_buckets(self) -> AsyncIterator[BucketType]:
@@ -190,7 +184,7 @@ class InMemoryBucketsStorage(BucketsStorage):
 
 class InMemoryCredentialsStorage(CredentialsStorage):
     def __init__(self) -> None:
-        self._credentials: List[PersistentCredentials] = []
+        self._credentials: list[PersistentCredentials] = []
 
     @asyncgeneratorcontextmanager
     async def list_credentials(

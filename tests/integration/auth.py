@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Callable, Dict, Iterator, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 import aiohttp
 import pytest
@@ -142,7 +143,7 @@ def cluster_token(token_factory: Callable[[str], str]) -> str:
 
 @pytest.fixture
 def no_claim_token(auth_jwt_secret: str) -> str:
-    payload: Dict[str, Any] = {}
+    payload: dict[str, Any] = {}
     return jwt.encode(payload, auth_jwt_secret, algorithm="HS256")
 
 
@@ -162,7 +163,7 @@ class _User(User):
     token: str = ""
 
     @property
-    def headers(self) -> Dict[str, str]:
+    def headers(self) -> dict[str, str]:
         return {AUTHORIZATION: f"Bearer {self.token}"}
 
 

@@ -1,9 +1,9 @@
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import AsyncIterator
 
 import aiohttp.web
 

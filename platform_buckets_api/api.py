@@ -2,17 +2,9 @@ import asyncio
 import json
 import logging
 import textwrap
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import (
-    Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-)
+from typing import Any, Optional
 
 import aiobotocore.session
 import aiohttp
@@ -118,7 +110,7 @@ def accepts_ndjson(request: aiohttp.web.Request) -> bool:
     return "application/x-ndjson" in accept
 
 
-def _permission_to_primitive(perm: Permission) -> Dict[str, str]:
+def _permission_to_primitive(perm: Permission) -> dict[str, str]:
     return {"uri": perm.uri, "action": perm.action}
 
 
@@ -128,7 +120,7 @@ async def _get_untrusted_user(request: Request) -> User:
 
 
 async def check_any_permissions(
-    request: aiohttp.web.Request, permissions: List[Permission]
+    request: aiohttp.web.Request, permissions: list[Permission]
 ) -> None:
     user_name = await check_authorized(request)
     auth_policy = request.config_dict.get(AUTZ_KEY)
@@ -815,7 +807,7 @@ async def create_auth_client(config: PlatformAuthConfig) -> AsyncIterator[AuthCl
 
 @asynccontextmanager
 async def create_kube_client(
-    config: KubeConfig, trace_configs: Optional[List[aiohttp.TraceConfig]] = None
+    config: KubeConfig, trace_configs: Optional[list[aiohttp.TraceConfig]] = None
 ) -> AsyncIterator[KubeClient]:
     client = KubeClient(
         base_url=config.endpoint_url,
@@ -866,7 +858,7 @@ async def make_google_iam_client_2(config: GCPProviderConfig) -> AsyncIterator[A
     yield iam_2
 
 
-def make_tracing_trace_configs(config: Config) -> List[aiohttp.TraceConfig]:
+def make_tracing_trace_configs(config: Config) -> list[aiohttp.TraceConfig]:
     trace_configs = []
 
     if config.zipkin:

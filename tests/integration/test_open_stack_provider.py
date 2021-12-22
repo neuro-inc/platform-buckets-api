@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator, Mapping
 from functools import partial
-from typing import Any, AsyncIterator, Mapping
+from typing import Any
 
 import aiobotocore.session
 import pytest

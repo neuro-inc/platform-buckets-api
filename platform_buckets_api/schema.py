@@ -1,5 +1,6 @@
 import functools
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, Optional, TypeVar
 
 import aiohttp.web
 from aiohttp_apispec import querystring_schema
