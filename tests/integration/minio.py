@@ -14,7 +14,6 @@ from yarl import URL
 
 from platform_buckets_api.providers import BMCWrapper
 
-
 logger = logging.getLogger(__name__)
 
 

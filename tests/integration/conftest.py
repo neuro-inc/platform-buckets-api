@@ -24,7 +24,6 @@ from platform_buckets_api.config import (
     ServerConfig,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -16,7 +16,6 @@ from yarl import URL
 
 from tests.integration.conftest import MotoConfig
 
-
 logger = logging.getLogger(__name__)
 
 

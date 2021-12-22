@@ -13,8 +13,8 @@ from platform_buckets_api.storage import (
     NotExistsError,
     UserBucket,
 )
-from tests.mocks import MockBucketProvider
 
+from tests.mocks import MockBucketProvider
 
 pytestmark = pytest.mark.asyncio
 

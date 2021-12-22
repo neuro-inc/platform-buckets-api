@@ -8,6 +8,7 @@ from aiobotocore.client import AioBaseClient
 from yarl import URL
 
 from platform_buckets_api.providers import OpenStackBucketProvider, OpenStackStorageApi
+
 from tests.integration.test_aws_provider import AwsBasicBucketClient
 from tests.integration.test_provider_base import (
     BUCKET_NAME_PREFIX,
@@ -16,7 +17,6 @@ from tests.integration.test_provider_base import (
     TestProviderBase,
     as_admin_cm,
 )
-
 
 pytestmark = pytest.mark.asyncio
 

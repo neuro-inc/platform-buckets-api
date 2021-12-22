@@ -5,7 +5,6 @@ from typing import Any
 import pytest
 from docker import DockerClient
 
-
 PYTEST_REUSE_DOCKER_OPT = "--reuse-docker"
 
 

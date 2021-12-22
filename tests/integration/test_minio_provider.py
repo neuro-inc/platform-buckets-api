@@ -5,13 +5,13 @@ from aiobotocore.client import AioBaseClient
 from yarl import URL
 
 from platform_buckets_api.providers import BMCWrapper, MinioBucketProvider
+
 from tests.integration.test_aws_provider import AwsBasicBucketClient, aws_bucket_exists
 from tests.integration.test_provider_base import (
     ProviderTestOption,
     TestProviderBase,
     as_admin_cm,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
