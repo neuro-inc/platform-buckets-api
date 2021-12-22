@@ -18,8 +18,8 @@ from neuro_auth_client.security import JWT_IDENTITY_CLAIM_OPTIONS
 from yarl import URL
 
 from platform_buckets_api.config import PlatformAuthConfig
-from tests.integration.conftest import random_name
 
+from tests.integration.conftest import random_name
 
 logger = logging.getLogger(__name__)
 

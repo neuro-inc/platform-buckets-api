@@ -19,7 +19,6 @@ from platform_buckets_api.providers import (
 )
 from platform_buckets_api.storage import ImportedBucket, ProviderBucket
 
-
 pytestmark = pytest.mark.asyncio
 
 BUCKET_NAME_PREFIX = "integration-tests-"

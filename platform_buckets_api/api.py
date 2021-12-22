@@ -101,7 +101,6 @@ from .storage import (
 )
 from .utils import ndjson_error_handler
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -501,7 +500,7 @@ class BucketsApiHandler:
         elif isinstance(bucket, ImportedBucket):
             credentials = bucket.credentials
         else:
-            assert False, "unreachable"
+            raise AssertionError("unreachable")
         return aiohttp.web.json_response(
             data={
                 "bucket_id": bucket.id,

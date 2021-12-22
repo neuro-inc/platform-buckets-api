@@ -8,7 +8,6 @@ from marshmallow import Schema, fields, validate
 
 from platform_buckets_api.config import BucketsProviderType
 
-
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -60,9 +59,7 @@ class ImportBucketRequest(Schema):
     org_name = fields.String(required=False, allow_none=True)
     provider = ProviderTypeField(
         required=True,
-        validate=validate.OneOf(
-            choices=[provider_type for provider_type in BucketsProviderType]
-        ),
+        validate=validate.OneOf(choices=list(BucketsProviderType)),
     )
     provider_bucket_name = fields.String(required=True)
     credentials = fields.Dict(required=True)
@@ -83,9 +80,7 @@ class Bucket(Schema):
     provider = ProviderTypeField(
         required=True,
         attribute="provider_bucket.provider_type",
-        validate=validate.OneOf(
-            choices=[provider_type for provider_type in BucketsProviderType]
-        ),
+        validate=validate.OneOf(choices=list(BucketsProviderType)),
     )
     created_at = fields.DateTime(required=True)
     imported = fields.Boolean(required=True)
@@ -101,9 +96,7 @@ class BucketCredentials(Schema):
     read_only = fields.Boolean(required=True)
     provider = ProviderTypeField(
         required=True,
-        validate=validate.OneOf(
-            choices=[provider_type for provider_type in BucketsProviderType]
-        ),
+        validate=validate.OneOf(choices=list(BucketsProviderType)),
     )
     credentials = fields.Dict(required=True)
 
