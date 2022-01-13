@@ -235,16 +235,6 @@ class BucketsApiHandler:
         self,
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
-        user = await _get_untrusted_user(request)
-        schema = Bucket(
-            partial=["provider", "owner", "created_at", "imported", "public"]
-        )
-        data = schema.load(await request.json())
-        org_name = data.get("org_name")
-
-        await check_any_permissions(
-            request, self.permissions_service.get_create_bucket_perms(user, org_name)
-        )
         if self.disable_creation:
             return json_response(
                 {
@@ -255,6 +245,16 @@ class BucketsApiHandler:
                 },
                 status=HTTPUnprocessableEntity.status_code,
             )
+        user = await _get_untrusted_user(request)
+        schema = Bucket(
+            partial=["provider", "owner", "created_at", "imported", "public"]
+        )
+        data = schema.load(await request.json())
+        org_name = data.get("org_name")
+
+        await check_any_permissions(
+            request, self.permissions_service.get_create_bucket_perms(user, org_name)
+        )
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name,
