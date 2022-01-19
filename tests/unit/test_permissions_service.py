@@ -14,7 +14,6 @@ from platform_buckets_api.permissions_service import PermissionsService
 from platform_buckets_api.storage import UserBucket
 from platform_buckets_api.utils import utc_now
 
-pytestmark = pytest.mark.asyncio
 
 
 class MockAuthClient(AuthClient):

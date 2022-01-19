@@ -9,7 +9,6 @@ from tests.unit.test_storage import (
     TestCredentialsStorage as _TestCredentialsStorage,
 )
 
-pytestmark = pytest.mark.asyncio
 
 
 class TestK8SBucketsStorage(_TestBucketsStorage):

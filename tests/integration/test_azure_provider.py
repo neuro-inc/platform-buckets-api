@@ -21,7 +21,6 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-pytestmark = pytest.mark.asyncio
 
 
 async def azure_bucket_exists(azure_blob_client: BlobServiceClient, name: str) -> bool:

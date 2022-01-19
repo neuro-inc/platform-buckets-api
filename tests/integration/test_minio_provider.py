@@ -13,7 +13,6 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-pytestmark = pytest.mark.asyncio
 
 
 async def minio_role_exists(bmc_wrapper: BMCWrapper, name: str) -> bool:
