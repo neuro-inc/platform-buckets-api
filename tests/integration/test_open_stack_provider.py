@@ -18,8 +18,6 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 async def open_stack_config() -> Mapping[str, Any]:

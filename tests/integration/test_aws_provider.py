@@ -18,8 +18,6 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 async def aws_bucket_exists(s3: AioBaseClient, name: str) -> bool:
     buckets = await s3.list_buckets()

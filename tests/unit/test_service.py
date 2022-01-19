@@ -16,8 +16,6 @@ from platform_buckets_api.storage import (
 
 from tests.mocks import MockBucketProvider
 
-pytestmark = pytest.mark.asyncio
-
 
 class MockPermissionsService(PermissionsService):
     def __init__(self) -> None:

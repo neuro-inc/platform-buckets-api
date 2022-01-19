@@ -27,8 +27,6 @@ from platform_buckets_api.utils import utc_now
 from .auth import UserFactory, _User
 from .conftest import ApiAddress, create_local_app_server
 
-pytestmark = pytest.mark.asyncio
-
 
 @dataclass(frozen=True)
 class BucketsApiEndpoints:
