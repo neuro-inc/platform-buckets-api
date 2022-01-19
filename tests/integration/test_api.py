@@ -28,7 +28,6 @@ from .auth import UserFactory, _User
 from .conftest import ApiAddress, create_local_app_server
 
 
-
 @dataclass(frozen=True)
 class BucketsApiEndpoints:
     address: ApiAddress

@@ -17,7 +17,6 @@ from platform_buckets_api.storage import (
 from tests.mocks import MockBucketProvider
 
 
-
 class MockPermissionsService(PermissionsService):
     def __init__(self) -> None:
         self.can_read_bucket_ids: list[str] = []

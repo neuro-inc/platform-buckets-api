@@ -10,7 +10,6 @@ from tests.unit.test_storage import (
 )
 
 
-
 class TestK8SBucketsStorage(_TestBucketsStorage):
     @pytest.fixture()
     def storage(self, kube_client: KubeClient) -> BucketsStorage:  # type: ignore

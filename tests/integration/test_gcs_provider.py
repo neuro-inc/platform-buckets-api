@@ -35,8 +35,6 @@ from tests.integration.test_provider_base import (
 BUCKET_SA_PREFIX = "bucket-e2e-test-"
 
 
-
-
 @run_in_executor
 def gcs_bucket_exists(gs_client: GCSClient, name: str) -> bool:
     try:

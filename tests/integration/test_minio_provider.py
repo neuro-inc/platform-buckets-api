@@ -14,7 +14,6 @@ from tests.integration.test_provider_base import (
 )
 
 
-
 async def minio_role_exists(bmc_wrapper: BMCWrapper, name: str) -> bool:
     resp = await bmc_wrapper.admin_user_list()
     user_names = {user["accessKey"] for user in resp.content}

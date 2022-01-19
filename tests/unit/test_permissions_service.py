@@ -15,7 +15,6 @@ from platform_buckets_api.storage import UserBucket
 from platform_buckets_api.utils import utc_now
 
 
-
 class MockAuthClient(AuthClient):
     def __init__(self) -> None:
         self.perm_tree_to_return = ClientSubTreeViewRoot(

@@ -21,7 +21,6 @@ from platform_buckets_api.storage import (
 from platform_buckets_api.utils import utc_now
 
 
-
 class TestCredentialsStorage:
     @pytest.fixture()
     def storage(

@@ -19,7 +19,6 @@ from tests.integration.test_provider_base import (
 )
 
 
-
 async def aws_bucket_exists(s3: AioBaseClient, name: str) -> bool:
     buckets = await s3.list_buckets()
     names = [bucket["Name"] for bucket in buckets["Buckets"]]

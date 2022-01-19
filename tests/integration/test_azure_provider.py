@@ -22,7 +22,6 @@ from tests.integration.test_provider_base import (
 )
 
 
-
 async def azure_bucket_exists(azure_blob_client: BlobServiceClient, name: str) -> bool:
     names = []
     async for container in azure_blob_client.list_containers():
