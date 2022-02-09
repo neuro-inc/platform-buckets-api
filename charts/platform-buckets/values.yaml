@@ -30,8 +30,6 @@ bucketProvider: {}
 #    s3EndpointUrl:
 #    regionName:
 
-
-
 image:
   repository: $IMAGE_REPO
   tag: $IMAGE_TAG
@@ -50,6 +48,10 @@ resources:
 
 ingress:
   enabled: false
+  # annotations:
+
+service:
+  # annotations:
 
 secrets: []
 
