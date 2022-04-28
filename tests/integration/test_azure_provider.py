@@ -71,7 +71,7 @@ class AzureBasicBucketClient(BasicBucketClient):
 
     async def put_object(self, key: str, data: bytes) -> None:
         blob_client = self._container_client.get_blob_client(key)
-        await blob_client.upload_blob(data)
+        await blob_client.upload_blob(data)  # type: ignore
 
 
 ACCOUNT_URL_ENV = "AZURE_STORAGE_ACCOUNT_URL"
