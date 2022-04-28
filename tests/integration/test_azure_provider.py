@@ -61,6 +61,7 @@ class AzureBasicBucketClient(BasicBucketClient):
     async def list_objects(self) -> list[str]:
         keys = []
         async for blob in self._container_client.list_blobs():
+            assert blob.name is not None
             keys.append(blob.name)
         return keys
 
@@ -94,6 +95,7 @@ async def azure_blob_client(
 ) -> AsyncIterator[BlobServiceClient]:
     async def _cleanup_containers(client: BlobServiceClient) -> None:
         async for container in client.list_containers():
+            assert container.name is not None
             if container.name.startswith(BUCKET_NAME_PREFIX):
                 await client.delete_container(container.name)
 
