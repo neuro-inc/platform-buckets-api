@@ -34,10 +34,9 @@ platform:
 
 bucketNamespace: platform-jobs
 
+
 cors:
   origins:
-    - https://neu.ro
-    - https://master--neuro-web.netlify.app
-    - http://localhost:8000
+  - *
 
 enableDocs: true
