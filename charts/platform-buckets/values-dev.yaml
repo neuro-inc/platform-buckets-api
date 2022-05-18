@@ -37,6 +37,6 @@ bucketNamespace: platform-jobs
 
 cors:
   origins:
-  - *
+  - '*'
 
 enableDocs: true

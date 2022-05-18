@@ -72,7 +72,7 @@ spec:
           value: {{ .Values.platform.clusterName}}
         {{- if .Values.cors.origins }}
         - name: NP_CORS_ORIGINS
-          value: {{ .Values.cors.origins | join "," }}
+          value: {{ .Values.cors.origins | join "," | quote }}
         {{- end }}
         - name: NP_BUCKET_PROVIDER_TYPE
           value: {{ .Values.bucketProvider.type }}
