@@ -238,6 +238,28 @@ class PersistentCredentialsService:
             raise
         return credentials
 
+    async def update_credentials(
+        self,
+        credentials_id: str,
+        bucket_ids: list[str],
+        read_only: bool,
+    ) -> PersistentCredentials:
+
+        credentials = await self._storage.get_credentials(credentials_id)
+        old_permissions = await self._make_permissions_list(
+            credentials.bucket_ids, credentials.read_only
+        )
+        new_permissions = await self._make_permissions_list(bucket_ids, read_only)
+
+        await self._provider.set_role_permissions(credentials.role, new_permissions)
+        credentials = replace(credentials, bucket_ids=bucket_ids, read_only=read_only)
+        try:
+            await self._storage.update_credentials(credentials)
+        except Exception:
+            await self._provider.set_role_permissions(credentials.role, old_permissions)
+            raise
+        return credentials
+
     async def get_credentials(self, credentials_id: str) -> PersistentCredentials:
         return await self._storage.get_credentials(credentials_id)
 
@@ -245,6 +267,15 @@ class PersistentCredentialsService:
         self, name: str, owner: str
     ) -> PersistentCredentials:
         return await self._storage.get_credentials_by_name(name, owner)
+
+    @asyncgeneratorcontextmanager
+    async def list_credentials_with_bucket(
+        self, bucket_id: str
+    ) -> AsyncIterator[PersistentCredentials]:
+        async with self._storage.list_credentials() as it:
+            async for credentials in it:
+                if bucket_id in credentials.bucket_ids:
+                    yield credentials
 
     @asyncgeneratorcontextmanager
     async def list_user_credentials(

@@ -13,6 +13,7 @@ from platform_buckets_api.storage import (
     ExistsError,
     NotExistsError,
     PersistentCredentials,
+    StorageError,
 )
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
@@ -61,6 +62,13 @@ class K8SBucketsStorage(BucketsStorage):
             bucket = await self.get_bucket(id)
         except NotExistsError:
             return
+        credentials = await self._kube_client.list_persistent_credentials()
+        for credential in credentials:
+            if id in credential.bucket_ids:
+                raise StorageError(
+                    "Cannot remove UserBucket that is mentioned "
+                    f"in PersistentCredentials with id {credential.id}"
+                )
         await self._kube_client.remove_user_bucket(bucket)
 
     async def update_bucket(self, bucket: BucketType) -> None:
@@ -123,3 +131,11 @@ class K8SCredentialsStorage(CredentialsStorage):
         except NotExistsError:
             return
         await self._kube_client.remove_persistent_credentials(credentials)
+
+    async def update_credentials(self, credentials: PersistentCredentials) -> None:
+        try:
+            await self._kube_client.update_persistent_credentials(credentials)
+        except ResourceNotFound:
+            raise NotExistsError(
+                f"PersistentCredentials with id {credentials.id} doesn't exists"
+            )

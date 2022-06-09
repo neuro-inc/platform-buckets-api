@@ -195,6 +195,10 @@ class BucketsApiHandler:
     def disable_creation(self) -> bool:
         return self._app["disable_creation"]
 
+    @property
+    def credentials_service(self) -> PersistentCredentialsService:
+        return self._app["credentials_service"]
+
     async def _resolve_bucket(self, request: Request) -> BaseBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
         try:
@@ -433,6 +437,22 @@ class BucketsApiHandler:
         await check_any_permissions(
             request, self.permissions_service.get_bucket_write_perms(bucket)
         )
+        async with self.credentials_service.list_credentials_with_bucket(
+            bucket.id
+        ) as it:
+            async for credential in it:
+                if len(credential.bucket_ids) == 1:
+                    await self.credentials_service.delete_credentials(credential.id)
+                else:
+                    await self.credentials_service.update_credentials(
+                        credential.id,
+                        bucket_ids=[
+                            bucket_id
+                            for bucket_id in credential.bucket_ids
+                            if bucket_id != bucket.id
+                        ],
+                        read_only=credential.read_only,
+                    )
         await self.service.delete_bucket(bucket.id)
         raise HTTPNoContent
 
@@ -1071,6 +1091,8 @@ async def create_app(
                 bucket_provider=bucket_provider,
                 buckets_service=buckets_service,
             )
+
+            app["buckets_app"]["credentials_service"] = credentials_service
             app["credentials_app"]["buckets_service"] = buckets_service
             app["credentials_app"]["credentials_service"] = credentials_service
             app["credentials_app"]["disable_creation"] = config.disable_creation
