@@ -368,6 +368,18 @@ class KubeClient:
         payload = await self._request(method="DELETE", url=url)
         self._raise_for_status(payload)
 
+    async def update_persistent_credentials(
+        self, user_credentials: PersistentCredentials
+    ) -> None:
+        data = PersistentCredentialsCRDMapper.to_primitive(user_credentials)
+        name = data["metadata"]["name"]
+        url = self._generate_persistent_bucket_credential_url(name)
+        payload = await self._request(method="GET", url=url)
+        self._raise_for_status(payload)
+        data["metadata"]["resourceVersion"] = payload["metadata"]["resourceVersion"]
+        payload = await self._request(method="PUT", url=url, json=data)
+        self._raise_for_status(payload)
+
     async def create_user_bucket(self, user_bucket: BucketType) -> None:
         url = self._user_buckets_url
         payload = await self._request(

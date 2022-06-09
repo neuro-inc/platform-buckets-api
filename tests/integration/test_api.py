@@ -715,6 +715,54 @@ class TestApi:
             payload = await resp.json()
             assert payload == []
 
+    async def test_delete_bucket_with_credentials(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+        make_credentials: CredentialsFactory,
+    ) -> None:
+        bucket1 = await make_bucket("test-bucket1", regular_user)
+        bucket2 = await make_bucket("test-bucket2", regular_user)
+
+        creds1 = await make_credentials(
+            "test-creds1", regular_user, [bucket1["id"], bucket2["id"]]
+        )
+        creds2 = await make_credentials("test-creds2", regular_user, [bucket1["id"]])
+        creds3 = await make_credentials("test-creds3", regular_user, [bucket2["id"]])
+        async with client.delete(
+            buckets_api.bucket_url(bucket1["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNoContent.status_code, await resp.text()
+
+        # Creds to multiple buckets - bucket removed from list
+        async with client.get(
+            buckets_api.credential_url(creds1["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert len(payload["credentials"]) == 1
+            assert payload["credentials"][0]["bucket_id"] == bucket2["id"]
+
+        # Creds to single buckets - creds removed
+        async with client.get(
+            buckets_api.credential_url(creds2["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+        # Creds to different buckets - nothing changed
+        async with client.get(
+            buckets_api.credential_url(creds3["id"]),
+            headers=regular_user.headers,
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == creds3
+
     async def test_delete_bucket_by_name(
         self,
         buckets_api: BucketsApiEndpoints,

@@ -130,6 +130,10 @@ class CredentialsStorage(abc.ABC):
     async def delete_credentials(self, id: str) -> None:
         pass
 
+    @abc.abstractmethod
+    async def update_credentials(self, credentials: PersistentCredentials) -> None:
+        pass
+
 
 class InMemoryBucketsStorage(BucketsStorage):
     def __init__(self) -> None:
@@ -234,3 +238,12 @@ class InMemoryCredentialsStorage(CredentialsStorage):
         self._credentials = [
             credentials for credentials in self._credentials if credentials.id != id
         ]
+
+    async def update_credentials(self, credentials: PersistentCredentials) -> None:
+        for index in range(len(self._credentials)):
+            if self._credentials[index].id == credentials.id:
+                self._credentials[index] = credentials
+                return
+        raise NotExistsError(
+            f"PersistentCredentials with id {credentials.id} doesn't exists"
+        )
