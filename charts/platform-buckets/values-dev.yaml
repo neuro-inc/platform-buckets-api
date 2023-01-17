@@ -5,7 +5,7 @@ bucketProvider:
       valueFrom:
         secretKeyRef:
           name: gcp-key
-          key: key.json
+          key: key_base64
 
 ingress:
   enabled: true
