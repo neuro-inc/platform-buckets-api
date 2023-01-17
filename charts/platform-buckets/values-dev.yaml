@@ -1,7 +1,11 @@
 bucketProvider:
-  type: "aws"  # "aws" or "minio"
-  aws:
-    s3RoleArn: arn:aws:iam::771188043543:role/bucker-api-users-role
+  type: gcp
+  gcp:
+    SAKeyJsonB64:
+      valueFrom:
+        secretKeyRef:
+          name: gcp-key
+          key: key.json
 
 ingress:
   enabled: true
