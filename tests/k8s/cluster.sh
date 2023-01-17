@@ -33,7 +33,6 @@ function k8s::start {
 
     sudo -E minikube start \
         --vm-driver=none \
-        --kubernetes-version=v1.14.10 \
         --wait=all \
         --wait-timeout=5m
 }
