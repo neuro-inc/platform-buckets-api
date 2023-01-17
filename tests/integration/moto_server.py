@@ -113,7 +113,12 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
         async with session.post(f"{_moto_server}/moto-api/reset-auth", data=b"4"):
             pass
     boto_session = aiobotocore.session.get_session()
-    async with boto_session.create_client("iam", endpoint_url=str(_moto_server)) as iam:
+    async with boto_session.create_client(
+        "iam", endpoint_url=str(_moto_server),
+        region_name="us-east-1",
+        aws_access_key_id="access-key",
+        aws_secret_access_key="secret-key",
+    ) as iam:
         create_user_resp = await iam.create_user(UserName="admin")
         keys = (await iam.create_access_key(UserName="admin"))["AccessKey"]
         policy_document = {
@@ -128,6 +133,7 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
         await iam.attach_user_policy(UserName="admin", PolicyArn=policy_arn)
     yield MotoConfig(
         url=_moto_server,
+        region_name="us-east-1",
         admin_user_arn=create_user_resp["User"]["Arn"],
         admin_access_key_id=keys["AccessKeyId"],
         admin_secret_access_key=keys["SecretAccessKey"],
@@ -141,6 +147,7 @@ async def s3(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
     async with session.create_client(
         "s3",
         endpoint_url=str(moto_server.url),
+        region_name=moto_server.region_name,
         aws_access_key_id=moto_server.admin_access_key_id,
         aws_secret_access_key=moto_server.admin_secret_access_key,
     ) as s3_client:
@@ -154,6 +161,7 @@ async def iam(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
     async with session.create_client(
         "iam",
         endpoint_url=str(moto_server.url),
+        region_name=moto_server.region_name,
         aws_access_key_id=moto_server.admin_access_key_id,
         aws_secret_access_key=moto_server.admin_secret_access_key,
     ) as iam_client:
@@ -167,6 +175,7 @@ async def sts(moto_server: MotoConfig) -> AsyncIterator[AioBaseClient]:
     async with session.create_client(
         "sts",
         endpoint_url=str(moto_server.url),
+        region_name=moto_server.region_name,
         aws_access_key_id=moto_server.admin_access_key_id,
         aws_secret_access_key=moto_server.admin_secret_access_key,
     ) as iam_client:

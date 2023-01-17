@@ -49,6 +49,7 @@ async def client() -> AsyncIterator[aiohttp.ClientSession]:
 @dataclass(frozen=True)
 class MotoConfig:
     url: URL
+    region_name: str
     admin_user_arn: str
     admin_access_key_id: str
     admin_secret_access_key: str
