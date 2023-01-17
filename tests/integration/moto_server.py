@@ -113,7 +113,9 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
         async with session.post(f"{_moto_server}/moto-api/reset-auth", data=b"4"):
             pass
     boto_session = aiobotocore.session.get_session()
-    async with boto_session.create_client("iam", endpoint_url=str(_moto_server)) as iam:
+    async with boto_session.create_client(
+        "iam", endpoint_url=str(_moto_server), region_name="us-east-1"
+    ) as iam:
         create_user_resp = await iam.create_user(UserName="admin")
         keys = (await iam.create_access_key(UserName="admin"))["AccessKey"]
         policy_document = {
