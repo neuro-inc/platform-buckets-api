@@ -31,7 +31,6 @@ platform:
 
 bucketNamespace: platform-jobs
 
-
 cors:
   origins:
   - '*'
