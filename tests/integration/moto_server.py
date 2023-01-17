@@ -114,7 +114,10 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
             pass
     boto_session = aiobotocore.session.get_session()
     async with boto_session.create_client(
-        "iam", endpoint_url=str(_moto_server), region_name="us-east-1"
+        "iam", endpoint_url=str(_moto_server),
+        region_name="us-east-1",
+        aws_access_key_id="access-key",
+        aws_secret_access_key="secret-key",
     ) as iam:
         create_user_resp = await iam.create_user(UserName="admin")
         keys = (await iam.create_access_key(UserName="admin"))["AccessKey"]
