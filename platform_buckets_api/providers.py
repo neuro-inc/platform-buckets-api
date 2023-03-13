@@ -601,7 +601,7 @@ class AzureUserBucketOperations(UserBucketOperations):
         )
         await container_client.set_container_access_policy(
             signed_identifiers=policies,
-            public_access=PublicAccess.Container,
+            public_access=PublicAccess.Container,  # type: ignore
         )
 
     async def sign_url_for_blob(
