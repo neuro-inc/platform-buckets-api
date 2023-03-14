@@ -59,6 +59,7 @@ class BaseBucket(abc.ABC):
     name: Optional[str]
     owner: str
     org_name: Optional[str]
+    project_name: str
     created_at: datetime
     provider_bucket: ProviderBucket
     public: bool
@@ -81,7 +82,9 @@ BucketType = Union[UserBucket, ImportedBucket]
 
 class BucketsStorage(abc.ABC):
     @abc.abstractmethod
-    def list_buckets(self) -> AbstractAsyncContextManager[AsyncIterator[BucketType]]:
+    def list_buckets(
+        self, org_name: Optional[str] = None, project_name: Optional[str] = None
+    ) -> AbstractAsyncContextManager[AsyncIterator[BucketType]]:
         pass
 
     @abc.abstractmethod
@@ -89,7 +92,13 @@ class BucketsStorage(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def get_bucket_by_name(self, name: str, owner: str) -> BucketType:
+    async def get_bucket_by_name(
+        self,
+        name: str,
+        org_name: Optional[str] = None,
+        project_name: Optional[str] = None,
+        owner: Optional[str] = None,
+    ) -> BucketType:
         pass
 
     @abc.abstractmethod
@@ -140,14 +149,25 @@ class InMemoryBucketsStorage(BucketsStorage):
         self._buckets: list[BucketType] = []
 
     @asyncgeneratorcontextmanager
-    async def list_buckets(self) -> AsyncIterator[BucketType]:
+    async def list_buckets(
+        self, org_name: Optional[str] = None, project_name: Optional[str] = None
+    ) -> AsyncIterator[BucketType]:
         for bucket in self._buckets:
+            if org_name and org_name != bucket.org_name:
+                continue
+            if project_name and project_name != bucket.project_name:
+                continue
             yield bucket
 
     async def create_bucket(self, bucket: BucketType) -> None:
         if bucket.name:
             try:
-                await self.get_bucket_by_name(owner=bucket.owner, name=bucket.name)
+                await self.get_bucket_by_name(
+                    name=bucket.name,
+                    org_name=bucket.org_name,
+                    project_name=bucket.project_name,
+                    owner=bucket.owner,
+                )
                 raise ExistsError(
                     f"UserBucket for {bucket.owner} with name "
                     f"{bucket.name} already exists"
@@ -163,17 +183,27 @@ class InMemoryBucketsStorage(BucketsStorage):
         for bucket in self._buckets:
             if bucket.id == id:
                 return bucket
-        raise NotExistsError(f"UserBucket with id {id} doesn't exists")
+        raise NotExistsError(f"UserBucket with id {id} doesn't exist")
 
     async def get_bucket_by_name(
         self,
         name: str,
-        owner: str,
+        org_name: Optional[str] = None,
+        project_name: Optional[str] = None,
+        owner: Optional[str] = None,
     ) -> BucketType:
         for bucket in self._buckets:
-            if bucket.owner == owner and bucket.name == name:
+            if (
+                bucket.name == name
+                and (not org_name or bucket.org_name == org_name)
+                and (not project_name or bucket.project_name == project_name)
+                and (not owner or bucket.owner == owner)
+            ):
                 return bucket
-        raise NotExistsError(f"UserBucket for {owner} with name {name} doesn't exists")
+        raise NotExistsError(
+            f"UserBucket with name {name}, org {org_name}, "
+            f"project {project_name}, owner {owner} doesn't exist"
+        )
 
     async def delete_bucket(self, id: str) -> None:
         self._buckets = [bucket for bucket in self._buckets if bucket.id != id]
@@ -183,7 +213,7 @@ class InMemoryBucketsStorage(BucketsStorage):
             if self._buckets[index].id == bucket.id:
                 self._buckets[index] = bucket
                 return
-        raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exists")
+        raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exist")
 
 
 class InMemoryCredentialsStorage(CredentialsStorage):
@@ -219,7 +249,7 @@ class InMemoryCredentialsStorage(CredentialsStorage):
         for credentials in self._credentials:
             if credentials.id == id:
                 return credentials
-        raise NotExistsError(f"PersistentCredentials with id {id} doesn't exists")
+        raise NotExistsError(f"PersistentCredentials with id {id} doesn't exist")
 
     async def get_credentials_by_name(
         self,
@@ -245,5 +275,5 @@ class InMemoryCredentialsStorage(CredentialsStorage):
                 self._credentials[index] = credentials
                 return
         raise NotExistsError(
-            f"PersistentCredentials with id {credentials.id} doesn't exists"
+            f"PersistentCredentials with id {credentials.id} doesn't exist"
         )

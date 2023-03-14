@@ -18,7 +18,6 @@ from neuro_auth_client.security import JWT_IDENTITY_CLAIM_OPTIONS
 from yarl import URL
 
 from platform_buckets_api.config import PlatformAuthConfig
-
 from tests.integration.conftest import random_name
 
 logger = logging.getLogger(__name__)
@@ -64,7 +63,6 @@ def _auth_server(
     auth_jwt_secret: str,
     _auth_url: URL,
 ) -> Iterator[URL]:
-
     if _auth_url:
         yield _auth_url
         return
@@ -173,6 +171,7 @@ class UserFactory(Protocol):
         name: Optional[str] = None,
         org_name: Optional[str] = None,
         org_level: bool = False,
+        project_name: str = "test-project",
     ) -> _User:
         ...
 
@@ -188,22 +187,30 @@ async def regular_user_factory(
         name: Optional[str] = None,
         org_name: Optional[str] = None,
         org_level: bool = False,
+        project_name: str = "test-project",
     ) -> _User:
         if not name:
             name = f"user-{random_name()}"
         user = User(name=name)
         await auth_client.add_user(user, token=admin_token)
-        if org_name is None:
-            permission = Permission(uri=f"blob://{cluster_name}/{name}", action="write")
-        elif org_level:
-            permission = Permission(
-                uri=f"blob://{cluster_name}/{org_name}", action="write"
+        org_path = f"/{org_name}" if org_name else ""
+        project_path = f"/{project_name}" if project_name else ""
+        name_path = "" if org_level else f"/{name}"
+        permissions = [Permission(uri=f"blob://{cluster_name}/{name}", action="write")]
+        if org_path:
+            permissions.append(
+                Permission(
+                    uri=f"blob://{cluster_name}{org_path}{name_path}", action="write"
+                )
             )
-        else:
-            permission = Permission(
-                uri=f"blob://{cluster_name}/{org_name}/{name}", action="write"
+        if project_path:
+            permissions.append(
+                Permission(
+                    uri=f"blob://{cluster_name}{org_path}{project_path}",
+                    action="write",
+                )
             )
-        await auth_client.grant_user_permissions(name, [permission], token=admin_token)
+        await auth_client.grant_user_permissions(name, permissions, token=admin_token)
 
         return _User(name=user.name, token=token_factory(user.name))
 
@@ -212,9 +219,9 @@ async def regular_user_factory(
 
 @pytest.fixture
 async def regular_user(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory()
+    return await regular_user_factory(project_name="test-project")
 
 
 @pytest.fixture
 async def regular_user2(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory()
+    return await regular_user_factory(project_name="test-project2")

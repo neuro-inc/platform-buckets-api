@@ -68,6 +68,7 @@ class TestPermissionsService:
             id="id",
             name="test-bucket",
             owner="test-user",
+            project_name="test-project",
             org_name=None,
             created_at=utc_now(),
             provider_bucket=None,  # type: ignore
@@ -83,25 +84,26 @@ class TestPermissionsService:
             name="test-bucket",
             owner="test-user",
             org_name="test-org",
+            project_name="test-project",
             created_at=utc_now(),
             provider_bucket=None,  # type: ignore
             public=False,
         )
 
     def test_create_permissions(
-        self, cluster_name: str, service: PermissionsService, fake_user: User
+        self, cluster_name: str, service: PermissionsService
     ) -> None:
-        perms = service.get_create_bucket_perms(fake_user, org_name=None)
+        perms = service.get_create_bucket_perms("test-project", org_name=None)
         assert len(perms) == 1
-        assert perms[0].uri == f"blob://{cluster_name}/{fake_user.name}"
+        assert perms[0].uri == f"blob://{cluster_name}/test-project"
         assert perms[0].action == "write"
 
     def test_create_permissions_with_org(
-        self, cluster_name: str, service: PermissionsService, fake_user: User
+        self, cluster_name: str, service: PermissionsService
     ) -> None:
-        perms = service.get_create_bucket_perms(fake_user, org_name="test-org")
+        perms = service.get_create_bucket_perms("test-project", org_name="test-org")
         assert len(perms) == 1
-        assert perms[0].uri == f"blob://{cluster_name}/test-org/{fake_user.name}"
+        assert perms[0].uri == f"blob://{cluster_name}/test-org/test-project"
         assert perms[0].action == "write"
 
     def test_read_permissions(
@@ -111,14 +113,16 @@ class TestPermissionsService:
         assert len(perms) == 2
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.owner}/{fake_bucket.id}",
+                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
+                f"{fake_bucket.id}",
                 action="read",
             )
             in perms
         )
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.owner}/{fake_bucket.name}",
+                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
+                f"{fake_bucket.name}",
                 action="read",
             )
             in perms
@@ -131,14 +135,16 @@ class TestPermissionsService:
         assert len(perms) == 2
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.owner}/{fake_bucket.id}",
+                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
+                f"{fake_bucket.id}",
                 action="write",
             )
             in perms
         )
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.owner}/{fake_bucket.name}",
+                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
+                f"{fake_bucket.name}",
                 action="write",
             )
             in perms
@@ -155,7 +161,7 @@ class TestPermissionsService:
         assert (
             Permission(
                 uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
-                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.id}",
+                f"{fake_bucket_with_org.project_name}/{fake_bucket_with_org.id}",
                 action="read",
             )
             in perms
@@ -163,7 +169,7 @@ class TestPermissionsService:
         assert (
             Permission(
                 uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
-                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.name}",
+                f"{fake_bucket_with_org.project_name}/{fake_bucket_with_org.name}",
                 action="read",
             )
             in perms
@@ -180,7 +186,7 @@ class TestPermissionsService:
         assert (
             Permission(
                 uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
-                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.id}",
+                f"{fake_bucket_with_org.project_name}/{fake_bucket_with_org.id}",
                 action="write",
             )
             in perms
@@ -188,7 +194,7 @@ class TestPermissionsService:
         assert (
             Permission(
                 uri=f"blob://{cluster_name}/{fake_bucket_with_org.org_name}/"
-                f"{fake_bucket_with_org.owner}/{fake_bucket_with_org.name}",
+                f"{fake_bucket_with_org.project_name}/{fake_bucket_with_org.name}",
                 action="write",
             )
             in perms
@@ -201,18 +207,18 @@ class TestPermissionsService:
         service: PermissionsService,
         fake_bucket: UserBucket,
     ) -> None:
-        username = fake_bucket.owner
+        project_name = fake_bucket.project_name
         mock_auth_client.perm_tree_to_return = ClientSubTreeViewRoot(
             scheme="blob",
             path=f"/{cluster_name}",
             sub_tree=ClientAccessSubTreeView(
                 action="list",
                 children={
-                    username: ClientAccessSubTreeView(
+                    project_name: ClientAccessSubTreeView(
                         action="write",
                         children={},
                     ),
-                    "another-user": ClientAccessSubTreeView(
+                    "another-project": ClientAccessSubTreeView(
                         action="list",
                         children={
                             "fully-shared": ClientAccessSubTreeView(
@@ -231,15 +237,23 @@ class TestPermissionsService:
         checker = await service.get_perms_checker(fake_bucket.owner)
         assert checker.can_read(fake_bucket)
         assert checker.can_write(fake_bucket)
-        fake_bucket = replace(fake_bucket, owner="another-user", name="not-listed")
+        fake_bucket = replace(
+            fake_bucket, project_name="another-project", name="not-listed"
+        )
         assert not checker.can_read(fake_bucket)
         assert not checker.can_write(fake_bucket)
-        fake_bucket = replace(fake_bucket, owner="another-user", name="read-shared")
+        fake_bucket = replace(
+            fake_bucket, project_name="another-project", name="read-shared"
+        )
         assert checker.can_read(fake_bucket)
         assert not checker.can_write(fake_bucket)
-        fake_bucket = replace(fake_bucket, owner="another-user", name="fully-shared")
+        fake_bucket = replace(
+            fake_bucket, project_name="another-project", name="fully-shared"
+        )
         assert checker.can_read(fake_bucket)
         assert checker.can_write(fake_bucket)
-        fake_bucket = replace(fake_bucket, owner="third-user", name="fully-shared")
+        fake_bucket = replace(
+            fake_bucket, project_name="third-project", name="fully-shared"
+        )
         assert not checker.can_read(fake_bucket)
         assert not checker.can_write(fake_bucket)

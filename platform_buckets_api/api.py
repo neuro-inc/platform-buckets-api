@@ -204,11 +204,18 @@ class BucketsApiHandler:
         try:
             bucket = await self.service.get_bucket(id_or_name)
         except NotExistsError:
+            org_name_qv = request.query.get("org_name")
+            project_name_qv = request.query.get("project_name")
             owner_qv = request.query.get("owner")
             user = await _get_untrusted_user(request)
+            if org_name_qv is None and project_name_qv is None:
+                owner_qv = owner_qv or user.name
             try:
                 bucket = await self.service.get_bucket_by_name(
-                    id_or_name, owner_qv or user.name
+                    name=id_or_name,
+                    owner=owner_qv,
+                    org_name=org_name_qv,
+                    project_name=project_name_qv,
                 )
             except NotExistsError:
                 raise HTTPNotFound(text=f"Bucket {id_or_name} not found")
@@ -253,17 +260,22 @@ class BucketsApiHandler:
         schema = Bucket(
             partial=["provider", "owner", "created_at", "imported", "public"]
         )
-        data = schema.load(await request.json())
+        data = await request.json()
+        data["project_name"] = data.get("project_name", user.name)
+        data = schema.load(data)
         org_name = data.get("org_name")
+        project_name = data["project_name"]
 
         await check_any_permissions(
-            request, self.permissions_service.get_create_bucket_perms(user, org_name)
+            request,
+            self.permissions_service.get_create_bucket_perms(project_name, org_name),
         )
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name,
                 name=data.get("name"),
                 org_name=org_name,
+                project_name=project_name,
             )
         except ExistsError:
             return json_response(
@@ -300,10 +312,14 @@ class BucketsApiHandler:
         user = await _get_untrusted_user(request)
 
         schema = ImportBucketRequest()
-        data = schema.load(await request.json())
+        data = await request.json()
+        data["project_name"] = data.get("project_name", user.name)
+        data = schema.load(data)
         org_name = data.get("org_name")
+        project_name = data["project_name"]
         await check_any_permissions(
-            request, self.permissions_service.get_create_bucket_perms(user, org_name)
+            request,
+            self.permissions_service.get_create_bucket_perms(project_name, org_name),
         )
         try:
             bucket = await self.service.import_bucket(
@@ -313,6 +329,7 @@ class BucketsApiHandler:
                 credentials=data["credentials"],
                 name=data.get("name"),
                 org_name=org_name,
+                project_name=project_name,
             )
         except ExistsError:
             return json_response(
@@ -398,7 +415,11 @@ class BucketsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.StreamResponse:
         username = await check_authorized(request)
-        async with self.service.get_user_buckets(owner=username) as buckets_it:
+        org_name = request.query.get("org_name")
+        project_name = request.query.get("project_name")
+        async with self.service.get_user_buckets(
+            owner=username, org_name=org_name, project_name=project_name
+        ) as buckets_it:
             if accepts_ndjson(request):
                 response = aiohttp.web.StreamResponse()
                 response.headers["Content-Type"] = "application/x-ndjson"

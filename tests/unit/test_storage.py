@@ -135,10 +135,11 @@ class TestBucketsStorage:
             owner=username,
             name=name,
             org_name=None,
+            project_name="project",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
-                name=f"{name}--{username}",
+                name=f"{name}--project",
                 metadata={"key": "value"} if with_meta else None,
             ),
             public=public,
@@ -156,10 +157,11 @@ class TestBucketsStorage:
             owner=username,
             name=name,
             org_name="test-org",
+            project_name="project",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
-                name=f"{name}--{username}",
+                name=f"{name}--project",
                 metadata={"key": "value"} if with_meta else None,
             ),
             public=public,
@@ -176,10 +178,11 @@ class TestBucketsStorage:
             owner=username,
             name=name,
             org_name=None,
+            project_name="project",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
-                name=f"{name}--{username}",
+                name=f"{name}--project",
             ),
             credentials={"key": "value"},
             public=public,
@@ -228,16 +231,20 @@ class TestBucketsStorage:
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         assert bucket1.name
-        bucket_get = await storage.get_bucket_by_name(bucket1.name, bucket1.owner)
+        bucket_get = await storage.get_bucket_by_name(
+            bucket1.name, project_name=bucket1.project_name
+        )
         assert bucket1 == bucket_get
 
         assert bucket2.name
-        bucket_get = await storage.get_bucket_by_name(bucket2.name, bucket1.owner)
+        bucket_get = await storage.get_bucket_by_name(
+            bucket2.name, project_name=bucket2.project_name
+        )
         assert bucket2 == bucket_get
 
     async def test_buckets_get_by_name_not_found(self, storage: BucketsStorage) -> None:
         with pytest.raises(NotExistsError):
-            await storage.get_bucket_by_name("any", "thing")
+            await storage.get_bucket_by_name("any")
 
     async def test_bucket_delete(self, storage: BucketsStorage) -> None:
         bucket = self._make_bucket("user1", "test")

@@ -27,15 +27,6 @@ from platform_buckets_api.config import (
 logger = logging.getLogger(__name__)
 
 
-pytest_plugins = [
-    "tests.integration.docker",
-    "tests.integration.auth",
-    "tests.integration.moto_server",
-    "tests.integration.minio",
-    "tests.integration.kube",
-]
-
-
 def random_name(length: int = 6) -> str:
     return secrets.token_hex(length // 2 + length % 2)[:length]
 
