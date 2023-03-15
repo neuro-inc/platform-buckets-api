@@ -3,7 +3,7 @@ import sys
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar, cast
 
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -26,7 +26,7 @@ else:
             exc: Optional[BaseException],
             tb: Optional[TracebackType],
         ) -> None:
-            await self.thing.aclose()
+            await self.thing.aclose()  # type: ignore
 
 
 def asyncgeneratorcontextmanager(
@@ -34,6 +34,6 @@ def asyncgeneratorcontextmanager(
 ) -> Callable[..., AbstractAsyncContextManager[T_co]]:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> AbstractAsyncContextManager[T_co]:
-        return aclosing(func(*args, **kwargs))  # type: ignore
+        return cast(AbstractAsyncContextManager[T_co], aclosing(func(*args, **kwargs)))
 
     return wrapper
