@@ -26,7 +26,7 @@ else:
             exc: Optional[BaseException],
             tb: Optional[TracebackType],
         ) -> None:
-            await self.thing.aclose()
+            await self.thing.aclose()  # type: ignore
 
 
 def asyncgeneratorcontextmanager(
@@ -34,6 +34,6 @@ def asyncgeneratorcontextmanager(
 ) -> Callable[..., AbstractAsyncContextManager[T_co]]:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> AbstractAsyncContextManager[T_co]:
-        return aclosing(func(*args, **kwargs))  # type: ignore
+        return aclosing(func(*args, **kwargs))
 
     return wrapper
