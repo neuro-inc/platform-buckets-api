@@ -51,6 +51,7 @@ OWNER_LABEL = "platform.neuromation.io/owner"
 CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
 BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 ORG_NAME_LABEL = "platform.neuromation.io/org_name"
+PROJECT_LABEL = "platform.neuromation.io/project"
 
 
 def _k8s_name_safe(**kwargs: str) -> str:
@@ -111,11 +112,13 @@ class PersistentCredentialsCRDMapper:
 class BucketCRDMapper:
     @staticmethod
     def from_primitive(payload: dict[str, Any]) -> BucketType:
+        owner = payload["metadata"]["labels"][OWNER_LABEL]
         common_kwargs = dict(
             id=payload["metadata"]["labels"][ID_LABEL],
             name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
-            owner=payload["metadata"]["labels"][OWNER_LABEL],
+            owner=owner,
             org_name=payload["metadata"]["labels"].get(ORG_NAME_LABEL),
+            project_name=payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
             created_at=datetime_load(payload["spec"]["created_at"]),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
@@ -149,6 +152,8 @@ class BucketCRDMapper:
             labels[BUCKET_NAME_LABEL] = entry.name
         if entry.org_name:
             labels[ORG_NAME_LABEL] = entry.org_name
+        if entry.project_name != entry.owner:
+            labels[PROJECT_LABEL] = entry.project_name
         res: dict[str, Any] = {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
@@ -392,6 +397,8 @@ class KubeClient:
         id: Optional[str] = None,
         owner: Optional[str] = None,
         name: Optional[str] = None,
+        org_name: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> list[BucketType]:
         url = self._user_buckets_url
         label_selectors = []
@@ -402,6 +409,10 @@ class KubeClient:
             label_selectors.append(f"{OWNER_LABEL}={owner}")
         if name:
             label_selectors.append(f"{BUCKET_NAME_LABEL}={name}")
+        if org_name:
+            label_selectors.append(f"{ORG_NAME_LABEL}={org_name}")
+        if project_name:
+            label_selectors.append(f"{PROJECT_LABEL}={project_name}")
         if label_selectors:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)

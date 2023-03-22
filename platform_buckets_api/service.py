@@ -37,14 +37,21 @@ logger = logging.getLogger()
 NEURO_BUCKET_PREFIX = "neuro-pl"
 
 
-def make_owner_prefix(owner: str) -> str:
+def make_bucket_prefix(org_name: Optional[str], project_name: str) -> str:
     hasher = hashlib.new("sha256")
-    hasher.update(owner.encode("utf-8"))
+    if org_name:
+        hasher.update(org_name.encode("utf-8"))
+    hasher.update(project_name.encode("utf-8"))
     return f"{NEURO_BUCKET_PREFIX}-{hasher.hexdigest()[:10]}"
 
 
-def make_bucket_name(name: Optional[str], owner: str) -> str:
-    res = make_owner_prefix(owner) + f"-{owner}"
+def make_bucket_name(
+    org_name: Optional[str], project_name: str, name: Optional[str]
+) -> str:
+    res = make_bucket_prefix(org_name, project_name)
+    if org_name:
+        res += f"-{org_name}"
+    res += f"-{project_name}"
     if name is not None:
         allowed_chars = string.ascii_lowercase + string.digits + "-"
         name = "".join(char for char in name if char in allowed_chars)
@@ -72,15 +79,20 @@ class BucketsService:
         self._provider = bucket_provider
 
     async def create_bucket(
-        self, owner: str, org_name: Optional[str], name: Optional[str] = None
+        self,
+        owner: str,
+        project_name: str,
+        org_name: Optional[str],
+        name: Optional[str] = None,
     ) -> UserBucket:
-        real_name = make_bucket_name(name, owner)
+        real_name = make_bucket_name(org_name, project_name, name)
         provider_bucket = await self._provider.create_bucket(real_name)
         bucket = UserBucket(
             id=f"bucket-{uuid4()}",
             name=name,
             owner=owner,
             org_name=org_name,
+            project_name=project_name,
             provider_bucket=provider_bucket,
             created_at=utc_now(),
             public=False,
@@ -95,6 +107,7 @@ class BucketsService:
     async def import_bucket(
         self,
         owner: str,
+        project_name: str,
         provider_bucket_name: str,
         provider_type: BucketsProviderType,
         credentials: Mapping[str, str],
@@ -106,6 +119,7 @@ class BucketsService:
             name=name,
             owner=owner,
             org_name=org_name,
+            project_name=project_name,
             provider_bucket=ProviderBucket(
                 name=provider_bucket_name,
                 provider_type=provider_type,
@@ -120,15 +134,23 @@ class BucketsService:
     async def get_bucket(self, id: str) -> BaseBucket:
         return await self._storage.get_bucket(id)
 
-    async def get_bucket_by_name(self, name: str, owner: str) -> BaseBucket:
-        return await self._storage.get_bucket_by_name(name, owner)
+    async def get_bucket_by_name(
+        self,
+        name: str,
+        org_name: Optional[str] = None,
+        project_name: Optional[str] = None,
+        owner: Optional[str] = None,
+    ) -> BaseBucket:
+        return await self._storage.get_bucket_by_name(
+            name=name, org_name=org_name, project_name=project_name, owner=owner
+        )
 
     async def get_bucket_by_path(self, path: str) -> BaseBucket:
         async with self._storage.list_buckets() as it:
             async for bucket in it:
-                bucket_paths = [f"{bucket.owner}/{bucket.id}"]
+                bucket_paths = [f"{bucket.project_name}/{bucket.id}"]
                 if bucket.name:
-                    bucket_paths.append(f"{bucket.owner}/{bucket.name}")
+                    bucket_paths.append(f"{bucket.project_name}/{bucket.name}")
                 if bucket.org_name:
                     bucket_paths = [
                         f"{bucket.org_name}/{bucket_path}"
@@ -182,9 +204,16 @@ class BucketsService:
         return bucket
 
     @asyncgeneratorcontextmanager
-    async def get_user_buckets(self, owner: str) -> AsyncIterator[BaseBucket]:
+    async def get_user_buckets(
+        self,
+        owner: str,
+        org_name: Optional[str] = None,
+        project_name: Optional[str] = None,
+    ) -> AsyncIterator[BaseBucket]:
         checker = await self._permissions_service.get_perms_checker(owner)
-        async with self._storage.list_buckets() as it:
+        async with self._storage.list_buckets(
+            org_name=org_name, project_name=project_name
+        ) as it:
             async for bucket in it:
                 if checker.can_read(bucket):
                     yield bucket
@@ -244,7 +273,6 @@ class PersistentCredentialsService:
         bucket_ids: list[str],
         read_only: bool,
     ) -> PersistentCredentials:
-
         credentials = await self._storage.get_credentials(credentials_id)
         old_permissions = await self._make_permissions_list(
             credentials.bucket_ids, credentials.read_only

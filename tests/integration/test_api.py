@@ -90,15 +90,15 @@ async def buckets_api_creation_disabled(
 
 
 @pytest.fixture
-async def grant_bucket_permission(
+async def grant_project_permission(
     auth_client: AuthClient,
     token_factory: Callable[[str], str],
     admin_token: str,
     cluster_name: str,
 ) -> AsyncIterator[Callable[[_User, str, str], Awaitable[None]]]:
-    async def _grant(user: _User, owner: str, id: str, action: str = "read") -> None:
+    async def _grant(user: _User, project_name: str, action: str = "read") -> None:
         permission = Permission(
-            uri=f"blob://{cluster_name}/{owner}/{id}", action=action
+            uri=f"blob://{cluster_name}/{project_name}", action=action
         )
         await auth_client.grant_user_permissions(user.name, [permission], admin_token)
 
@@ -207,7 +207,11 @@ class TestApi:
 
     class BucketFactory(Protocol):
         async def __call__(
-            self, name: Optional[str], user: _User, org_name: Optional[str] = None
+            self,
+            name: Optional[str],
+            user: _User,
+            project_name: str = "test-project",
+            org_name: Optional[str] = None,
         ) -> dict[str, Any]:
             pass
 
@@ -216,10 +220,14 @@ class TestApi:
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
         async def _factory(
-            name: Optional[str], user: _User, org_name: Optional[str] = None
+            name: Optional[str],
+            user: _User,
+            project_name: str = "test-project",
+            org_name: Optional[str] = None,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
+                "project_name": project_name,
             }
             if org_name:
                 payload["org_name"] = org_name
@@ -238,10 +246,14 @@ class TestApi:
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
         async def _factory(
-            name: Optional[str], user: _User, org_name: Optional[str] = None
+            name: Optional[str],
+            user: _User,
+            project_name: str = "test-project",
+            org_name: Optional[str] = None,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
+                "project_name": project_name,
                 "provider_bucket_name": f"in-provider-{name}",
                 "provider": "aws",
                 "credentials": {"key": f"key-for-{name}"},
@@ -403,13 +415,13 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        grant_project_permission: Callable[[_User, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test-bucket", regular_user)
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp["id"]
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, project_name=regular_user.name
         )
+        await grant_project_permission(regular_user2, create_resp["project_name"])
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user2.headers,
@@ -447,13 +459,11 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        grant_project_permission: Callable[[_User, str], Awaitable[None]],
         import_bucket: BucketFactory,
     ) -> None:
         create_resp = await import_bucket("test-bucket", regular_user)
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp["id"]
-        )
+        await grant_project_permission(regular_user2, create_resp["project_name"])
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user2.headers,
@@ -589,9 +599,10 @@ class TestApi:
         create_resp = await make_bucket(
             "test-bucket", regular_user, org_name="test-org"
         )
+        project_name = create_resp["project_name"]
         async with client.get(
             buckets_api.bucket_by_path,
-            params={"path": f"test-org/{regular_user.name}/test-bucket"},
+            params={"path": f"test-org/{project_name}/test-bucket"},
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -665,7 +676,6 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-
         headers = {"Accept": "application/x-ndjson"}
         async with client.get(
             buckets_api.buckets_url,
@@ -789,7 +799,6 @@ class TestApi:
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
-        make_bucket: BucketFactory,
     ) -> None:
         async with client.delete(
             buckets_api.bucket_url("test-bucket"),
@@ -797,7 +806,7 @@ class TestApi:
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
 
-    async def test_cant_get_another_user_bucket(
+    async def test_cannot_get_another_user_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
@@ -805,14 +814,16 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test-bucket", regular_user)
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, project_name=regular_user.name
+        )
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPForbidden.status_code, await resp.text()
 
-    async def test_cant_list_another_user_bucket(
+    async def test_cannot_list_another_user_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
@@ -820,7 +831,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test-bucket", regular_user)
+        await make_bucket("test-bucket", regular_user, project_name=regular_user.name)
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user2.headers,
@@ -828,7 +839,7 @@ class TestApi:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert await resp.json() == []
 
-    async def test_cant_delete_another_user_bucket(
+    async def test_cannot_delete_another_user_bucket(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
@@ -836,7 +847,9 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp = await make_bucket("test-bucket", regular_user)
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, project_name=regular_user.name
+        )
         async with client.delete(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
@@ -849,25 +862,13 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        grant_project_permission: Callable[[_User, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
-        create_resp1 = await make_bucket("test-bucket1", regular_user)
-        create_resp2 = await make_bucket("test-bucket2", regular_user)
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp1["id"]
-        )
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp2["name"]
-        )
+        create_resp = await make_bucket("test-bucket1", regular_user)
+        await grant_project_permission(regular_user2, create_resp["project_name"])
         async with client.get(
-            buckets_api.bucket_url(create_resp1["id"]),
-            headers=regular_user2.headers,
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-
-        async with client.get(
-            buckets_api.bucket_url(create_resp2["id"]),
+            buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -877,7 +878,7 @@ class TestApi:
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
-            assert len(await resp.json()) == 2
+            assert len(await resp.json()) == 1
 
     async def test_can_get_shared_bucket_by_name(
         self,
@@ -885,15 +886,13 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_bucket_permission: Callable[[_User, str, str], Awaitable[None]],
+        grant_project_permission: Callable[[_User, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
         create_resp1 = await make_bucket("test-bucket1", regular_user)
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp1["id"]
-        )
+        await grant_project_permission(regular_user2, create_resp1["project_name"])
         async with client.get(
-            buckets_api.bucket_url(create_resp1["id"]),
+            buckets_api.bucket_url(create_resp1["name"]),
             params={"owner": regular_user.name},
             headers=regular_user2.headers,
         ) as resp:
@@ -905,22 +904,22 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_bucket_permission: Callable[[_User, str, str, str], Awaitable[None]],
+        grant_project_permission: Callable[[_User, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
         create_resp1 = await make_bucket("test-bucket1", regular_user)
         create_resp2 = await make_bucket("test-bucket2", regular_user)
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp1["id"], "read"
-        )
-        await grant_bucket_permission(
-            regular_user2, regular_user.name, create_resp2["id"], "write"
+        await grant_project_permission(
+            regular_user2, create_resp2["project_name"], "read"
         )
         async with client.delete(
             buckets_api.bucket_url(create_resp1["id"]),
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPForbidden.status_code, await resp.text()
+        await grant_project_permission(
+            regular_user2, create_resp2["project_name"], "write"
+        )
         async with client.delete(
             buckets_api.bucket_url(create_resp2["id"]),
             headers=regular_user2.headers,
@@ -1218,7 +1217,7 @@ class TestApi:
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
 
-    async def test_cant_get_another_user_credentials(
+    async def test_cannot_get_another_user_credentials(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
@@ -1238,7 +1237,7 @@ class TestApi:
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
 
-    async def test_cant_list_another_user_credentials(
+    async def test_cannot_list_another_user_credentials(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
@@ -1259,7 +1258,7 @@ class TestApi:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert await resp.json() == []
 
-    async def test_cant_delete_another_user_credentials(
+    async def test_cannot_delete_another_user_credentials(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,

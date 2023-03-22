@@ -1,6 +1,6 @@
 from typing import Optional
 
-from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission, User
+from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission
 
 from platform_buckets_api.storage import BaseBucket
 
@@ -11,23 +11,23 @@ class PermissionsService:
         self._bucket_cluster_uri = f"blob://{cluster_name}"
 
     def get_create_bucket_perms(
-        self, user: User, org_name: Optional[str]
+        self, project_name: str, org_name: Optional[str]
     ) -> list[Permission]:
         if org_name:
             return [
                 Permission(
-                    f"{self._bucket_cluster_uri}/{org_name}/{user.name}", "write"
+                    f"{self._bucket_cluster_uri}/{org_name}/{project_name}", "write"
                 )
             ]
-        return [Permission(f"{self._bucket_cluster_uri}/{user.name}", "write")]
+        return [Permission(f"{self._bucket_cluster_uri}/{project_name}", "write")]
 
     def _get_bucket_uris(self, bucket: BaseBucket) -> list[str]:
         base = self._bucket_cluster_uri
         if bucket.org_name:
             base = f"{base}/{bucket.org_name}"
         return [
-            f"{base}/{bucket.owner}/{bucket.name}",
-            f"{base}/{bucket.owner}/{bucket.id}",
+            f"{base}/{bucket.project_name}/{bucket.name}",
+            f"{base}/{bucket.project_name}/{bucket.id}",
         ]
 
     def get_bucket_read_perms(self, bucket: BaseBucket) -> list[Permission]:
@@ -37,7 +37,6 @@ class PermissionsService:
         return [Permission(uri, "write") for uri in self._get_bucket_uris(bucket)]
 
     class Checker:
-
         SCHEME = "blob:/"
 
         def __init__(self, service: "PermissionsService", tree: ClientSubTreeViewRoot):

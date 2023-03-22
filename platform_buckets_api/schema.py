@@ -57,6 +57,7 @@ class ImportBucketRequest(Schema):
         ],
     )
     org_name = fields.String(required=False, allow_none=True)
+    project_name = fields.String(required=False, allow_none=False)
     provider = ProviderTypeField(
         required=True,
         validate=validate.OneOf(choices=list(BucketsProviderType)),
@@ -77,6 +78,7 @@ class Bucket(Schema):
     )
     owner = fields.String(required=True)
     org_name = fields.String(required=False, allow_none=True)
+    project_name = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,
         attribute="provider_bucket.provider_type",

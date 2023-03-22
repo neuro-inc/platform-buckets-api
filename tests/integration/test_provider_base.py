@@ -246,6 +246,7 @@ class TestProviderBase:
                 owner="user",
                 name="not-important",
                 org_name=None,
+                project_name="not-important",
                 public=False,
                 provider_bucket=bucket,
                 credentials=provider_option.credentials_for_imported,
