@@ -10,7 +10,7 @@ RUN ls /tmp/dist
 RUN pip install --user --find-links /tmp/dist platform-buckets-api
 
 RUN apt-get -q update && apt-get -q install -y wget
-RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc
+RUN wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
 RUN chmod +x mc
 
 FROM python:3.9.9-slim-bullseye as service
