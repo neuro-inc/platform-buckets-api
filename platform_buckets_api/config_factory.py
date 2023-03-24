@@ -184,6 +184,7 @@ class EnvironConfigFactory:
                 "NP_BUCKETS_API_K8S_AUTH_CERT_KEY_PATH"
             ),
             token=token,
+            token_path=token_path,
             namespace=self._environ.get("NP_BUCKETS_API_K8S_NS", KubeConfig.namespace),
             client_conn_timeout_s=int(
                 self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT")

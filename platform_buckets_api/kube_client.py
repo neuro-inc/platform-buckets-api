@@ -46,6 +46,10 @@ class ResourceGone(KubeClientException):
     pass
 
 
+class KubeClientUnauthorized(Exception):
+    pass
+
+
 ID_LABEL = "platform.neuromation.io/id"
 OWNER_LABEL = "platform.neuromation.io/owner"
 CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
@@ -256,6 +260,11 @@ class KubeClient:
             trace_configs=self._trace_configs,
         )
 
+    async def _reload_http_client(self) -> None:
+        await self.close()
+        self._token = None
+        await self.init()
+
     @property
     def namespace(self) -> str:
         return self._namespace
@@ -306,10 +315,20 @@ class KubeClient:
 
     async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         assert self._client, "client is not initialized"
+        doing_retry = kwargs.pop("doing_retry", False)
+
         async with self._client.request(*args, **kwargs) as response:
-            # TODO (A Danshyn 05/21/18): check status code etc
             payload = await response.json()
+        try:
+            self._raise_for_status(payload)
             return payload
+        except KubeClientUnauthorized:
+            if doing_retry:
+                raise
+            # K8s SA's token might be stale, need to refresh it and retry
+            await self._reload_http_client()
+            kwargs["doing_retry"] = True
+            return await self._request(*args, **kwargs)
 
     def _raise_for_status(self, payload: dict[str, Any]) -> None:
         kind = payload["kind"]
@@ -319,6 +338,8 @@ class KubeClient:
             code = payload.get("code")
             if code == 400:
                 raise ResourceBadRequest(payload)
+            if code == 401:
+                raise KubeClientUnauthorized(payload)
             if code == 404:
                 raise ResourceNotFound(payload)
             if code == 409:
@@ -333,12 +354,11 @@ class KubeClient:
         self, user_credentials: PersistentCredentials
     ) -> None:
         url = self._persistent_bucket_credentials_url
-        payload = await self._request(
+        await self._request(
             method="POST",
             url=url,
             json=PersistentCredentialsCRDMapper.to_primitive(user_credentials),
         )
-        self._raise_for_status(payload)
 
     async def list_persistent_credentials(
         self,
@@ -370,8 +390,7 @@ class KubeClient:
             "metadata"
         ]["name"]
         url = self._generate_persistent_bucket_credential_url(name)
-        payload = await self._request(method="DELETE", url=url)
-        self._raise_for_status(payload)
+        await self._request(method="DELETE", url=url)
 
     async def update_persistent_credentials(
         self, user_credentials: PersistentCredentials
@@ -380,17 +399,14 @@ class KubeClient:
         name = data["metadata"]["name"]
         url = self._generate_persistent_bucket_credential_url(name)
         payload = await self._request(method="GET", url=url)
-        self._raise_for_status(payload)
         data["metadata"]["resourceVersion"] = payload["metadata"]["resourceVersion"]
         payload = await self._request(method="PUT", url=url, json=data)
-        self._raise_for_status(payload)
 
     async def create_user_bucket(self, user_bucket: BucketType) -> None:
         url = self._user_buckets_url
-        payload = await self._request(
+        await self._request(
             method="POST", url=url, json=BucketCRDMapper.to_primitive(user_bucket)
         )
-        self._raise_for_status(payload)
 
     async def list_user_buckets(
         self,
@@ -423,21 +439,17 @@ class KubeClient:
     async def get_user_bucket(self, name: str) -> BucketType:
         url = self._generate_user_bucket_url(name)
         payload = await self._request(method="GET", url=url)
-        self._raise_for_status(payload)
         return BucketCRDMapper.from_primitive(payload)
 
     async def remove_user_bucket(self, bucket: BucketType) -> None:
         name = BucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
         url = self._generate_user_bucket_url(name)
-        payload = await self._request(method="DELETE", url=url)
-        self._raise_for_status(payload)
+        await self._request(method="DELETE", url=url)
 
     async def update_user_bucket(self, bucket: BucketType) -> None:
         data = BucketCRDMapper.to_primitive(bucket)
         name = data["metadata"]["name"]
         url = self._generate_user_bucket_url(name)
         payload = await self._request(method="GET", url=url)
-        self._raise_for_status(payload)
         data["metadata"]["resourceVersion"] = payload["metadata"]["resourceVersion"]
-        payload = await self._request(method="PUT", url=url, json=data)
-        self._raise_for_status(payload)
+        await self._request(method="PUT", url=url, json=data)
