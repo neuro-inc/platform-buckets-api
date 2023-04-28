@@ -183,7 +183,7 @@ spec:
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
       volumes:
-      - name: kube-api-data
+      - name: kube-api-token
         projected:
           sources:
           - serviceAccountToken:
