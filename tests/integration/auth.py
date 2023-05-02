@@ -185,7 +185,6 @@ async def regular_user_factory(
 ) -> AsyncIterator[UserFactory]:
     async def _factory(
         name: Optional[str] = None,
-        cluster_level: bool = False,
         org_name: Optional[str] = None,
         org_level: bool = False,
         project_name: str = "test-project",
@@ -198,8 +197,6 @@ async def regular_user_factory(
         project_path = f"/{project_name}" if project_name else ""
         name_path = "" if org_level else f"/{name}"
         permissions = [Permission(uri=f"blob://{cluster_name}/{name}", action="write")]
-        if cluster_level:
-            permissions.append(Permission(uri=f"blob://{cluster_name}", action="write"))
         if org_path:
             permissions.append(
                 Permission(
