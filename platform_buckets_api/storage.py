@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar, Optional, Union
 
-from platform_buckets_api.config import BucketsProviderType
-from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
+from .config import BucketsProviderType
+from .utils.asyncio import asyncgeneratorcontextmanager
 
 
 class StorageError(Exception):
@@ -93,11 +93,7 @@ class BucketsStorage(abc.ABC):
 
     @abc.abstractmethod
     async def get_bucket_by_name(
-        self,
-        name: str,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        owner: Optional[str] = None,
+        self, name: str, org_name: Optional[str], project_name: str
     ) -> BucketType:
         pass
 
@@ -163,10 +159,7 @@ class InMemoryBucketsStorage(BucketsStorage):
         if bucket.name:
             try:
                 await self.get_bucket_by_name(
-                    name=bucket.name,
-                    org_name=bucket.org_name,
-                    project_name=bucket.project_name,
-                    owner=bucket.owner,
+                    bucket.name, bucket.org_name, bucket.project_name
                 )
                 raise ExistsError(
                     f"UserBucket for {bucket.owner} with name "
@@ -186,23 +179,18 @@ class InMemoryBucketsStorage(BucketsStorage):
         raise NotExistsError(f"UserBucket with id {id} doesn't exist")
 
     async def get_bucket_by_name(
-        self,
-        name: str,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        owner: Optional[str] = None,
+        self, name: str, org_name: Optional[str], project_name: str
     ) -> BucketType:
         for bucket in self._buckets:
             if (
                 bucket.name == name
                 and (not org_name or bucket.org_name == org_name)
                 and (not project_name or bucket.project_name == project_name)
-                and (not owner or bucket.owner == owner)
             ):
                 return bucket
         raise NotExistsError(
             f"UserBucket with name {name}, org {org_name}, "
-            f"project {project_name}, owner {owner} doesn't exist"
+            f"project {project_name} doesn't exist"
         )
 
     async def delete_bucket(self, id: str) -> None:

@@ -135,15 +135,20 @@ class BucketsService:
         return await self._storage.get_bucket(id)
 
     async def get_bucket_by_name(
-        self,
-        name: str,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        owner: Optional[str] = None,
+        self, name: str, org_name: Optional[str], project_name: str
     ) -> BaseBucket:
-        return await self._storage.get_bucket_by_name(
-            name=name, org_name=org_name, project_name=project_name, owner=owner
-        )
+        try:
+            return await self._storage.get_bucket_by_name(name, org_name, project_name)
+        except NotExistsError:
+            # project_name could be a username if user is searching for
+            # legacy bucket which does't have project. We need to search
+            # for user bucket also. It is important to check that it is a legacy bucket
+            # before returning it since legacy buckets and project buckets
+            # without org have the same name format.
+            bucket = await self._storage.get_bucket_by_name(name, None, project_name)
+            if bucket.owner != bucket.project_name:
+                raise
+            return bucket
 
     async def get_bucket_by_path(self, path: str) -> BaseBucket:
         async with self._storage.list_buckets() as it:

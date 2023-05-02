@@ -232,19 +232,19 @@ class TestBucketsStorage:
         await storage.create_bucket(bucket2)
         assert bucket1.name
         bucket_get = await storage.get_bucket_by_name(
-            bucket1.name, project_name=bucket1.project_name
+            bucket1.name, None, bucket1.project_name
         )
         assert bucket1 == bucket_get
 
         assert bucket2.name
         bucket_get = await storage.get_bucket_by_name(
-            bucket2.name, project_name=bucket2.project_name
+            bucket2.name, None, bucket2.project_name
         )
         assert bucket2 == bucket_get
 
     async def test_buckets_get_by_name_not_found(self, storage: BucketsStorage) -> None:
         with pytest.raises(NotExistsError):
-            await storage.get_bucket_by_name("any")
+            await storage.get_bucket_by_name("any", None, "any")
 
     async def test_bucket_delete(self, storage: BucketsStorage) -> None:
         bucket = self._make_bucket("user1", "test")

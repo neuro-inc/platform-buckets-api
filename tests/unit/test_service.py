@@ -175,7 +175,9 @@ class TestBucketsService:
             name="test-bucket",
             org_name=None,
         )
-        bucket_get = await service.get_bucket_by_name("test-bucket")
+        bucket_get = await service.get_bucket_by_name(
+            "test-bucket", None, "test-project"
+        )
         assert bucket == bucket_get
 
     async def test_get_bucket_by_path(

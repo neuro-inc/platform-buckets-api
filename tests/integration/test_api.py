@@ -583,10 +583,53 @@ class TestApi:
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
+            params={"project_name": "test-project"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
             assert payload == create_resp
+
+    async def test_get_bucket_by_name__for_legacy_bucket(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+        make_bucket: BucketFactory,
+    ) -> None:
+        create_resp = await make_bucket(
+            "test-bucket", regular_user, project_name=regular_user.name
+        )
+        async with client.get(
+            buckets_api.bucket_url("test-bucket"), headers=regular_user.headers
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == create_resp
+
+    async def test_get_bucket_by_name__bad_request(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user: _User,
+    ) -> None:
+        async with client.get(
+            buckets_api.bucket_url("test-bucket"),
+            headers=regular_user.headers,
+            params={"owner": regular_user.name, "project_name": "test-project"},
+        ) as resp:
+            assert resp.status == HTTPBadRequest.status_code, await resp.text()
+        async with client.get(
+            buckets_api.bucket_url("test-bucket"),
+            headers=regular_user.headers,
+            params={"owner": regular_user.name, "org_name": "test-org"},
+        ) as resp:
+            assert resp.status == HTTPBadRequest.status_code, await resp.text()
+        async with client.get(
+            buckets_api.bucket_url("test-bucket"),
+            headers=regular_user.headers,
+            params={"org_name": "test-org"},
+        ) as resp:
+            assert resp.status == HTTPBadRequest.status_code, await resp.text()
 
     async def test_get_bucket_by_path(
         self,
@@ -668,6 +711,126 @@ class TestApi:
             assert len(payload) == len(buckets_data)
             for bucket_data in buckets_data:
                 assert bucket_data in payload
+
+    async def test_list_buckets_no_org(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        bucket = await make_bucket("bucket-1", user)
+        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"org_name": "NO_ORG"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"org_name": "test-org"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_list_buckets_in_org(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        user = await regular_user_factory(org_name="test-org")
+        bucket = await make_bucket("bucket-1", user, org_name="test-org")
+        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"org_name": "test-org"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"org_name": "other-test-org"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_list_buckets_in_project(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        bucket = await make_bucket("bucket-1", user)
+        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"project_name": "test-project"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"project_name": "other-test-project"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
+
+    async def test_list_buckets_in_legacy_project(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        make_bucket: BucketFactory,
+    ) -> None:
+        user = await regular_user_factory()
+        bucket = await make_bucket("bucket-1", user, project_name=user.name)
+        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"project_name": user.name},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == [bucket]
+        async with client.get(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            params={"project_name": "test-project"},
+        ) as resp:
+            assert resp.status == HTTPOk.status_code, await resp.text()
+            payload = await resp.json()
+            assert payload == []
 
     async def test_list_buckets_ndjson(
         self,
@@ -784,6 +947,7 @@ class TestApi:
         async with client.delete(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
+            params={"project_name": "test-project"},
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
         async with client.get(
@@ -893,7 +1057,7 @@ class TestApi:
         await grant_project_permission(regular_user2, create_resp1["project_name"])
         async with client.get(
             buckets_api.bucket_url(create_resp1["name"]),
-            params={"owner": regular_user.name},
+            params={"project_name": create_resp1["project_name"]},
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()

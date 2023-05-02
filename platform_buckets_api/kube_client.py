@@ -57,6 +57,8 @@ BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 ORG_NAME_LABEL = "platform.neuromation.io/org_name"
 PROJECT_LABEL = "platform.neuromation.io/project"
 
+NO_ORG = "NO_ORG"
+
 
 def _k8s_name_safe(**kwargs: str) -> str:
     hasher = hashlib.new("sha256")
@@ -425,16 +427,20 @@ class KubeClient:
             label_selectors.append(f"{OWNER_LABEL}={owner}")
         if name:
             label_selectors.append(f"{BUCKET_NAME_LABEL}={name}")
-        if org_name:
+        if org_name and org_name.upper() == NO_ORG:
+            label_selectors.append(f"!{ORG_NAME_LABEL}")
+        elif org_name:
             label_selectors.append(f"{ORG_NAME_LABEL}={org_name}")
-        if project_name:
-            label_selectors.append(f"{PROJECT_LABEL}={project_name}")
         if label_selectors:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._request(method="GET", url=url, params=params)
-        return [
-            BucketCRDMapper.from_primitive(item) for item in payload.get("items", [])
-        ]
+        buckets = []
+        for item in payload.get("items", []):
+            bucket = BucketCRDMapper.from_primitive(item)
+            if project_name and project_name != bucket.project_name:
+                continue
+            buckets.append(bucket)
+        return buckets
 
     async def get_user_bucket(self, name: str) -> BucketType:
         url = self._generate_user_bucket_url(name)
