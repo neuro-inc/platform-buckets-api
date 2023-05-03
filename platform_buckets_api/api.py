@@ -204,18 +204,23 @@ class BucketsApiHandler:
         try:
             bucket = await self.service.get_bucket(id_or_name)
         except NotExistsError:
-            org_name_qv = request.query.get("org_name")
-            project_name_qv = request.query.get("project_name")
-            owner_qv = request.query.get("owner")
-            user = await _get_untrusted_user(request)
-            if org_name_qv is None and project_name_qv is None:
-                owner_qv = owner_qv or user.name
+            org_name = request.query.get("org_name")
+            project_name = request.query.get("project_name")
+            owner = request.query.get("owner")
+            if project_name:
+                if owner:
+                    raise ValueError("owner cannot be specified with project_name")
+            else:
+                if org_name:
+                    raise ValueError("org_name can be specified only with project_name")
+                if owner is None:
+                    user = await _get_untrusted_user(request)
+                    owner = user.name
+                org_name = None
+                project_name = owner
             try:
                 bucket = await self.service.get_bucket_by_name(
-                    name=id_or_name,
-                    owner=owner_qv,
-                    org_name=org_name_qv,
-                    project_name=project_name_qv,
+                    id_or_name, org_name, project_name
                 )
             except NotExistsError:
                 raise HTTPNotFound(text=f"Bucket {id_or_name} not found")
@@ -357,7 +362,15 @@ class BucketsApiHandler:
             },
         },
     )
-    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
+    @querystring_schema(
+        Schema.from_dict(
+            {
+                "owner": fields.String(required=False),
+                "org_name": fields.String(required=False),
+                "project_name": fields.String(required=False),
+            }
+        )
+    )
     async def get_bucket(
         self,
         request: aiohttp.web.Request,
@@ -377,7 +390,7 @@ class BucketsApiHandler:
         description=textwrap.dedent(
             """\
         Looks for bucket that corresponds given path, for example,
-        for "org_name/user_name/bucket/some/key" it will find bucket "bucket"
+        for "org_name/project_name/bucket/some/key" it will find bucket "bucket"
         and return it.
         """
         ),
@@ -449,7 +462,15 @@ class BucketsApiHandler:
             },
         },
     )
-    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
+    @querystring_schema(
+        Schema.from_dict(
+            {
+                "owner": fields.String(required=False),
+                "org_name": fields.String(required=False),
+                "project_name": fields.String(required=False),
+            }
+        )
+    )
     async def delete_bucket(
         self,
         request: aiohttp.web.Request,
@@ -490,7 +511,15 @@ class BucketsApiHandler:
             },
         },
     )
-    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
+    @querystring_schema(
+        Schema.from_dict(
+            {
+                "owner": fields.String(required=False),
+                "org_name": fields.String(required=False),
+                "project_name": fields.String(required=False),
+            }
+        )
+    )
     @request_schema(PatchBucket())
     async def patch_bucket(
         self,
@@ -521,7 +550,15 @@ class BucketsApiHandler:
             },
         },
     )
-    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
+    @querystring_schema(
+        Schema.from_dict(
+            {
+                "owner": fields.String(required=False),
+                "org_name": fields.String(required=False),
+                "project_name": fields.String(required=False),
+            }
+        )
+    )
     async def make_tmp_credentials(
         self,
         request: aiohttp.web.Request,
@@ -569,7 +606,15 @@ class BucketsApiHandler:
         },
     )
     @request_schema(SignedUrlRequest())
-    @querystring_schema(Schema.from_dict({"owner": fields.String(required=False)}))
+    @querystring_schema(
+        Schema.from_dict(
+            {
+                "owner": fields.String(required=False),
+                "org_name": fields.String(required=False),
+                "project_name": fields.String(required=False),
+            }
+        )
+    )
     async def sign_blob_url(
         self,
         request: aiohttp.web.Request,

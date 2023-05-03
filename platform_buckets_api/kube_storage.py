@@ -38,23 +38,19 @@ class K8SBucketsStorage(BucketsStorage):
         return res[0]
 
     async def get_bucket_by_name(
-        self,
-        name: str,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        owner: Optional[str] = None,
+        self, name: str, org_name: Optional[str], project_name: str
     ) -> BucketType:
         res = await self._kube_client.list_user_buckets(
-            name=name, org_name=org_name, project_name=project_name, owner=owner
+            name=name, org_name=org_name, project_name=project_name
         )
         assert len(res) <= 1, (
             f"Found multiple buckets for name = {name}, "
-            f"org = {org_name}, project = {project_name}, owner = {owner}"
+            f"org = {org_name}, project = {project_name}"
         )
         if len(res) == 0:
             raise NotExistsError(
                 f"UserBucket with org {org_name} project {project_name}, "
-                f"name {name}, owner {owner} doesn't exist"
+                f"name {name} doesn't exist"
             )
         return res[0]
 
