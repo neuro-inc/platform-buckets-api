@@ -315,8 +315,33 @@ class TestApi:
         assert payload["name"] == "test-bucket"
         assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
+        assert payload["project_name"] == "test-project"
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
+
+    async def test_create_bucket_same_name_different_project(
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        make_bucket: BucketFactory,
+        regular_user_factory: UserFactory,
+    ) -> None:
+        regular_user1 = await regular_user_factory(project_name="test-project1")
+        bucket1 = await make_bucket(
+            "test-bucket", regular_user1, project_name="test-project1"
+        )
+        assert bucket1["name"] == "test-bucket"
+        assert bucket1["owner"] == regular_user1.name
+        assert bucket1["project_name"] == "test-project1"
+
+        regular_user2 = await regular_user_factory(project_name="test-project2")
+        bucket2 = await make_bucket(
+            "test-bucket", regular_user2, project_name="test-project2"
+        )
+        assert bucket2["id"] != bucket1["id"]
+        assert bucket2["name"] == "test-bucket"
+        assert bucket2["owner"] == regular_user2.name
+        assert bucket2["project_name"] == "test-project2"
 
     async def test_create_bucket_with_org(
         self,
@@ -525,12 +550,13 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test-bucket", regular_user)
+        bucket = await make_bucket("test-bucket", regular_user)
         async with client.post(
             buckets_api.buckets_url,
             headers=regular_user.headers,
             json={
                 "name": "test-bucket",
+                "project_name": bucket["project_name"],
             },
         ) as resp:
             assert resp.status == HTTPConflict.status_code, await resp.text()
