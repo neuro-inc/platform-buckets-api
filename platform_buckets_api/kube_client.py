@@ -147,9 +147,15 @@ class BucketCRDMapper:
     def to_primitive(entry: BucketType) -> dict[str, Any]:
         # Use this strange key as name to enable uniqueness of owner/name pair
         if entry.name:
-            name = f"user-bucket-{_k8s_name_safe(owner=entry.owner, name=entry.name)}"
+            if entry.project_name == entry.owner:
+                kwargs = dict(name=entry.name, owner=entry.owner)
+            else:
+                kwargs = dict(name=entry.name, project_name=entry.project_name)
+                if entry.org_name:
+                    kwargs["org_name"] = entry.org_name
         else:
-            name = f"user-bucket-{_k8s_name_safe(id=entry.id)}"
+            kwargs = dict(id=entry.id)
+        name = f"user-bucket-{_k8s_name_safe(**kwargs)}"
         labels = {
             ID_LABEL: entry.id,
             OWNER_LABEL: entry.owner,

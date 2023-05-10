@@ -209,7 +209,7 @@ class BucketsService:
         return bucket
 
     @asyncgeneratorcontextmanager
-    async def get_user_buckets(
+    async def get_buckets(
         self,
         owner: str,
         org_name: Optional[str] = None,

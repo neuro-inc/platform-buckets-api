@@ -237,23 +237,21 @@ class TestBucketsService:
             name="test-bucket3",
             org_name=None,
         )
-        async with service.get_user_buckets("test-user") as it:
+        async with service.get_buckets("test-user") as it:
             buckets = [bucket async for bucket in it]
         assert len(buckets) == 2
         assert bucket1 in buckets
         assert bucket2 in buckets
         assert bucket3 not in buckets
 
-        async with service.get_user_buckets(
-            "test-user", project_name="test-project1"
-        ) as it:
+        async with service.get_buckets("test-user", project_name="test-project1") as it:
             buckets = [bucket async for bucket in it]
         assert len(buckets) == 1
         assert bucket1 in buckets
         assert bucket2 not in buckets
         assert bucket3 not in buckets
 
-        async with service.get_user_buckets("test-user", org_name="test-org") as it:
+        async with service.get_buckets("test-user", org_name="test-org") as it:
             buckets = [bucket async for bucket in it]
         assert len(buckets) == 1
         assert bucket1 not in buckets

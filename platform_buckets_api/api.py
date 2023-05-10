@@ -430,7 +430,7 @@ class BucketsApiHandler:
         username = await check_authorized(request)
         org_name = request.query.get("org_name")
         project_name = request.query.get("project_name")
-        async with self.service.get_user_buckets(
+        async with self.service.get_buckets(
             owner=username, org_name=org_name, project_name=project_name
         ) as buckets_it:
             if accepts_ndjson(request):
