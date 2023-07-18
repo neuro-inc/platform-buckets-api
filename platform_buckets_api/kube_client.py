@@ -1,7 +1,9 @@
+import asyncio
 import hashlib
 import json
 import logging
 import ssl
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlsplit
@@ -200,6 +202,7 @@ class KubeClient:
         auth_cert_key_path: Optional[str] = None,
         token: Optional[str] = None,
         token_path: Optional[str] = None,
+        token_update_interval_s: int = 300,
         conn_timeout_s: int = 300,
         read_timeout_s: int = 100,
         watch_timeout_s: int = 1800,
@@ -217,6 +220,7 @@ class KubeClient:
         self._auth_cert_key_path = auth_cert_key_path
         self._token = token
         self._token_path = token_path
+        self._token_update_interval_s = token_update_interval_s
 
         self._conn_timeout_s = conn_timeout_s
         self._read_timeout_s = read_timeout_s
@@ -225,6 +229,7 @@ class KubeClient:
         self._trace_configs = trace_configs
 
         self._client: Optional[aiohttp.ClientSession] = None
+        self._token_updater_task: Optional[asyncio.Task[None]] = None
 
     @property
     def _is_ssl(self) -> bool:
@@ -244,34 +249,35 @@ class KubeClient:
         return ssl_context
 
     async def init(self) -> None:
-        self._client = await self.create_http_client()
-
-    async def create_http_client(self) -> aiohttp.ClientSession:
         connector = aiohttp.TCPConnector(
             limit=self._conn_pool_size, ssl=self._create_ssl_context()
         )
-        if self._auth_type == KubeClientAuthType.TOKEN:
-            token = self._token
-            if not token:
-                assert self._token_path is not None
-                token = Path(self._token_path).read_text()
-            headers = {"Authorization": "Bearer " + token}
-        else:
-            headers = {}
+        if self._token_path:
+            self._token = Path(self._token_path).read_text()
+            self._token_updater_task = asyncio.create_task(self._start_token_updater())
         timeout = aiohttp.ClientTimeout(
             connect=self._conn_timeout_s, total=self._read_timeout_s
         )
-        return aiohttp.ClientSession(
+        self._client = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
-            headers=headers,
             trace_configs=self._trace_configs,
         )
 
-    async def _reload_http_client(self) -> None:
-        await self.close()
-        self._token = None
-        await self.init()
+    async def _start_token_updater(self) -> None:
+        if not self._token_path:
+            return
+        while True:
+            try:
+                token = Path(self._token_path).read_text()
+                if token != self._token:
+                    self._token = token
+                    logger.info("Kube token was refreshed")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.exception("Failed to update kube token: %s", exc)
+            await asyncio.sleep(self._token_update_interval_s)
 
     @property
     def namespace(self) -> str:
@@ -281,6 +287,11 @@ class KubeClient:
         if self._client:
             await self._client.close()
             self._client = None
+        if self._token_updater_task:
+            self._token_updater_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._token_updater_task
+            self._token_updater_task = None
 
     async def __aenter__(self) -> "KubeClient":
         await self.init()
@@ -321,22 +332,21 @@ class KubeClient:
     def _generate_user_bucket_url(self, name: str) -> str:
         return f"{self._user_buckets_url}/{name}"
 
-    async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        assert self._client, "client is not initialized"
-        doing_retry = kwargs.pop("doing_retry", False)
+    def _create_headers(
+        self, headers: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
+        headers = dict(headers) if headers else {}
+        if self._auth_type == KubeClientAuthType.TOKEN and self._token:
+            headers["Authorization"] = "Bearer " + self._token
+        return headers
 
-        async with self._client.request(*args, **kwargs) as response:
+    async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        headers = self._create_headers(kwargs.pop("headers", None))
+        assert self._client, "client is not initialized"
+        async with self._client.request(*args, headers=headers, **kwargs) as response:
             payload = await response.json()
-        try:
             self._raise_for_status(payload)
             return payload
-        except KubeClientUnauthorized:
-            if doing_retry:
-                raise
-            # K8s SA's token might be stale, need to refresh it and retry
-            await self._reload_http_client()
-            kwargs["doing_retry"] = True
-            return await self._request(*args, **kwargs)
 
     def _raise_for_status(self, payload: dict[str, Any]) -> None:
         kind = payload["kind"]
