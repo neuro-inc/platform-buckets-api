@@ -995,11 +995,11 @@ async def create_app(
             if _bucket_provider is None:
                 if isinstance(config.bucket_provider, AWSProviderConfig):
                     session = aiobotocore.session.get_session()
-                    client_kwargs = dict(
-                        region_name=config.bucket_provider.region_name,
-                        aws_secret_access_key=config.bucket_provider.secret_access_key,
-                        aws_access_key_id=config.bucket_provider.access_key_id,
-                    )
+                    client_kwargs = {
+                        "region_name": config.bucket_provider.region_name,
+                        "aws_secret_access_key": config.bucket_provider.secret_access_key,
+                        "aws_access_key_id": config.bucket_provider.access_key_id,
+                    }
                     if config.bucket_provider.endpoint_url:
                         client_kwargs["endpoint_url"] = str(
                             config.bucket_provider.endpoint_url
@@ -1021,12 +1021,12 @@ async def create_app(
                     )
                 elif isinstance(config.bucket_provider, MinioProviderConfig):
                     session = aiobotocore.session.get_session()
-                    client_kwargs = dict(
-                        region_name=config.bucket_provider.region_name,
-                        aws_secret_access_key=config.bucket_provider.secret_access_key,
-                        aws_access_key_id=config.bucket_provider.access_key_id,
-                        endpoint_url=str(config.bucket_provider.endpoint_url),
-                    )
+                    client_kwargs = {
+                        "region_name": config.bucket_provider.region_name,
+                        "aws_secret_access_key": config.bucket_provider.secret_access_key,
+                        "aws_access_key_id": config.bucket_provider.access_key_id,
+                        "endpoint_url": str(config.bucket_provider.endpoint_url),
+                    }
                     s3_client = await exit_stack.enter_async_context(
                         session.create_client("s3", **client_kwargs)
                     )
@@ -1074,13 +1074,13 @@ async def create_app(
                     )
                 elif isinstance(config.bucket_provider, EMCECSProviderConfig):
                     session = aiobotocore.session.get_session()
-                    client_kwargs = dict(
-                        aws_secret_access_key=config.bucket_provider.secret_access_key,
-                        aws_access_key_id=config.bucket_provider.access_key_id,
+                    client_kwargs = {
+                        "aws_secret_access_key": config.bucket_provider.secret_access_key,
+                        "aws_access_key_id": config.bucket_provider.access_key_id,
                         # This "region" value is ignored by EMC ECS,
                         # but required by botocore
-                        region_name="any",
-                    )
+                        "region_name": "any",
+                    }
                     s3_client = await exit_stack.enter_async_context(
                         session.create_client(
                             "s3",

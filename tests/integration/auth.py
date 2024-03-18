@@ -172,8 +172,7 @@ class UserFactory(Protocol):
         org_name: Optional[str] = None,
         org_level: bool = False,
         project_name: str = "test-project",
-    ) -> _User:
-        ...
+    ) -> _User: ...
 
 
 @pytest.fixture

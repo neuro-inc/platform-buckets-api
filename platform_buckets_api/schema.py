@@ -19,10 +19,12 @@ def query_schema(**kwargs: fields.Field) -> Callable[[F], F]:
         @functools.wraps(handler)
         async def _wrapped(self: Any, request: aiohttp.web.Request) -> Any:
             query_data = {
-                key: request.query.getall(key)
-                if len(request.query.getall(key)) > 1
-                or isinstance(schema.fields.get(key), fields.List)
-                else request.query[key]
+                key: (
+                    request.query.getall(key)
+                    if len(request.query.getall(key)) > 1
+                    or isinstance(schema.fields.get(key), fields.List)
+                    else request.query[key]
+                )
                 for key in request.query.keys()
             }
             validated = schema.load(query_data)
