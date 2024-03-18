@@ -21,7 +21,6 @@ from yarl import URL
 
 from platform_buckets_api.providers import GoogleBucketProvider, run_in_executor
 from platform_buckets_api.storage import ProviderBucket
-
 from tests.integration.test_provider_base import (
     BUCKET_NAME_PREFIX,
     ROLE_NAME_PREFIX,

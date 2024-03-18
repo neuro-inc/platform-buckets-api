@@ -188,9 +188,10 @@ class TestProviderBase:
         credentials = await provider_option.provider.get_bucket_credentials(
             bucket, write=False, requester="testing"
         )
-        async with provider_option.make_client(
-            bucket, credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
 
     async def test_signed_url_for_blob(
@@ -353,9 +354,10 @@ class TestProviderBase:
         role = await provider_option.provider.create_role(
             _make_role_name(), permissions
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
 
     async def test_role_grant_access_multiple_buckets(
@@ -428,15 +430,17 @@ class TestProviderBase:
                 ),
             ],
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
         await provider_option.provider.set_role_permissions(
             role,
             [],
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_no_access(admin, user_client)

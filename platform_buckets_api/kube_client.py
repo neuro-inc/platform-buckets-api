@@ -121,20 +121,20 @@ class BucketCRDMapper:
     @staticmethod
     def from_primitive(payload: dict[str, Any]) -> BucketType:
         owner = payload["metadata"]["labels"][OWNER_LABEL]
-        common_kwargs = dict(
-            id=payload["metadata"]["labels"][ID_LABEL],
-            name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
-            owner=owner,
-            org_name=payload["metadata"]["labels"].get(ORG_NAME_LABEL),
-            project_name=payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
-            created_at=datetime_load(payload["spec"]["created_at"]),
-            provider_bucket=ProviderBucket(
+        common_kwargs = {
+            "id": payload["metadata"]["labels"][ID_LABEL],
+            "name": payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
+            "owner": owner,
+            "org_name": payload["metadata"]["labels"].get(ORG_NAME_LABEL),
+            "project_name": payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
+            "created_at": datetime_load(payload["spec"]["created_at"]),
+            "provider_bucket": ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
                 metadata=payload["spec"].get("metadata"),
             ),
-            public=payload["spec"].get("public", False),
-        )
+            "public": payload["spec"].get("public", False),
+        }
         if payload["spec"].get("imported", False):
             return ImportedBucket(
                 **common_kwargs,
@@ -150,13 +150,13 @@ class BucketCRDMapper:
         # Use this strange key as name to enable uniqueness of owner/name pair
         if entry.name:
             if entry.project_name == entry.owner:
-                kwargs = dict(name=entry.name, owner=entry.owner)
+                kwargs = {"name": entry.name, "owner": entry.owner}
             else:
-                kwargs = dict(name=entry.name, project_name=entry.project_name)
+                kwargs = {"name": entry.name, "project_name": entry.project_name}
                 if entry.org_name:
                     kwargs["org_name"] = entry.org_name
         else:
-            kwargs = dict(id=entry.id)
+            kwargs = {"id": entry.id}
         name = f"user-bucket-{_k8s_name_safe(**kwargs)}"
         labels = {
             ID_LABEL: entry.id,

@@ -1325,12 +1325,12 @@ class OpenStackBucketProvider(BucketProvider):
         credentials = await self.get_bucket_credentials(
             bucket, write=False, requester="sign_url"
         )
-        client_kwargs = dict(
-            region_name=credentials["region_name"],
-            endpoint_url=credentials["endpoint_url"],
-            aws_secret_access_key=credentials["secret_access_key"],
-            aws_access_key_id=credentials["access_key_id"],
-        )
+        client_kwargs = {
+            "region_name": credentials["region_name"],
+            "endpoint_url": credentials["endpoint_url"],
+            "aws_secret_access_key": credentials["secret_access_key"],
+            "aws_access_key_id": credentials["access_key_id"],
+        }
         async with session.create_client("s3", **client_kwargs) as s3_client:
             return URL(
                 await s3_client.generate_presigned_url(
