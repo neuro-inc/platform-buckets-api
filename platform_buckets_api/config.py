@@ -1,5 +1,5 @@
 import enum
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Union
 
@@ -17,26 +17,6 @@ class ServerConfig:
 class PlatformAuthConfig:
     url: Optional[URL]
     token: str = field(repr=False)
-
-
-@dataclass(frozen=True)
-class CORSConfig:
-    allowed_origins: Sequence[str] = ()
-
-
-@dataclass(frozen=True)
-class ZipkinConfig:
-    url: URL
-    app_name: str = "platform-buckets-api"
-    sample_rate: float = 0.0
-
-
-@dataclass(frozen=True)
-class SentryConfig:
-    dsn: URL
-    cluster_name: str
-    app_name: str = "platform-buckets-api"
-    sample_rate: float = 0.0
 
 
 class BucketsProviderType(str, enum.Enum):
@@ -133,7 +113,6 @@ class Config:
     server: ServerConfig
     platform_auth: PlatformAuthConfig
     kube: KubeConfig
-    cors: CORSConfig
     cluster_name: str
     bucket_provider: Union[
         AWSProviderConfig,
@@ -145,5 +124,3 @@ class Config:
     ]
     enable_docs: bool = False
     disable_creation: bool = False
-    zipkin: Optional[ZipkinConfig] = None
-    sentry: Optional[SentryConfig] = None

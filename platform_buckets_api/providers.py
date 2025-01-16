@@ -610,6 +610,9 @@ class AzureUserBucketOperations(UserBucketOperations):
         expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
             seconds=expires_in_sec
         )
+
+        assert self._blob_client.account_name, "account name is required"
+
         token: str = generate_blob_sas(
             account_name=self._blob_client.account_name,
             blob_name=key,
@@ -666,6 +669,9 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
         expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
             hours=1
         )
+
+        assert self._blob_client.account_name, "account name is required"
+
         token: str = generate_container_sas(
             account_name=self._blob_client.account_name,
             container_name=bucket.name,
@@ -714,6 +720,9 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
             signed_identifiers=policies,
             public_access=access_policy["public_access"],
         )
+
+        assert self._blob_client.account_name, "account name is required"
+
         sas_token = generate_container_sas(
             container_client.account_name,
             container_client.container_name,

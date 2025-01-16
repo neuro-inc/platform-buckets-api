@@ -9,7 +9,6 @@ from typing import Any, Optional
 import aiobotocore.session
 import aiohttp
 import aiohttp.web
-import aiohttp_cors
 import googleapiclient.discovery
 from aiohttp.web import (
     HTTPBadRequest,
@@ -45,18 +44,13 @@ from neuro_auth_client import AuthClient, Permission, User
 from neuro_auth_client.security import AuthScheme, setup_security
 from neuro_logging import (
     init_logging,
-    make_sentry_trace_config,
-    make_zipkin_trace_config,
-    notrace,
     setup_sentry,
-    setup_zipkin_tracer,
 )
 
 from .config import (
     AWSProviderConfig,
     AzureProviderConfig,
     Config,
-    CORSConfig,
     EMCECSProviderConfig,
     GCPProviderConfig,
     KubeConfig,
@@ -104,6 +98,18 @@ from .utils import ndjson_error_handler
 logger = logging.getLogger(__name__)
 
 
+V1_APP_KEY = aiohttp.web.AppKey("api_v1_app", aiohttp.web.Application)
+BUCKETS_APP_KEY = aiohttp.web.AppKey("buckets", aiohttp.web.Application)
+CREDENTIALS_APP_KEY = aiohttp.web.AppKey("credentials", aiohttp.web.Application)
+CONFIG_KEY = aiohttp.web.AppKey("config", Config)
+BUCKETS_SERVICE_KEY = aiohttp.web.AppKey("buckets_service", BucketsService)
+PERMISSIONS_SERVICE_KEY = aiohttp.web.AppKey("permissions_service", PermissionsService)
+DISABLE_CREATION_KEY = aiohttp.web.AppKey("disable_creation", bool)
+CREDENTIALS_SERVICE_APP_KEY = aiohttp.web.AppKey(
+    "credentials_service", PersistentCredentialsService
+)
+
+
 def accepts_ndjson(request: aiohttp.web.Request) -> bool:
     accept = request.headers.get("Accept", "")
     return "application/x-ndjson" in accept
@@ -148,11 +154,9 @@ class ApiHandler:
             ]
         )
 
-    @notrace
     async def handle_ping(self, request: Request) -> Response:
         return Response(text="Pong")
 
-    @notrace
     async def handle_secured_ping(self, request: Request) -> Response:
         await check_authorized(request)
         return Response(text="Secured Pong")
@@ -185,19 +189,19 @@ class BucketsApiHandler:
 
     @property
     def service(self) -> BucketsService:
-        return self._app["service"]
+        return self._app[BUCKETS_SERVICE_KEY]
 
     @property
     def permissions_service(self) -> PermissionsService:
-        return self._app["permissions_service"]
+        return self._app[PERMISSIONS_SERVICE_KEY]
 
     @property
     def disable_creation(self) -> bool:
-        return self._app["disable_creation"]
+        return self._app[DISABLE_CREATION_KEY]
 
     @property
     def credentials_service(self) -> PersistentCredentialsService:
-        return self._app["credentials_service"]
+        return self._app[CREDENTIALS_SERVICE_APP_KEY]
 
     async def _resolve_bucket(self, request: Request) -> BaseBucket:
         id_or_name = request.match_info["bucket_id_or_name"]
@@ -651,19 +655,19 @@ class PersistentCredentialsApiHandler:
 
     @property
     def buckets_service(self) -> BucketsService:
-        return self._app["buckets_service"]
+        return self._app[BUCKETS_SERVICE_KEY]
 
     @property
     def credentials_service(self) -> PersistentCredentialsService:
-        return self._app["credentials_service"]
+        return self._app[CREDENTIALS_SERVICE_APP_KEY]
 
     @property
     def permissions_service(self) -> PermissionsService:
-        return self._app["permissions_service"]
+        return self._app[PERMISSIONS_SERVICE_KEY]
 
     @property
     def disable_creation(self) -> bool:
-        return self._app["disable_creation"]
+        return self._app[DISABLE_CREATION_KEY]
 
     async def _resolve_credentials(self, request: Request) -> PersistentCredentials:
         id_or_name = request.match_info["credential_id_or_name"]
@@ -943,42 +947,11 @@ async def make_google_iam_client_2(config: GCPProviderConfig) -> AsyncIterator[A
     yield iam_2
 
 
-def make_tracing_trace_configs(config: Config) -> list[aiohttp.TraceConfig]:
-    trace_configs = []
-
-    if config.zipkin:
-        trace_configs.append(make_zipkin_trace_config())
-
-    if config.sentry:
-        trace_configs.append(make_sentry_trace_config())
-
-    return trace_configs
-
-
-def _setup_cors(app: aiohttp.web.Application, config: CORSConfig) -> None:
-    if not config.allowed_origins:
-        return
-
-    logger.info(f"Setting up CORS with allowed origins: {config.allowed_origins}")
-    default_options = aiohttp_cors.ResourceOptions(
-        allow_credentials=True,
-        expose_headers="*",
-        allow_headers="*",
-        allow_methods="*",
-    )
-    cors = aiohttp_cors.setup(
-        app, defaults={origin: default_options for origin in config.allowed_origins}
-    )
-    for route in app.router.routes():
-        logger.debug(f"Setting up CORS for {route}")
-        cors.add(route)
-
-
 async def create_app(
     config: Config, _bucket_provider: Optional[BucketProvider] = None
 ) -> aiohttp.web.Application:
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
-    app["config"] = config
+    app[config] = config
 
     async def _init_app(app: aiohttp.web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:
@@ -1131,7 +1104,7 @@ async def create_app(
 
             logger.info("Initializing Kubernetes client")
             kube_client = await exit_stack.enter_async_context(
-                create_kube_client(config.kube, make_tracing_trace_configs(config))
+                create_kube_client(config.kube)
             )
 
             logger.info("Initializing PermissionsService")
@@ -1139,8 +1112,8 @@ async def create_app(
                 auth_client=auth_client,
                 cluster_name=config.cluster_name,
             )
-            app["buckets_app"]["permissions_service"] = permissions_service
-            app["credentials_app"]["permissions_service"] = permissions_service
+            app[BUCKETS_APP_KEY][PERMISSIONS_SERVICE_KEY] = permissions_service
+            app[CREDENTIALS_APP_KEY][PERMISSIONS_SERVICE_KEY] = permissions_service
 
             logger.info("Initializing BucketsService")
             buckets_service = BucketsService(
@@ -1148,8 +1121,8 @@ async def create_app(
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
-            app["buckets_app"]["service"] = buckets_service
-            app["buckets_app"]["disable_creation"] = config.disable_creation
+            app[BUCKETS_APP_KEY][BUCKETS_SERVICE_KEY] = buckets_service
+            app[BUCKETS_APP_KEY][DISABLE_CREATION_KEY] = config.disable_creation
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
@@ -1158,29 +1131,28 @@ async def create_app(
                 buckets_service=buckets_service,
             )
 
-            app["buckets_app"]["credentials_service"] = credentials_service
-            app["credentials_app"]["buckets_service"] = buckets_service
-            app["credentials_app"]["credentials_service"] = credentials_service
-            app["credentials_app"]["disable_creation"] = config.disable_creation
+            app[BUCKETS_APP_KEY][CREDENTIALS_SERVICE_APP_KEY] = credentials_service
+            app[CREDENTIALS_APP_KEY][BUCKETS_SERVICE_KEY] = buckets_service
+            app[CREDENTIALS_APP_KEY][CREDENTIALS_SERVICE_APP_KEY] = credentials_service
+            app[CREDENTIALS_APP_KEY][DISABLE_CREATION_KEY] = config.disable_creation
 
             yield
 
     app.cleanup_ctx.append(_init_app)
 
     api_v1_app = await create_api_v1_app()
-    app["api_v1_app"] = api_v1_app
+    app[V1_APP_KEY] = api_v1_app
 
     buckets_app = await create_buckets_app(config)
-    app["buckets_app"] = buckets_app
+    app[BUCKETS_APP_KEY] = buckets_app
     api_v1_app.add_subapp("/buckets/buckets", buckets_app)
 
     credentials_app = await create_persistent_credentials_app(config)
-    app["credentials_app"] = credentials_app
+    app[CREDENTIALS_APP_KEY] = credentials_app
     api_v1_app.add_subapp("/buckets/persistent_credentials", credentials_app)
 
     app.add_subapp("/api/v1", api_v1_app)
 
-    _setup_cors(app, config.cors)
     if config.enable_docs:
         prefix = "/api/docs/v1/buckets"
         setup_aiohttp_apispec(
@@ -1198,30 +1170,11 @@ async def create_app(
     return app
 
 
-def setup_tracing(config: Config) -> None:
-    if config.zipkin:
-        setup_zipkin_tracer(
-            config.zipkin.app_name,
-            config.server.host,
-            config.server.port,
-            config.zipkin.url,
-            config.zipkin.sample_rate,
-        )
-
-    if config.sentry:
-        setup_sentry(
-            config.sentry.dsn,
-            app_name=config.sentry.app_name,
-            cluster_name=config.sentry.cluster_name,
-            sample_rate=config.sentry.sample_rate,
-        )
-
-
 def main() -> None:  # pragma: no coverage
     init_logging()
     config = EnvironConfigFactory().create()
     logging.info("Loaded config: %r", config)
-    setup_tracing(config)
+    setup_sentry()
     aiohttp.web.run_app(
         create_app(config),
         host=config.server.host,

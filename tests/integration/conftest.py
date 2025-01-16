@@ -17,7 +17,6 @@ from yarl import URL
 from platform_buckets_api.config import (
     AWSProviderConfig,
     Config,
-    CORSConfig,
     KubeConfig,
     MinioProviderConfig,
     PlatformAuthConfig,
@@ -93,7 +92,6 @@ def config_factory(
             server=ServerConfig(host="0.0.0.0", port=8080),
             platform_auth=auth_config,
             kube=kube_config,
-            cors=CORSConfig(allowed_origins=["https://neu.ro"]),
             sentry=None,
             cluster_name=cluster_name,
             bucket_provider=AWSProviderConfig(
