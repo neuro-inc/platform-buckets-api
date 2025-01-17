@@ -42,7 +42,7 @@ from azure.storage.blob import (
 )
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from bmc._utils import Command
-from google.api_core.exceptions import BadRequest
+from google.api_core.exceptions import BadRequest as GoogleBadRequest
 from google.api_core.iam import Policy
 from google.api_core.retry import Retry
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
@@ -939,18 +939,26 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
         self._iam_client.projects().serviceAccounts().delete(name=full_name).execute()
 
     @run_in_executor
-    def _create_sa_key(self, full_name: str) -> Mapping[str, Any]:
-        return (
-            self._iam_client.projects()
-            .serviceAccounts()
-            .keys()
-            .create(name=full_name)
-            .execute()
-        )
+    def _create_sa_key(
+        self, full_name: str, retry: Retry | None = None
+    ) -> Mapping[str, Any]:
+        def _create() -> Mapping[str, Any]:
+            return (
+                self._iam_client.projects()
+                .serviceAccounts()
+                .keys()
+                .create(name=full_name)
+                .execute()
+            )
+
+        if retry:
+            _create = retry(_create)
+
+        return _create()
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         def _should_retry_add_iam_policy(exc: Exception) -> bool:
-            if isinstance(exc, BadRequest) and "not exist" in str(exc):
+            if isinstance(exc, GoogleBadRequest) and "not exist" in str(exc):
                 return True
             return DEFAULT_RETRY._predicate(exc)
 
@@ -1024,6 +1032,11 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
     ) -> ProviderRole:
+        def _should_retry_create_sa_key(exc: Exception) -> bool:
+            if isinstance(exc, GoogleHttpError) and "not exist" in str(exc):
+                return True
+            return False
+
         if len(username) > 30:
             raise ValueError("GCS account name cannot be larger then 30 characters")
         try:
@@ -1035,7 +1048,10 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
         except GoogleHttpError as e:
             if e.status_code == 409:
                 raise RoleExistsError(username)
-        resp = await self._create_sa_key(full_name=self._make_sa_full_name(username))
+        resp = await self._create_sa_key(
+            full_name=self._make_sa_full_name(username),
+            retry=Retry(_should_retry_create_sa_key),
+        )
         role = ProviderRole(
             provider_type=BucketsProviderType.GCP,
             name=username,
