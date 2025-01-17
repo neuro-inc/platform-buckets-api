@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterator
-from typing import Optional
 
 from platform_buckets_api.kube_client import (
     KubeClient,
@@ -38,7 +37,7 @@ class K8SBucketsStorage(BucketsStorage):
         return res[0]
 
     async def get_bucket_by_name(
-        self, name: str, org_name: Optional[str], project_name: str
+        self, name: str, org_name: str | None, project_name: str
     ) -> BucketType:
         res = await self._kube_client.list_user_buckets(
             name=name, org_name=org_name, project_name=project_name
@@ -56,7 +55,7 @@ class K8SBucketsStorage(BucketsStorage):
 
     @asyncgeneratorcontextmanager
     async def list_buckets(
-        self, org_name: Optional[str] = None, project_name: Optional[str] = None
+        self, org_name: str | None = None, project_name: str | None = None
     ) -> AsyncIterator[BucketType]:
         for bucket in await self._kube_client.list_user_buckets(
             org_name=org_name, project_name=project_name
@@ -124,7 +123,7 @@ class K8SCredentialsStorage(CredentialsStorage):
 
     @asyncgeneratorcontextmanager
     async def list_credentials(
-        self, owner: Optional[str] = None
+        self, owner: str | None = None
     ) -> AsyncIterator[PersistentCredentials]:
         for credentials in await self._kube_client.list_persistent_credentials(
             owner=owner

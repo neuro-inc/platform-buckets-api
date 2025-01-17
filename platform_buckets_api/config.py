@@ -1,7 +1,7 @@
 import enum
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import ClassVar, Optional, Union
+from typing import ClassVar
 
 from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL
@@ -15,28 +15,8 @@ class ServerConfig:
 
 @dataclass(frozen=True)
 class PlatformAuthConfig:
-    url: Optional[URL]
+    url: URL | None
     token: str = field(repr=False)
-
-
-@dataclass(frozen=True)
-class CORSConfig:
-    allowed_origins: Sequence[str] = ()
-
-
-@dataclass(frozen=True)
-class ZipkinConfig:
-    url: URL
-    app_name: str = "platform-buckets-api"
-    sample_rate: float = 0.0
-
-
-@dataclass(frozen=True)
-class SentryConfig:
-    dsn: URL
-    cluster_name: str
-    app_name: str = "platform-buckets-api"
-    sample_rate: float = 0.0
 
 
 class BucketsProviderType(str, enum.Enum):
@@ -52,10 +32,10 @@ class BucketsProviderType(str, enum.Enum):
 class AWSProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
     s3_role_arn: str
-    access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
+    access_key_id: str | None = None
+    secret_access_key: str | None = None
     region_name: str = "us-east-1"
-    endpoint_url: Optional[URL] = None
+    endpoint_url: URL | None = None
 
 
 @dataclass(frozen=True)
@@ -114,13 +94,13 @@ class KubeClientAuthType(str, enum.Enum):
 @dataclass(frozen=True)
 class KubeConfig:
     endpoint_url: str
-    cert_authority_data_pem: Optional[str] = field(repr=False, default=None)
-    cert_authority_path: Optional[str] = None
+    cert_authority_data_pem: str | None = field(repr=False, default=None)
+    cert_authority_path: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.CERTIFICATE
-    auth_cert_path: Optional[str] = None
-    auth_cert_key_path: Optional[str] = None
-    token: Optional[str] = field(repr=False, default=None)
-    token_path: Optional[str] = None
+    auth_cert_path: str | None = None
+    auth_cert_key_path: str | None = None
+    token: str | None = field(repr=False, default=None)
+    token_path: str | None = None
     namespace: str = "default"
     client_conn_timeout_s: int = 300
     client_read_timeout_s: int = 300
@@ -133,17 +113,14 @@ class Config:
     server: ServerConfig
     platform_auth: PlatformAuthConfig
     kube: KubeConfig
-    cors: CORSConfig
     cluster_name: str
-    bucket_provider: Union[
-        AWSProviderConfig,
-        MinioProviderConfig,
-        AzureProviderConfig,
-        GCPProviderConfig,
-        EMCECSProviderConfig,
-        OpenStackProviderConfig,
-    ]
+    bucket_provider: (
+        AWSProviderConfig
+        | MinioProviderConfig
+        | AzureProviderConfig
+        | GCPProviderConfig
+        | EMCECSProviderConfig
+        | OpenStackProviderConfig
+    )
     enable_docs: bool = False
     disable_creation: bool = False
-    zipkin: Optional[ZipkinConfig] = None
-    sentry: Optional[SentryConfig] = None

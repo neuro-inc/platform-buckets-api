@@ -2,13 +2,13 @@ import asyncio
 import json
 import logging
 import os
+from asyncio import timeout
 from collections.abc import AsyncIterator, Iterator
 
 import aiobotocore.session
 import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
-from async_timeout import timeout
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -56,7 +56,6 @@ def _moto_server(
     moto_container_image: str,
     moto_container_name: str,
 ) -> Iterator[URL]:
-
     try:
         container = docker_client.containers.get(moto_container_name)
         if reuse_docker:
@@ -100,7 +99,7 @@ async def wait_for_moto_server(
                     last_exc = exc
                 logger.debug(f"waiting for {url}: {last_exc}")
                 await asyncio.sleep(interval_s)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.fail(f"failed to connect to {url}: {last_exc}")
 
 
@@ -114,7 +113,8 @@ async def moto_server(_moto_server: URL) -> AsyncIterator[MotoConfig]:
             pass
     boto_session = aiobotocore.session.get_session()
     async with boto_session.create_client(
-        "iam", endpoint_url=str(_moto_server),
+        "iam",
+        endpoint_url=str(_moto_server),
         region_name="us-east-1",
         aws_access_key_id="access-key",
         aws_secret_access_key="secret-key",

@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Callable
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 import aiohttp.web
 from aiohttp_apispec import querystring_schema
@@ -12,17 +12,19 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def query_schema(**kwargs: fields.Field) -> Callable[[F], F]:
-    schema: Schema = Schema.from_dict(kwargs)()  # type: ignore
+    schema: Schema = Schema.from_dict(kwargs)()
 
     def _decorator(handler: F) -> F:
         @querystring_schema(schema)
         @functools.wraps(handler)
         async def _wrapped(self: Any, request: aiohttp.web.Request) -> Any:
             query_data = {
-                key: request.query.getall(key)
-                if len(request.query.getall(key)) > 1
-                or isinstance(schema.fields.get(key), fields.List)
-                else request.query[key]
+                key: (
+                    request.query.getall(key)
+                    if len(request.query.getall(key)) > 1
+                    or isinstance(schema.fields.get(key), fields.List)
+                    else request.query[key]
+                )
                 for key in request.query.keys()
             }
             validated = schema.load(query_data)
@@ -39,8 +41,8 @@ class ProviderTypeField(fields.String):
         return BucketsProviderType(res)
 
     def _serialize(
-        self, value: Optional[BucketsProviderType], *args: Any, **kwargs: Any
-    ) -> Optional[str]:
+        self, value: BucketsProviderType | None, *args: Any, **kwargs: Any
+    ) -> str | None:
         if value is None:
             return None
         return super()._serialize(value.value, *args, **kwargs)

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission
 
 from platform_buckets_api.storage import BaseBucket
@@ -11,7 +9,7 @@ class PermissionsService:
         self._bucket_cluster_uri = f"blob://{cluster_name}"
 
     def get_create_bucket_perms(
-        self, project_name: str, org_name: Optional[str]
+        self, project_name: str, org_name: str | None
     ) -> list[Permission]:
         if org_name:
             return [

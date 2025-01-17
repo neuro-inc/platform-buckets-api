@@ -1,5 +1,4 @@
 from dataclasses import replace
-from typing import Optional
 from uuid import uuid4
 
 import pytest
@@ -29,7 +28,7 @@ class TestCredentialsStorage:
         return in_memory_credentials_storage
 
     def _make_credentials(
-        self, owner: str, name: Optional[str] = None, read_only: bool = False
+        self, owner: str, name: str | None = None, read_only: bool = False
     ) -> PersistentCredentials:
         return PersistentCredentials(
             id=f"credentials-{uuid4()}",
@@ -126,7 +125,7 @@ class TestBucketsStorage:
     def _make_bucket(
         self,
         username: str,
-        name: Optional[str],
+        name: str | None,
         public: bool = False,
         with_meta: bool = True,
     ) -> UserBucket:
@@ -148,7 +147,7 @@ class TestBucketsStorage:
     def _make_bucket_with_org(
         self,
         username: str,
-        name: Optional[str],
+        name: str | None,
         public: bool = False,
         with_meta: bool = True,
     ) -> UserBucket:
@@ -170,7 +169,7 @@ class TestBucketsStorage:
     def _make_imported_bucket(
         self,
         username: str,
-        name: Optional[str],
+        name: str | None,
         public: bool = False,
     ) -> ImportedBucket:
         return ImportedBucket(

@@ -1,12 +1,12 @@
 import asyncio
 import logging
+from asyncio import timeout
 from collections.abc import AsyncIterator, Iterator
 
 import aiobotocore.session
 import aiohttp
 import pytest
 from aiobotocore.client import AioBaseClient
-from async_timeout import timeout
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -44,7 +44,6 @@ def _minio_server(
     minio_container_image: str,
     minio_container_name: str,
 ) -> Iterator[URL]:
-
     try:
         container = docker_client.containers.get(minio_container_name)
         if reuse_docker:
@@ -94,7 +93,7 @@ async def wait_for_minio_server(
                     last_exc = exc
                 logger.debug(f"waiting for {url}: {last_exc}")
                 await asyncio.sleep(interval_s)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.fail(f"failed to connect to {url}: {last_exc}")
 
 

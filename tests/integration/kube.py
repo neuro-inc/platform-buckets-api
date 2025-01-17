@@ -3,7 +3,7 @@ import json
 import subprocess
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
@@ -38,9 +38,7 @@ def kube_config_user_payload(kube_config_payload: dict[str, Any]) -> Any:
 
 
 @pytest.fixture(scope="session")
-def cert_authority_data_pem(
-    kube_config_cluster_payload: dict[str, Any]
-) -> Optional[str]:
+def cert_authority_data_pem(kube_config_cluster_payload: dict[str, Any]) -> str | None:
     ca_path = kube_config_cluster_payload["certificate-authority"]
     if ca_path:
         return Path(ca_path).read_text()
@@ -51,7 +49,7 @@ def cert_authority_data_pem(
 async def kube_config(
     kube_config_cluster_payload: dict[str, Any],
     kube_config_user_payload: dict[str, Any],
-    cert_authority_data_pem: Optional[str],
+    cert_authority_data_pem: str | None,
 ) -> KubeConfig:
     cluster = kube_config_cluster_payload
     user = kube_config_user_payload

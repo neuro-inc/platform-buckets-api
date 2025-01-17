@@ -1,14 +1,14 @@
 import asyncio
 import logging
 import os
+from asyncio import timeout
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import aiohttp
 import pytest
 from aiohttp.hdrs import AUTHORIZATION
-from async_timeout import timeout
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -110,7 +110,7 @@ async def wait_for_auth_server(
                     last_exc = exc
                 logger.debug(f"waiting for {url}: {last_exc}")
                 await asyncio.sleep(interval_s)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.fail(f"failed to connect to {url}: {last_exc}")
 
 
@@ -168,12 +168,12 @@ class _User(User):
 class UserFactory(Protocol):
     async def __call__(
         self,
-        name: Optional[str] = None,
-        org_name: Optional[str] = None,
+        name: str | None = None,
+        org_name: str | None = None,
         org_level: bool = False,
         project_name: str = "test-project",
     ) -> _User:
-        ...
+        pass
 
 
 @pytest.fixture
@@ -184,8 +184,8 @@ async def regular_user_factory(
     cluster_name: str,
 ) -> AsyncIterator[UserFactory]:
     async def _factory(
-        name: Optional[str] = None,
-        org_name: Optional[str] = None,
+        name: str | None = None,
+        org_name: str | None = None,
         org_level: bool = False,
         project_name: str = "test-project",
     ) -> _User:

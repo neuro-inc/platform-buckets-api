@@ -3,7 +3,7 @@ import sys
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Optional, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -22,9 +22,9 @@ else:
 
         async def __aexit__(
             self,
-            exc_type: Optional[type[BaseException]],
-            exc: Optional[BaseException],
-            tb: Optional[TracebackType],
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
         ) -> None:
             await self.thing.aclose()  # type: ignore
 

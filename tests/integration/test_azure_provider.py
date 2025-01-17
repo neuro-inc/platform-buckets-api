@@ -12,7 +12,6 @@ from platform_buckets_api.providers import (
     _container_policies_as_dict,
 )
 from platform_buckets_api.storage import ProviderBucket
-
 from tests.integration.test_provider_base import (
     BUCKET_NAME_PREFIX,
     BasicBucketClient,

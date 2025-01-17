@@ -1,4 +1,4 @@
-FROM python:3.9.9-slim-bullseye AS installer
+FROM python:3.13.1-slim-bookworm AS installer
 
 ENV PATH=/root/.local/bin:$PATH
 
@@ -13,7 +13,7 @@ RUN apt-get -q update && apt-get -q install -y wget
 RUN wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
 RUN chmod +x mc
 
-FROM python:3.9.9-slim-bullseye as service
+FROM python:3.13.1-slim-bookworm as service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-buckets-api"
 
