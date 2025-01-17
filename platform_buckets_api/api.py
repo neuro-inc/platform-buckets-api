@@ -4,7 +4,7 @@ import logging
 import textwrap
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import aiobotocore.session
 import aiohttp
@@ -41,7 +41,7 @@ from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
 from marshmallow import Schema, fields
 from neuro_auth_client import AuthClient, Permission, User
-from neuro_auth_client.security import AuthScheme, setup_security
+from neuro_auth_client.security import AuthPolicy, AuthScheme, setup_security
 from neuro_logging import (
     init_logging,
     setup_sentry,
@@ -128,7 +128,7 @@ async def check_any_permissions(
     request: aiohttp.web.Request, permissions: list[Permission]
 ) -> None:
     user_name = await check_authorized(request)
-    auth_policy = request.config_dict.get(AUTZ_KEY)
+    auth_policy = cast(AuthPolicy, request.config_dict.get(AUTZ_KEY))
     if not auth_policy:
         raise RuntimeError("Auth policy not configured")
 
@@ -951,7 +951,7 @@ async def create_app(
     config: Config, _bucket_provider: Optional[BucketProvider] = None
 ) -> aiohttp.web.Application:
     app = aiohttp.web.Application(middlewares=[handle_exceptions])
-    app[config] = config
+    app[CONFIG_KEY] = config
 
     async def _init_app(app: aiohttp.web.Application) -> AsyncIterator[None]:
         async with AsyncExitStack() as exit_stack:

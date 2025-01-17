@@ -721,7 +721,7 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
             public_access=access_policy["public_access"],
         )
 
-        assert self._blob_client.account_name, "account name is required"
+        assert container_client.account_name, "account name is required"
 
         sas_token = generate_container_sas(
             container_client.account_name,
