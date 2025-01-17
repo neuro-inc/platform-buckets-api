@@ -92,7 +92,6 @@ def config_factory(
             "server": ServerConfig(host="0.0.0.0", port=8080),
             "platform_auth": auth_config,
             "kube": kube_config,
-            "sentry": None,
             "cluster_name": cluster_name,
             "bucket_provider": AWSProviderConfig(
                 endpoint_url=moto_server.url,

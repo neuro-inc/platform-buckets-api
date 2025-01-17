@@ -76,8 +76,6 @@ def test_create_custom(cert_authority_path: str, token_path: str) -> None:
         "NP_BUCKETS_API_PLATFORM_AUTH_TOKEN": "platform-auth-token",
         "NP_BUCKETS_API_ENABLE_DOCS": "true",
         "NP_BUCKETS_API_DISABLE_CREATION": "true",
-        "NP_SENTRY_DSN": "https://test.com",
-        "NP_SENTRY_CLUSTER_NAME": "test",
         "NP_CLUSTER_NAME": "test-cluster",
         "NP_BUCKET_PROVIDER_TYPE": "aws",
         "NP_AWS_ACCESS_KEY_ID": "key-id",
