@@ -26,12 +26,12 @@ jobs:
     - name: Install python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.9
+        python-version-file: .python-version
     - name: Cache packages
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.9-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
+        key: ${{ runner.os }}-py-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Install MC (minio client)
