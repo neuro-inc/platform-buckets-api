@@ -20,7 +20,7 @@ repos:
   - id: shed
     args:
     - --refactor
-    - --py39-plus
+    - --py313-plus
     types_or:
     - python
     - markdown

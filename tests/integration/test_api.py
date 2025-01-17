@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import aiohttp
 import pytest
@@ -148,10 +148,10 @@ class TestApi:
     class BucketFactory(Protocol):
         async def __call__(
             self,
-            name: Optional[str],
+            name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: Optional[str] = None,
+            org_name: str | None = None,
         ) -> dict[str, Any]:
             pass
 
@@ -160,10 +160,10 @@ class TestApi:
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
         async def _factory(
-            name: Optional[str],
+            name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: Optional[str] = None,
+            org_name: str | None = None,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
@@ -186,10 +186,10 @@ class TestApi:
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> BucketFactory:
         async def _factory(
-            name: Optional[str],
+            name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: Optional[str] = None,
+            org_name: str | None = None,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
@@ -211,10 +211,10 @@ class TestApi:
         return _factory
 
     CredentialsFactory = Callable[
-        [Optional[str], _User, list[str]], Awaitable[dict[str, Any]]
+        [str | None, _User, list[str]], Awaitable[dict[str, Any]]
     ]
     CredentialsFactoryWithReadOnly = Callable[
-        [Optional[str], _User, list[str], bool], Awaitable[dict[str, Any]]
+        [str | None, _User, list[str], bool], Awaitable[dict[str, Any]]
     ]
 
     @pytest.fixture()
@@ -222,7 +222,7 @@ class TestApi:
         self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
     ) -> CredentialsFactory:
         async def _factory(
-            name: Optional[str],
+            name: str | None,
             user: _User,
             bucket_ids: list[str],
             read_only: bool = False,

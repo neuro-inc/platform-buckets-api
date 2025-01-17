@@ -88,19 +88,19 @@ def config_factory(
     s3_role: str,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
-        defaults = dict(
-            server=ServerConfig(host="0.0.0.0", port=8080),
-            platform_auth=auth_config,
-            kube=kube_config,
-            sentry=None,
-            cluster_name=cluster_name,
-            bucket_provider=AWSProviderConfig(
+        defaults = {
+            "server": ServerConfig(host="0.0.0.0", port=8080),
+            "platform_auth": auth_config,
+            "kube": kube_config,
+            "sentry": None,
+            "cluster_name": cluster_name,
+            "bucket_provider": AWSProviderConfig(
                 endpoint_url=moto_server.url,
                 access_key_id=moto_server.admin_access_key_id,
                 secret_access_key=moto_server.admin_secret_access_key,
                 s3_role_arn=s3_role,
             ),
-        )
+        }
         kwargs = {**defaults, **kwargs}
         return Config(**kwargs)
 

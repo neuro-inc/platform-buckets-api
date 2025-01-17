@@ -3,7 +3,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiohttp.web
 
@@ -28,7 +28,7 @@ async def ndjson_error_handler(
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def datetime_dump(dt: datetime) -> str:
@@ -36,4 +36,4 @@ def datetime_dump(dt: datetime) -> str:
 
 
 def datetime_load(raw: str) -> datetime:
-    return datetime.fromtimestamp(float(raw), timezone.utc)
+    return datetime.fromtimestamp(float(raw), UTC)

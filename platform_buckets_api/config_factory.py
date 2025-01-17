@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Union
 
 from yarl import URL
 
@@ -26,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 class EnvironConfigFactory:
-    def __init__(self, environ: Optional[dict[str, str]] = None) -> None:
+    def __init__(self, environ: dict[str, str] | None = None) -> None:
         self._environ = environ or os.environ
 
-    def _get_url(self, name: str) -> Optional[URL]:
+    def _get_url(self, name: str) -> URL | None:
         value = self._environ[name]
         if value == "-":
             return None
@@ -64,23 +63,25 @@ class EnvironConfigFactory:
 
     def create_bucket_provider(
         self,
-    ) -> Union[
-        AWSProviderConfig,
-        MinioProviderConfig,
-        AzureProviderConfig,
-        GCPProviderConfig,
-        EMCECSProviderConfig,
-        OpenStackProviderConfig,
-    ]:
+    ) -> (
+        AWSProviderConfig
+        | MinioProviderConfig
+        | AzureProviderConfig
+        | GCPProviderConfig
+        | EMCECSProviderConfig
+        | OpenStackProviderConfig
+    ):
         type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type == BucketsProviderType.AWS:
             return AWSProviderConfig(
                 s3_role_arn=self._environ["NP_AWS_S3_ROLE_ARN"],
                 access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID") or None,
                 secret_access_key=self._environ.get("NP_AWS_SECRET_ACCESS_KEY") or None,
-                endpoint_url=URL(self._environ["NP_AWS_ENDPOINT_URL"])
-                if "NP_AWS_ENDPOINT_URL" in self._environ
-                else None,
+                endpoint_url=(
+                    URL(self._environ["NP_AWS_ENDPOINT_URL"])
+                    if "NP_AWS_ENDPOINT_URL" in self._environ
+                    else None
+                ),
                 region_name=self._environ.get("NP_AWS_REGION_NAME")
                 or AWSProviderConfig.region_name,
             )

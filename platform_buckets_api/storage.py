@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar, Optional, Union
+from typing import ClassVar, Union
 
 from .config import BucketsProviderType
 from .utils.asyncio import asyncgeneratorcontextmanager
@@ -40,13 +40,13 @@ class ProviderRole:
 class ProviderBucket:
     provider_type: BucketsProviderType
     name: str
-    metadata: Optional[Mapping[str, str]] = None
+    metadata: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
 class PersistentCredentials:
     id: str
-    name: Optional[str]
+    name: str | None
     owner: str
     bucket_ids: list[str]
     role: ProviderRole
@@ -56,9 +56,9 @@ class PersistentCredentials:
 @dataclass(frozen=True)
 class BaseBucket(abc.ABC):
     id: str
-    name: Optional[str]
+    name: str | None
     owner: str
-    org_name: Optional[str]
+    org_name: str | None
     project_name: str
     created_at: datetime
     provider_bucket: ProviderBucket
@@ -83,7 +83,7 @@ BucketType = Union[UserBucket, ImportedBucket]
 class BucketsStorage(abc.ABC):
     @abc.abstractmethod
     def list_buckets(
-        self, org_name: Optional[str] = None, project_name: Optional[str] = None
+        self, org_name: str | None = None, project_name: str | None = None
     ) -> AbstractAsyncContextManager[AsyncIterator[BucketType]]:
         pass
 
@@ -93,7 +93,7 @@ class BucketsStorage(abc.ABC):
 
     @abc.abstractmethod
     async def get_bucket_by_name(
-        self, name: str, org_name: Optional[str], project_name: str
+        self, name: str, org_name: str | None, project_name: str
     ) -> BucketType:
         pass
 
@@ -113,7 +113,7 @@ class BucketsStorage(abc.ABC):
 class CredentialsStorage(abc.ABC):
     @abc.abstractmethod
     def list_credentials(
-        self, owner: Optional[str] = None
+        self, owner: str | None = None
     ) -> AbstractAsyncContextManager[AsyncIterator[PersistentCredentials]]:
         pass
 
@@ -146,7 +146,7 @@ class InMemoryBucketsStorage(BucketsStorage):
 
     @asyncgeneratorcontextmanager
     async def list_buckets(
-        self, org_name: Optional[str] = None, project_name: Optional[str] = None
+        self, org_name: str | None = None, project_name: str | None = None
     ) -> AsyncIterator[BucketType]:
         for bucket in self._buckets:
             if org_name and org_name != bucket.org_name:
@@ -179,7 +179,7 @@ class InMemoryBucketsStorage(BucketsStorage):
         raise NotExistsError(f"UserBucket with id {id} doesn't exist")
 
     async def get_bucket_by_name(
-        self, name: str, org_name: Optional[str], project_name: str
+        self, name: str, org_name: str | None, project_name: str
     ) -> BucketType:
         for bucket in self._buckets:
             if (
@@ -210,7 +210,7 @@ class InMemoryCredentialsStorage(CredentialsStorage):
 
     @asyncgeneratorcontextmanager
     async def list_credentials(
-        self, owner: Optional[str] = None
+        self, owner: str | None = None
     ) -> AsyncIterator[PersistentCredentials]:
         for credentials in self._credentials:
             if owner is None or credentials.owner == owner:

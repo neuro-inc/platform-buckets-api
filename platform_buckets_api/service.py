@@ -5,7 +5,6 @@ import string
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from typing import Optional
 from uuid import uuid4
 
 from yarl import URL
@@ -37,7 +36,7 @@ logger = logging.getLogger()
 NEURO_BUCKET_PREFIX = "neuro-pl"
 
 
-def make_bucket_prefix(org_name: Optional[str], project_name: str) -> str:
+def make_bucket_prefix(org_name: str | None, project_name: str) -> str:
     hasher = hashlib.new("sha256")
     if org_name:
         hasher.update(org_name.encode("utf-8"))
@@ -45,9 +44,7 @@ def make_bucket_prefix(org_name: Optional[str], project_name: str) -> str:
     return f"{NEURO_BUCKET_PREFIX}-{hasher.hexdigest()[:10]}"
 
 
-def make_bucket_name(
-    org_name: Optional[str], project_name: str, name: Optional[str]
-) -> str:
+def make_bucket_name(org_name: str | None, project_name: str, name: str | None) -> str:
     res = make_bucket_prefix(org_name, project_name)
     if org_name:
         res += f"-{org_name}"
@@ -60,7 +57,7 @@ def make_bucket_name(
     return res[:45] + secrets.token_hex(6)
 
 
-def make_role_name(name: Optional[str], owner: str) -> str:
+def make_role_name(name: str | None, owner: str) -> str:
     res = f"bkt-user-{owner}"
     if name is not None:
         res += f"-{name}"
@@ -82,8 +79,8 @@ class BucketsService:
         self,
         owner: str,
         project_name: str,
-        org_name: Optional[str],
-        name: Optional[str] = None,
+        org_name: str | None,
+        name: str | None = None,
     ) -> UserBucket:
         real_name = make_bucket_name(org_name, project_name, name)
         provider_bucket = await self._provider.create_bucket(real_name)
@@ -111,8 +108,8 @@ class BucketsService:
         provider_bucket_name: str,
         provider_type: BucketsProviderType,
         credentials: Mapping[str, str],
-        org_name: Optional[str],
-        name: Optional[str] = None,
+        org_name: str | None,
+        name: str | None = None,
     ) -> ImportedBucket:
         bucket = ImportedBucket(
             id=f"bucket-{uuid4()}",
@@ -135,7 +132,7 @@ class BucketsService:
         return await self._storage.get_bucket(id)
 
     async def get_bucket_by_name(
-        self, name: str, org_name: Optional[str], project_name: str
+        self, name: str, org_name: str | None, project_name: str
     ) -> BaseBucket:
         try:
             return await self._storage.get_bucket_by_name(name, org_name, project_name)
@@ -212,8 +209,8 @@ class BucketsService:
     async def get_buckets(
         self,
         owner: str,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
+        org_name: str | None = None,
+        project_name: str | None = None,
     ) -> AsyncIterator[BaseBucket]:
         checker = await self._permissions_service.get_perms_checker(owner)
         async with self._storage.list_buckets(
@@ -248,7 +245,7 @@ class PersistentCredentialsService:
         self,
         bucket_ids: Iterable[str],
         owner: str,
-        name: Optional[str] = None,
+        name: str | None = None,
         read_only: bool = False,
     ) -> PersistentCredentials:
         role_name = make_role_name(name, owner)

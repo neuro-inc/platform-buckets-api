@@ -5,7 +5,7 @@ import logging
 import ssl
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 from urllib.parse import urlsplit
 
 import aiohttp
@@ -121,20 +121,20 @@ class BucketCRDMapper:
     @staticmethod
     def from_primitive(payload: dict[str, Any]) -> BucketType:
         owner = payload["metadata"]["labels"][OWNER_LABEL]
-        common_kwargs = dict(
-            id=payload["metadata"]["labels"][ID_LABEL],
-            name=payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
-            owner=owner,
-            org_name=payload["metadata"]["labels"].get(ORG_NAME_LABEL),
-            project_name=payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
-            created_at=datetime_load(payload["spec"]["created_at"]),
-            provider_bucket=ProviderBucket(
+        common_kwargs = {
+            "id": payload["metadata"]["labels"][ID_LABEL],
+            "name": payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
+            "owner": owner,
+            "org_name": payload["metadata"]["labels"].get(ORG_NAME_LABEL),
+            "project_name": payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
+            "created_at": datetime_load(payload["spec"]["created_at"]),
+            "provider_bucket": ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
                 name=payload["spec"]["provider_name"],
                 metadata=payload["spec"].get("metadata"),
             ),
-            public=payload["spec"].get("public", False),
-        )
+            "public": payload["spec"].get("public", False),
+        }
         if payload["spec"].get("imported", False):
             return ImportedBucket(
                 **common_kwargs,
@@ -150,13 +150,13 @@ class BucketCRDMapper:
         # Use this strange key as name to enable uniqueness of owner/name pair
         if entry.name:
             if entry.project_name == entry.owner:
-                kwargs = dict(name=entry.name, owner=entry.owner)
+                kwargs = {"name": entry.name, "owner": entry.owner}
             else:
-                kwargs = dict(name=entry.name, project_name=entry.project_name)
+                kwargs = {"name": entry.name, "project_name": entry.project_name}
                 if entry.org_name:
                     kwargs["org_name"] = entry.org_name
         else:
-            kwargs = dict(id=entry.id)
+            kwargs = {"id": entry.id}
         name = f"user-bucket-{_k8s_name_safe(**kwargs)}"
         labels = {
             ID_LABEL: entry.id,
@@ -195,19 +195,19 @@ class KubeClient:
         *,
         base_url: str,
         namespace: str,
-        cert_authority_path: Optional[str] = None,
-        cert_authority_data_pem: Optional[str] = None,
+        cert_authority_path: str | None = None,
+        cert_authority_data_pem: str | None = None,
         auth_type: KubeClientAuthType = KubeClientAuthType.CERTIFICATE,
-        auth_cert_path: Optional[str] = None,
-        auth_cert_key_path: Optional[str] = None,
-        token: Optional[str] = None,
-        token_path: Optional[str] = None,
+        auth_cert_path: str | None = None,
+        auth_cert_key_path: str | None = None,
+        token: str | None = None,
+        token_path: str | None = None,
         token_update_interval_s: int = 300,
         conn_timeout_s: int = 300,
         read_timeout_s: int = 100,
         watch_timeout_s: int = 1800,
         conn_pool_size: int = 100,
-        trace_configs: Optional[list[aiohttp.TraceConfig]] = None,
+        trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._base_url = base_url
         self._namespace = namespace
@@ -228,14 +228,14 @@ class KubeClient:
         self._conn_pool_size = conn_pool_size
         self._trace_configs = trace_configs
 
-        self._client: Optional[aiohttp.ClientSession] = None
-        self._token_updater_task: Optional[asyncio.Task[None]] = None
+        self._client: aiohttp.ClientSession | None = None
+        self._token_updater_task: asyncio.Task[None] | None = None
 
     @property
     def _is_ssl(self) -> bool:
         return urlsplit(self._base_url).scheme == "https"
 
-    def _create_ssl_context(self) -> Union[bool, ssl.SSLContext]:
+    def _create_ssl_context(self) -> bool | ssl.SSLContext:
         if not self._is_ssl:
             return True
         ssl_context = ssl.create_default_context(
@@ -304,7 +304,7 @@ class KubeClient:
     def _api_v1_url(self) -> str:
         return f"{self._base_url}/api/v1"
 
-    def _generate_namespace_url(self, namespace_name: Optional[str] = None) -> str:
+    def _generate_namespace_url(self, namespace_name: str | None = None) -> str:
         namespace_name = namespace_name or self._namespace
         return f"{self._api_v1_url}/namespaces/{namespace_name}"
 
@@ -332,9 +332,7 @@ class KubeClient:
     def _generate_user_bucket_url(self, name: str) -> str:
         return f"{self._user_buckets_url}/{name}"
 
-    def _create_headers(
-        self, headers: Optional[dict[str, Any]] = None
-    ) -> dict[str, Any]:
+    def _create_headers(self, headers: dict[str, Any] | None = None) -> dict[str, Any]:
         headers = dict(headers) if headers else {}
         if self._auth_type == KubeClientAuthType.TOKEN and self._token:
             headers["Authorization"] = "Bearer " + self._token
@@ -380,9 +378,9 @@ class KubeClient:
 
     async def list_persistent_credentials(
         self,
-        id: Optional[str] = None,
-        owner: Optional[str] = None,
-        name: Optional[str] = None,
+        id: str | None = None,
+        owner: str | None = None,
+        name: str | None = None,
     ) -> list[PersistentCredentials]:
         url = self._persistent_bucket_credentials_url
         label_selectors = []
@@ -428,11 +426,11 @@ class KubeClient:
 
     async def list_user_buckets(
         self,
-        id: Optional[str] = None,
-        owner: Optional[str] = None,
-        name: Optional[str] = None,
-        org_name: Optional[str] = None,
-        project_name: Optional[str] = None,
+        id: str | None = None,
+        owner: str | None = None,
+        name: str | None = None,
+        org_name: str | None = None,
+        project_name: str | None = None,
     ) -> list[BucketType]:
         url = self._user_buckets_url
         label_selectors = []
