@@ -32,8 +32,8 @@ class BucketsProviderType(str, enum.Enum):
 class AWSProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
     s3_role_arn: str
-    access_key_id: str | None = None
-    secret_access_key: str | None = None
+    access_key_id: str | None = field(repr=False, default=None)
+    secret_access_key: str | None = field(repr=False, default=None)
     region_name: str = "us-east-1"
     endpoint_url: URL | None = None
 
@@ -41,8 +41,8 @@ class AWSProviderConfig:
 @dataclass(frozen=True)
 class MinioProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.MINIO
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: str = field(repr=False)
+    secret_access_key: str = field(repr=False)
     region_name: str
     endpoint_url: URL
     endpoint_public_url: URL
@@ -52,13 +52,13 @@ class MinioProviderConfig:
 class AzureProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.AZURE
     endpoint_url: URL
-    credential: str
+    credential: str = field(repr=False)
 
 
 @dataclass(frozen=True)
 class GCPProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.GCP
-    key_json: Mapping[str, str]
+    key_json: Mapping[str, str] = field(repr=False)
 
     @property
     def sa_credentials(self) -> SACredentials:
@@ -69,8 +69,8 @@ class GCPProviderConfig:
 class EMCECSProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.EMC_ECS
     s3_role_urn: str
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: str = field(repr=False)
+    secret_access_key: str = field(repr=False)
     s3_endpoint_url: URL
     management_endpoint_url: URL
 
@@ -79,7 +79,7 @@ class EMCECSProviderConfig:
 class OpenStackProviderConfig:
     type: ClassVar[BucketsProviderType] = BucketsProviderType.OPEN_STACK
     account_id: str
-    password: str
+    password: str = field(repr=False)
     region_name: str
     endpoint_url: URL
     s3_endpoint_url: URL
