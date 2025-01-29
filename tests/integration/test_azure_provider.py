@@ -90,7 +90,7 @@ async def azure_raw_credentials() -> tuple[str, str]:
 
 @pytest.fixture()
 async def azure_blob_client(
-    azure_raw_credentials: tuple[str, str]
+    azure_raw_credentials: tuple[str, str],
 ) -> AsyncIterator[BlobServiceClient]:
     async def _cleanup_containers(client: BlobServiceClient) -> None:
         async for container in client.list_containers():

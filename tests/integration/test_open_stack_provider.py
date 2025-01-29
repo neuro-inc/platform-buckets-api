@@ -32,7 +32,7 @@ async def open_stack_config() -> Mapping[str, Any]:
 
 @pytest.fixture()
 async def open_stack_s3(
-    open_stack_config: Mapping[str, Any]
+    open_stack_config: Mapping[str, Any],
 ) -> AsyncIterator[AioBaseClient]:
     session = aiobotocore.session.get_session()
     async with session.create_client(
