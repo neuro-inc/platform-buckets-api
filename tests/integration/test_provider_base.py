@@ -67,7 +67,7 @@ class ProviderTestOption:
 
 
 def as_admin_cm(
-    creator_func: Callable[[ProviderBucket], BasicBucketClient]
+    creator_func: Callable[[ProviderBucket], BasicBucketClient],
 ) -> Callable[[ProviderBucket], AbstractAsyncContextManager[BasicBucketClient]]:
     @asynccontextmanager
     async def creator(bucket: ProviderBucket) -> AsyncIterator[BasicBucketClient]:
