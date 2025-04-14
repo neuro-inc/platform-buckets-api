@@ -21,7 +21,7 @@ from collections.abc import (
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from os import fdopen
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 import aiobotocore.session
 import aiohttp
@@ -42,12 +42,19 @@ from azure.storage.blob import (
 )
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from bmc._utils import Command
+from google.api_core.exceptions import BadRequest as GoogleBadRequest
 from google.api_core.iam import Policy
+from google.api_core.retry import Retry
 from google.cloud.iam_credentials import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
 from google.cloud.storage.constants import (
     PUBLIC_ACCESS_PREVENTION_ENFORCED,
     PUBLIC_ACCESS_PREVENTION_UNSPECIFIED,
+)
+from google.cloud.storage.retry import (
+    DEFAULT_RETRY,
+    ConditionalRetryPolicy,
+    is_etag_in_json,
 )
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError as GoogleHttpError
@@ -247,7 +254,7 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
         sts_client: AioBaseClient,
         s3_role_arn: str,
         session_duration_s: int = 3600,
-        public_url: Optional[URL] = None,
+        public_url: URL | None = None,
     ):
         self._s3_client = s3_client
         self._sts_client = sts_client
@@ -466,7 +473,7 @@ class BMCWrapper:
         self._url = url
         self._username = username
         self._password = password
-        self._target: Optional[str] = None
+        self._target: str | None = None
 
     def _make_wrapper(
         self, real_func: Callable[..., Any]
@@ -526,7 +533,7 @@ class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         sts_client: AioBaseClient,
         mc: BMCWrapper,
         session_duration_s: int = 3600,
-        public_url: Optional[URL] = None,
+        public_url: URL | None = None,
     ):
         super().__init__(
             s3_client,
@@ -607,9 +614,12 @@ class AzureUserBucketOperations(UserBucketOperations):
     async def sign_url_for_blob(
         self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
     ) -> URL:
-        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        expiry = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
             seconds=expires_in_sec
         )
+
+        assert self._blob_client.account_name, "account name is required"
+
         token: str = generate_blob_sas(
             account_name=self._blob_client.account_name,
             blob_name=key,
@@ -663,9 +673,10 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
     async def get_bucket_credentials(
         self, bucket: ProviderBucket, write: bool, requester: str
     ) -> Mapping[str, str]:
-        expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-            hours=1
-        )
+        expiry = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
+
+        assert self._blob_client.account_name, "account name is required"
+
         token: str = generate_container_sas(
             account_name=self._blob_client.account_name,
             container_name=bucket.name,
@@ -714,6 +725,9 @@ class AzureBucketProvider(BucketProvider, AzureUserBucketOperations):
             signed_identifiers=policies,
             public_access=access_policy["public_access"],
         )
+
+        assert container_client.account_name, "account name is required"
+
         sas_token = generate_container_sas(
             container_client.account_name,
             container_client.container_name,
@@ -878,14 +892,21 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
 
     @run_in_executor
     def _add_iam_policy_to_bucket(
-        self, bucket_name: str, role: str, sa_email: str
+        self,
+        bucket_name: str,
+        role: str,
+        sa_email: str,
+        retry: Retry | None = None,
     ) -> None:
         bucket = self._gcs_client.bucket(bucket_name)
         policy = bucket.get_iam_policy()
         policy.bindings += [
             {"members": {policy.service_account(sa_email)}, "role": role}
         ]
-        bucket.set_iam_policy(policy)
+        kwargs = {}
+        if retry:
+            kwargs["retry"] = ConditionalRetryPolicy(retry, is_etag_in_json, ["data"])
+        bucket.set_iam_policy(policy, **kwargs)
 
     @run_in_executor
     def _drop_sa_roles_for_buckets(self, sa_email: str) -> None:
@@ -918,16 +939,29 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
         self._iam_client.projects().serviceAccounts().delete(name=full_name).execute()
 
     @run_in_executor
-    def _create_sa_key(self, full_name: str) -> Mapping[str, Any]:
-        return (
-            self._iam_client.projects()
-            .serviceAccounts()
-            .keys()
-            .create(name=full_name)
-            .execute()
-        )
+    def _create_sa_key(
+        self, full_name: str, retry: Retry | None = None
+    ) -> Mapping[str, Any]:
+        def _create() -> Mapping[str, Any]:
+            return (
+                self._iam_client.projects()
+                .serviceAccounts()
+                .keys()
+                .create(name=full_name)
+                .execute()
+            )
+
+        if retry:
+            _create = retry(_create)
+
+        return _create()
 
     async def create_bucket(self, name: str) -> ProviderBucket:
+        def _should_retry_add_iam_policy(exc: Exception) -> bool:
+            if isinstance(exc, GoogleBadRequest) and "not exist" in str(exc):
+                return True
+            return DEFAULT_RETRY._predicate(exc)
+
         write_role_created = False
         read_role_created = False
         bucket_created = False
@@ -946,15 +980,19 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
                 description="Read only SA generated by platform bucket api",
             )
             read_role_created = True
+            # NOTE: New service account is not available immediately in Storage service.
+            # We will retry until it becomes available.
             await self._add_iam_policy_to_bucket(
                 bucket_name=name,
                 role="roles/storage.objectAdmin",
                 sa_email=self._make_bucket_sa_email(name, write=True),
+                retry=DEFAULT_RETRY.with_predicate(_should_retry_add_iam_policy),
             )
             await self._add_iam_policy_to_bucket(
                 bucket_name=name,
                 role="roles/storage.objectViewer",
                 sa_email=self._make_bucket_sa_email(name, write=False),
+                retry=DEFAULT_RETRY.with_predicate(_should_retry_add_iam_policy),
             )
         except Exception as e:
             if bucket_created:
@@ -994,6 +1032,11 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
     async def create_role(
         self, username: str, initial_permissions: Iterable[BucketPermission]
     ) -> ProviderRole:
+        def _should_retry_create_sa_key(exc: Exception) -> bool:
+            if isinstance(exc, GoogleHttpError) and "not exist" in str(exc):
+                return True
+            return False
+
         if len(username) > 30:
             raise ValueError("GCS account name cannot be larger then 30 characters")
         try:
@@ -1005,7 +1048,10 @@ class GoogleBucketProvider(BucketProvider, GoogleUserBucketOperations):
         except GoogleHttpError as e:
             if e.status_code == 409:
                 raise RoleExistsError(username)
-        resp = await self._create_sa_key(full_name=self._make_sa_full_name(username))
+        resp = await self._create_sa_key(
+            full_name=self._make_sa_full_name(username),
+            retry=Retry(_should_retry_create_sa_key),
+        )
         role = ProviderRole(
             provider_type=BucketsProviderType.GCP,
             name=username,
@@ -1066,7 +1112,7 @@ class OpenStackStorageApi:
         self._password = password
         self._client = aiohttp.ClientSession()
         self._url = url
-        self._token: Optional[OpenStackToken] = None
+        self._token: OpenStackToken | None = None
 
     async def __aenter__(self) -> "OpenStackStorageApi":
         return self
@@ -1082,7 +1128,7 @@ class OpenStackStorageApi:
         return self._account_id
 
     async def _get_token(self) -> OpenStackToken:
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         if self._token is None or self._token.expires_at - now < datetime.timedelta(
             minutes=15
         ):
@@ -1127,7 +1173,7 @@ class OpenStackStorageApi:
             return (await resp.text()).split("\n")
 
     async def create_container(
-        self, container_name: str, meta: Optional[Mapping[str, str]] = None
+        self, container_name: str, meta: Mapping[str, str] | None = None
     ) -> None:
         token = await self._get_token()
         headers = {"X-Auth-Token": token.token}
@@ -1140,7 +1186,7 @@ class OpenStackStorageApi:
             resp.raise_for_status()
 
     async def set_container_meta(
-        self, container_name: str, meta: Optional[Mapping[str, str]] = None
+        self, container_name: str, meta: Mapping[str, str] | None = None
     ) -> None:
         token = await self._get_token()
         headers = {"X-Auth-Token": token.token}
@@ -1325,12 +1371,12 @@ class OpenStackBucketProvider(BucketProvider):
         credentials = await self.get_bucket_credentials(
             bucket, write=False, requester="sign_url"
         )
-        client_kwargs = dict(
-            region_name=credentials["region_name"],
-            endpoint_url=credentials["endpoint_url"],
-            aws_secret_access_key=credentials["secret_access_key"],
-            aws_access_key_id=credentials["access_key_id"],
-        )
+        client_kwargs = {
+            "region_name": credentials["region_name"],
+            "endpoint_url": credentials["endpoint_url"],
+            "aws_secret_access_key": credentials["secret_access_key"],
+            "aws_access_key_id": credentials["access_key_id"],
+        }
         async with session.create_client("s3", **client_kwargs) as s3_client:
             return URL(
                 await s3_client.generate_presigned_url(

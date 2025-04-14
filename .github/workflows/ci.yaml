@@ -6,8 +6,6 @@ on:
     tags: [v*.*, v*.*.*]
   pull_request:
     branches: [master]
-  pull_request_target:
-    branches: [master]
   schedule:
   - cron: 0 4 * * *
 
@@ -15,9 +13,6 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
-      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     steps:
     - name: Checkout commit
       uses: actions/checkout@v4
@@ -26,12 +21,12 @@ jobs:
     - name: Install python
       uses: actions/setup-python@v5
       with:
-        python-version: 3.9
+        python-version-file: .python-version
     - name: Cache packages
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.9-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
+        key: ${{ runner.os }}-py-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Install MC (minio client)
@@ -76,7 +71,7 @@ jobs:
     - name: Build Docker image
       run: make docker_build
     - name: Upload image artifact
-      uses: neuro-inc/upload-image-action@v21.9.2
+      uses: neuro-inc/upload-image-action@v24.4.0
       with:
         image: platformbucketsapi
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +80,7 @@ jobs:
     name: Create release
     needs: test
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v0.0.31
+    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v24.10.0
     with:
       image: platformbucketsapi
       helm_charts: platform-buckets

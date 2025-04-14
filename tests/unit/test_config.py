@@ -10,7 +10,6 @@ from platform_buckets_api.config import (
     AWSProviderConfig,
     AzureProviderConfig,
     Config,
-    CORSConfig,
     EMCECSProviderConfig,
     GCPProviderConfig,
     KubeClientAuthType,
@@ -18,9 +17,7 @@ from platform_buckets_api.config import (
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
-    SentryConfig,
     ServerConfig,
-    ZipkinConfig,
 )
 from platform_buckets_api.config_factory import EnvironConfigFactory
 
@@ -57,7 +54,6 @@ def test_create_default(cert_authority_path: str, token_path: str) -> None:
     assert config == Config(
         server=ServerConfig(host="0.0.0.0", port=8080),
         platform_auth=PlatformAuthConfig(url=None, token=""),
-        cors=CORSConfig(),
         kube=KubeConfig(
             endpoint_url="https://localhost:8443",
             auth_type=KubeClientAuthType.CERTIFICATE,
@@ -78,12 +74,8 @@ def test_create_custom(cert_authority_path: str, token_path: str) -> None:
         "NP_BUCKETS_API_PORT": 8080,
         "NP_BUCKETS_API_PLATFORM_AUTH_URL": "http://platformauthapi/api/v1",
         "NP_BUCKETS_API_PLATFORM_AUTH_TOKEN": "platform-auth-token",
-        "NP_CORS_ORIGINS": "https://domain1.com,http://do.main",
         "NP_BUCKETS_API_ENABLE_DOCS": "true",
         "NP_BUCKETS_API_DISABLE_CREATION": "true",
-        "NP_ZIPKIN_URL": "http://zipkin:9411",
-        "NP_SENTRY_DSN": "https://test.com",
-        "NP_SENTRY_CLUSTER_NAME": "test",
         "NP_CLUSTER_NAME": "test-cluster",
         "NP_BUCKET_PROVIDER_TYPE": "aws",
         "NP_AWS_ACCESS_KEY_ID": "key-id",
@@ -108,7 +100,6 @@ def test_create_custom(cert_authority_path: str, token_path: str) -> None:
         platform_auth=PlatformAuthConfig(
             url=URL("http://platformauthapi/api/v1"), token="platform-auth-token"
         ),
-        cors=CORSConfig(["https://domain1.com", "http://do.main"]),
         kube=KubeConfig(
             endpoint_url="https://localhost:8443",
             cert_authority_data_pem=CA_DATA_PEM,
@@ -123,8 +114,6 @@ def test_create_custom(cert_authority_path: str, token_path: str) -> None:
             client_watch_timeout_s=555,
             client_conn_pool_size=333,
         ),
-        zipkin=ZipkinConfig(url=URL("http://zipkin:9411")),
-        sentry=SentryConfig(dsn=URL("https://test.com"), cluster_name="test"),
         enable_docs=True,
         disable_creation=True,
         cluster_name="test-cluster",

@@ -57,8 +57,6 @@ service:
 
 secrets: []
 
-zipkin: {}
-
 sentry: {}
 
 annotations: {}
@@ -69,9 +67,6 @@ platform:
   token: {}
 
 bucketNamespace: default
-
-cors:
-  origins: []
 
 enableDocs: false
 disableCreation: false

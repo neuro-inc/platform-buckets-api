@@ -12,7 +12,6 @@ from platform_buckets_api.providers import (
     _container_policies_as_dict,
 )
 from platform_buckets_api.storage import ProviderBucket
-
 from tests.integration.test_provider_base import (
     BUCKET_NAME_PREFIX,
     BasicBucketClient,
@@ -91,7 +90,7 @@ async def azure_raw_credentials() -> tuple[str, str]:
 
 @pytest.fixture()
 async def azure_blob_client(
-    azure_raw_credentials: tuple[str, str]
+    azure_raw_credentials: tuple[str, str],
 ) -> AsyncIterator[BlobServiceClient]:
     async def _cleanup_containers(client: BlobServiceClient) -> None:
         async for container in client.list_containers():

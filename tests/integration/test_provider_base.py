@@ -3,7 +3,7 @@ import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from aiohttp import ClientSession
@@ -67,7 +67,7 @@ class ProviderTestOption:
 
 
 def as_admin_cm(
-    creator_func: Callable[[ProviderBucket], BasicBucketClient]
+    creator_func: Callable[[ProviderBucket], BasicBucketClient],
 ) -> Callable[[ProviderBucket], AbstractAsyncContextManager[BasicBucketClient]]:
     @asynccontextmanager
     async def creator(bucket: ProviderBucket) -> AsyncIterator[BasicBucketClient]:
@@ -188,9 +188,10 @@ class TestProviderBase:
         credentials = await provider_option.provider.get_bucket_credentials(
             bucket, write=False, requester="testing"
         )
-        async with provider_option.make_client(
-            bucket, credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
 
     async def test_signed_url_for_blob(
@@ -242,7 +243,7 @@ class TestProviderBase:
         async with UserBucketOperations.get_for_imported_bucket(
             ImportedBucket(
                 id="not-important",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 owner="user",
                 name="not-important",
                 org_name=None,
@@ -353,9 +354,10 @@ class TestProviderBase:
         role = await provider_option.provider.create_role(
             _make_role_name(), permissions
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
 
     async def test_role_grant_access_multiple_buckets(
@@ -428,15 +430,17 @@ class TestProviderBase:
                 ),
             ],
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_read_access(admin, user_client)
         await provider_option.provider.set_role_permissions(
             role,
             [],
         )
-        async with provider_option.make_client(
-            bucket, role.credentials
-        ) as user_client, provider_option.get_admin(bucket) as admin:
+        async with (
+            provider_option.make_client(bucket, role.credentials) as user_client,
+            provider_option.get_admin(bucket) as admin,
+        ):
             await _test_no_access(admin, user_client)

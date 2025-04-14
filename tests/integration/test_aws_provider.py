@@ -9,7 +9,6 @@ from yarl import URL
 
 from platform_buckets_api.providers import AWSBucketProvider
 from platform_buckets_api.storage import ProviderBucket
-
 from tests.integration.conftest import MotoConfig
 from tests.integration.test_provider_base import (
     BasicBucketClient,

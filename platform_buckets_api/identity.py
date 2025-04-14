@@ -1,8 +1,10 @@
 import logging
 from dataclasses import dataclass, field
+from typing import cast
 
 from aiohttp.web import HTTPUnauthorized, Request
 from aiohttp_security.api import AUTZ_KEY, IDENTITY_KEY
+from neuro_auth_client.security import AuthPolicy, IdentityPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ async def untrusted_user(request: Request) -> Identity:
     """
     identity = await _get_identity(request)
 
-    autz_policy = request.config_dict.get(AUTZ_KEY)
+    autz_policy = cast(AuthPolicy, request.config_dict.get(AUTZ_KEY))
     name = autz_policy.get_user_name_from_identity(identity)
     if name is None:
         raise HTTPUnauthorized()
@@ -29,7 +31,7 @@ async def untrusted_user(request: Request) -> Identity:
 
 
 async def _get_identity(request: Request) -> str:
-    identity_policy = request.config_dict.get(IDENTITY_KEY)
+    identity_policy = cast(IdentityPolicy, request.config_dict.get(IDENTITY_KEY))
     identity = await identity_policy.identify(request)
     if identity is None:
         raise HTTPUnauthorized()

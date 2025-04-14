@@ -1,5 +1,4 @@
 from dataclasses import replace
-from typing import Optional
 
 import pytest
 from neuro_auth_client import (
@@ -27,7 +26,7 @@ class MockAuthClient(AuthClient):
         )
 
     async def get_permissions_tree(
-        self, name: str, resource: str, depth: Optional[int] = None
+        self, name: str, resource: str, depth: int | None = None
     ) -> ClientSubTreeViewRoot:
         return self.perm_tree_to_return
 
