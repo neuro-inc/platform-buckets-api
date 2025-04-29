@@ -65,7 +65,7 @@ jobs:
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        file: .coverage-integration.xml
+        files: .coverage-integration.xml
         flags: integration
         name: codecov-integration
     - name: Build Docker image
