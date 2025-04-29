@@ -23,7 +23,7 @@ jobs:
       with:
         python-version-file: .python-version
     - name: Cache packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-py-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
