@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+from apolo_kube_client.config import KubeClientAuthType
 from yarl import URL
 
 from .config import (
@@ -13,7 +14,6 @@ from .config import (
     Config,
     EMCECSProviderConfig,
     GCPProviderConfig,
-    KubeClientAuthType,
     KubeConfig,
     MinioProviderConfig,
     OpenStackProviderConfig,

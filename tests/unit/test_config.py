@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from apolo_kube_client.config import KubeClientAuthType, KubeConfig
 from yarl import URL
 
 from platform_buckets_api.config import (
@@ -12,8 +13,6 @@ from platform_buckets_api.config import (
     Config,
     EMCECSProviderConfig,
     GCPProviderConfig,
-    KubeClientAuthType,
-    KubeConfig,
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
@@ -56,7 +55,7 @@ def test_create_default(cert_authority_path: str, token_path: str) -> None:
         platform_auth=PlatformAuthConfig(url=None, token=""),
         kube=KubeConfig(
             endpoint_url="https://localhost:8443",
-            auth_type=KubeClientAuthType.CERTIFICATE,
+            auth_type=KubeClientAuthType.NONE,
         ),
         cluster_name="",
         bucket_provider=AWSProviderConfig(
