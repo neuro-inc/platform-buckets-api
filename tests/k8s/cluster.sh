@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
+set -o errexit
 
 # based on
 # https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
-
-function k8s::install_kubectl {
-    local kubectl_version=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-    curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${kubectl_version}/bin/linux/amd64/kubectl
-    chmod +x kubectl
-    sudo mv kubectl /usr/local/bin/
-}
 
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
@@ -19,25 +13,57 @@ function k8s::install_minikube {
     sudo mv minikube /usr/local/bin/
     sudo -E minikube config set WantReportErrorPrompt false
     sudo -E minikube config set WantNoneDriverWarning false
-    sudo modprobe br_netfilter
-    sudo echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
-    sudo echo 1 > /proc/sys/net/ipv4/ip_forward
 }
 
 function k8s::start {
-    export KUBECONFIG=$HOME/.kube/config
-    mkdir -p $(dirname $KUBECONFIG)
-    touch $KUBECONFIG
+    # ----------------------------------------------------------------------------
+    # Bring up a local Minikube cluster with the “none” driver.
+    # Preconditions:
+    #   * minikube binary already installed (see k8s::install_minikube)
+    #   * Docker (or containerd) present on the host
+    # ----------------------------------------------------------------------------
 
-    export MINIKUBE_WANTUPDATENOTIFICATION=false
-    export MINIKUBE_WANTREPORTERRORPROMPT=false
-    export MINIKUBE_HOME=$HOME
-    export CHANGE_MINIKUBE_NONE_USER=true
+    # ----- Kubeconfig -----------------------------------------------------------
+    export KUBECONFIG="$HOME/.kube/config"
+    mkdir -p "$(dirname "$KUBECONFIG")"
+    touch "$KUBECONFIG"
 
+    # ----- Minikube env vars ----------------------------------------------------
+    export MINIKUBE_DISABLE_PROMPT=1          # suppress interactive prompts
+    export MINIKUBE_DISABLE_WARNING=1         # suppress non-driver warning
+    export MINIKUBE_HOME="$HOME"
+    export CHANGE_MINIKUBE_NONE_USER=true     # allow non-root kubectl usage
+
+    # ----- Kernel prerequisites for the none driver ----------------------------
+    echo "• Enabling br_netfilter and required sysctl flags …"
+    sudo modprobe br_netfilter
+    sudo sysctl -w \
+        net.bridge.bridge-nf-call-iptables=1 \
+        net.bridge.bridge-nf-call-ip6tables=1 \
+        net.ipv4.ip_forward=1
+
+    # ----- Disable swap (kubeadm requirement) -----------------------------------
+    echo "• Disabling swap …"
+    sudo swapoff -a
+
+    # ----- Optional utilities required by kubeadm pre-flight --------------------
+    if ! command -v socat >/dev/null 2>&1; then
+        echo "• Installing socat (kubeadm pre-flight dependency) …"
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq socat
+    fi
+
+    # ----- Start Minikube -------------------------------------------------------
+    echo "• Starting Minikube (driver=none) …"
     sudo -E minikube start \
-        --vm-driver=none \
+        --driver=none \
         --wait=all \
         --wait-timeout=5m
+
+    # ----- Configure kubectl context & label the node ---------------------------
+    kubectl config use-context minikube
+    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
 }
 
 function k8s::apply_all_configurations {
@@ -76,7 +102,6 @@ function k8s::test {
 
 case "${1:-}" in
     install)
-        k8s::install_kubectl
         k8s::install_minikube
         ;;
     start)
