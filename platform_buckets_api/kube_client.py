@@ -24,8 +24,8 @@ ID_LABEL = "platform.neuromation.io/id"
 OWNER_LABEL = "platform.neuromation.io/owner"
 CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
 BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
-ORG_NAME_LABEL = "platform.neuromation.io/org_name"
-PROJECT_LABEL = "platform.neuromation.io/project"
+APOLO_ORG_NAME_LABEL = "platform.apolo.us/org"
+APOLO_PROJECT_NAME_LABEL = "platform.apolo.us/project"
 
 NO_ORG = "NO_ORG"
 
@@ -94,8 +94,10 @@ class BucketCRDMapper:
             "id": payload["metadata"]["labels"][ID_LABEL],
             "name": payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
             "owner": owner,
-            "org_name": payload["metadata"]["labels"].get(ORG_NAME_LABEL),
-            "project_name": payload["metadata"]["labels"].get(PROJECT_LABEL, owner),
+            "org_name": payload["metadata"]["labels"].get(APOLO_ORG_NAME_LABEL),
+            "project_name": payload["metadata"]["labels"].get(
+                APOLO_PROJECT_NAME_LABEL, owner
+            ),
             "created_at": datetime_load(payload["spec"]["created_at"]),
             "provider_bucket": ProviderBucket(
                 provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
@@ -116,46 +118,49 @@ class BucketCRDMapper:
 
     @staticmethod
     def to_primitive(entry: BucketType) -> dict[str, Any]:
-        # Use this strange key as name to enable uniqueness of owner/name pair
-        if entry.name:
-            if entry.project_name == entry.owner:
-                kwargs = {"name": entry.name, "owner": entry.owner}
-            else:
-                kwargs = {"name": entry.name, "project_name": entry.project_name}
-                if entry.org_name:
-                    kwargs["org_name"] = entry.org_name
-        else:
-            kwargs = {"id": entry.id}
-        name = f"user-bucket-{_k8s_name_safe(**kwargs)}"
         labels = {
             ID_LABEL: entry.id,
             OWNER_LABEL: entry.owner,
+            APOLO_PROJECT_NAME_LABEL: entry.project_name,
+            APOLO_ORG_NAME_LABEL: entry.org_name,
         }
+
+        # Use this strange key as name to enable the uniqueness of owner/name pair
         if entry.name:
             labels[BUCKET_NAME_LABEL] = entry.name
-        if entry.org_name:
-            labels[ORG_NAME_LABEL] = entry.org_name
-        if entry.project_name != entry.owner:
-            labels[PROJECT_LABEL] = entry.project_name
-        res: dict[str, Any] = {
+            if entry.project_name == entry.owner:
+                kwargs = {"name": entry.name, "owner": entry.owner}
+            else:
+                kwargs = {
+                    "name": entry.name,
+                    "project_name": entry.project_name,
+                    "org_name": entry.org_name,
+                }
+        else:
+            kwargs = {"id": entry.id}
+        name = f"user-bucket-{_k8s_name_safe(**kwargs)}"
+
+        spec = {
+            "provider_type": entry.provider_bucket.provider_type.value,
+            "provider_name": entry.provider_bucket.name,
+            "created_at": datetime_dump(entry.created_at),
+            "public": entry.public,
+            "metadata": entry.provider_bucket.metadata,
+        }
+
+        if isinstance(entry, ImportedBucket):
+            spec["imported"] = True
+            spec["credentials"] = entry.credentials
+
+        return {
             "kind": "UserBucket",
             "apiVersion": "neuromation.io/v1",
             "metadata": {
                 "name": name,
                 "labels": labels,
             },
-            "spec": {
-                "provider_type": entry.provider_bucket.provider_type.value,
-                "provider_name": entry.provider_bucket.name,
-                "created_at": datetime_dump(entry.created_at),
-                "public": entry.public,
-                "metadata": entry.provider_bucket.metadata,
-            },
+            "spec": spec,
         }
-        if isinstance(entry, ImportedBucket):
-            res["spec"]["imported"] = True
-            res["spec"]["credentials"] = entry.credentials
-        return res
 
 
 class KubeApi:
@@ -290,7 +295,7 @@ class KubeApi:
             normalized_name = normalize_name(org_name)
             if normalized_name != normalize_name(NO_ORG):
                 normalized_name = org_name
-            label_selectors.append(f"{ORG_NAME_LABEL}={normalized_name}")
+            label_selectors.append(f"{APOLO_ORG_NAME_LABEL}={normalized_name}")
         if label_selectors:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._kube.get(url=url, params=params)
