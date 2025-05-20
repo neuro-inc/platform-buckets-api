@@ -4,13 +4,6 @@ set -o errexit
 # based on
 # https://github.com/kubernetes/minikube#linux-continuous-integration-without-vm-support
 
-function k8s::install_kubectl {
-    local kubectl_version=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-    curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${kubectl_version}/bin/linux/amd64/kubectl
-    chmod +x kubectl
-    sudo mv kubectl /usr/local/bin/
-}
-
 function k8s::install_minikube {
     local minikube_version="v1.25.2"
     sudo apt-get update
@@ -23,7 +16,7 @@ function k8s::install_minikube {
 }
 
 function k8s::start {
-   # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
     # Bring up a local Minikube cluster with the “none” driver.
     # Preconditions:
     #   * minikube binary already installed (see k8s::install_minikube)
@@ -66,6 +59,11 @@ function k8s::start {
         --driver=none \
         --wait=all \
         --wait-timeout=5m
+
+    # ----- Configure kubectl context & label the node ---------------------------
+    kubectl config use-context minikube
+    kubectl get nodes -o name | xargs -I {} kubectl label {} --overwrite \
+        platform.neuromation.io/nodepool=minikube
 }
 
 function k8s::apply_all_configurations {
@@ -104,7 +102,6 @@ function k8s::test {
 
 case "${1:-}" in
     install)
-        k8s::install_kubectl
         k8s::install_minikube
         ;;
     start)
