@@ -11,8 +11,6 @@ function k8s::install_minikube {
     curl -Lo minikube https://storage.googleapis.com/minikube/releases/${minikube_version}/minikube-linux-amd64
     chmod +x minikube
     sudo mv minikube /usr/local/bin/
-    sudo -E minikube config set WantReportErrorPrompt false
-    sudo -E minikube config set WantNoneDriverWarning false
 }
 
 function k8s::start {
