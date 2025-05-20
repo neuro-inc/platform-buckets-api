@@ -19,6 +19,9 @@ function k8s::install_minikube {
     sudo mv minikube /usr/local/bin/
     sudo -E minikube config set WantReportErrorPrompt false
     sudo -E minikube config set WantNoneDriverWarning false
+    sudo modprobe br_netfilter
+    sudo echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
+    sudo echo 1 > /proc/sys/net/ipv4/ip_forward
 }
 
 function k8s::start {
