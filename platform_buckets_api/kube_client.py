@@ -209,7 +209,7 @@ class KubeApi:
 
     @property
     def _user_buckets_url(self) -> str:
-        return f"{self._kube._base_url}/apis/neuromation.io/v1/userbuckets"
+        return f"{self._apis_url}/neuromation.io/v1/userbuckets"
 
     async def create_persistent_credentials(
         self,
