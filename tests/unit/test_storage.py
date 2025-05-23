@@ -44,6 +44,7 @@ class TestCredentialsStorage:
             ),
             bucket_ids=["1", "2", "3"],
             read_only=read_only,
+            namespace="default",
         )
 
     async def test_credentials_create_list(self, storage: CredentialsStorage) -> None:
@@ -107,7 +108,7 @@ class TestCredentialsStorage:
     async def test_credentials_delete(self, storage: CredentialsStorage) -> None:
         credentials = self._make_credentials("user1", "test")
         await storage.create_credentials(credentials)
-        await storage.delete_credentials(credentials.id)
+        await storage.delete_credentials(credentials)
         with pytest.raises(NotExistsError):
             await storage.get_credentials(credentials.id)
         async with storage.list_credentials() as it:
@@ -133,7 +134,7 @@ class TestBucketsStorage:
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
-            org_name=None,
+            org_name="no-org",
             project_name="project",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
@@ -176,7 +177,7 @@ class TestBucketsStorage:
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
-            org_name=None,
+            org_name="no-org",
             project_name="project",
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
@@ -187,11 +188,15 @@ class TestBucketsStorage:
             public=public,
         )
 
-    async def test_buckets_create_list(self, storage: BucketsStorage) -> None:
+    async def test_buckets_create_list(
+        self,
+        storage: BucketsStorage,
+    ) -> None:
         bucket1 = self._make_bucket("user1", "test", with_meta=False)
         bucket2 = self._make_bucket("user2", None)
         bucket3 = self._make_bucket("user2", None, True)
         bucket4 = self._make_imported_bucket("user2", None)
+
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         await storage.create_bucket(bucket3)

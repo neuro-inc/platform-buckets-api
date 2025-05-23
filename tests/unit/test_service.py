@@ -71,7 +71,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         assert bucket.owner == "test-user"
         assert bucket.project_name == "test-project"
@@ -86,14 +86,14 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         with pytest.raises(ExistsError):
             await service.create_bucket(
                 owner="test-user",
                 project_name="test-project",
                 name="test-bucket",
-                org_name=None,
+                org_name="no-org",
             )
         if len(mock_provider.created_buckets) == 2:
             second_bucket = mock_provider.created_buckets[1]
@@ -106,13 +106,13 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket-1",
-            org_name=None,
+            org_name="no-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user",
             project_name="test-project",
             name="test-bucket-2",
-            org_name=None,
+            org_name="no-org",
         )
         assert mock_provider.created_buckets == [
             bucket1.provider_bucket,
@@ -161,7 +161,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         bucket_get = await service.get_bucket(bucket.id)
         assert bucket == bucket_get
@@ -173,7 +173,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         bucket_get = await service.get_bucket_by_name(
             "test-bucket", None, "test-project"
@@ -187,13 +187,13 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project1",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user/sub",
             project_name="test-project2",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         bucket3 = await service.create_bucket(
             owner="test-user",
@@ -223,7 +223,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project1",
             name="test-bucket1",
-            org_name=None,
+            org_name="no-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user",
@@ -235,7 +235,7 @@ class TestBucketsService:
             owner="another-user",
             project_name="test-project3",
             name="test-bucket3",
-            org_name=None,
+            org_name="no-org",
         )
         async with service.get_buckets("test-user") as it:
             buckets = [bucket async for bucket in it]
@@ -265,7 +265,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         await service.delete_bucket(bucket.id)
         with pytest.raises(NotExistsError):
@@ -278,7 +278,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         await service.set_public_access(bucket, True)
         assert mock_provider.public_state[bucket.provider_bucket.name]
@@ -290,7 +290,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name=None,
+            org_name="no-org",
         )
         await service.set_public_access(bucket, True)
         assert (await service.get_bucket(bucket.id)).public
@@ -328,7 +328,9 @@ class TestPersistentCredentialsService:
         return [
             (
                 await buckets_service.create_bucket(
-                    "test-user", "test-project", org_name=None
+                    "test-user",
+                    "test-project",
+                    org_name="no-org",
                 )
             ).id
             for _ in range(3)
@@ -355,7 +357,10 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
-            owner="usr", name="creds", bucket_ids=bucket_ids
+            namespace="default",
+            owner="usr",
+            name="creds",
+            bucket_ids=bucket_ids,
         )
         assert mock_provider.created_roles == [credentials.role]
         # Because role name size is limited in GCP, only short owner/name
@@ -370,11 +375,17 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         await service.create_credentials(
-            owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials",
+            bucket_ids=bucket_ids,
         )
         with pytest.raises(ExistsError):
             await service.create_credentials(
-                owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+                namespace="default",
+                owner="test-user",
+                name="test-credentials",
+                bucket_ids=bucket_ids,
             )
         if len(mock_provider.created_roles) == 2:
             second_credentials = mock_provider.created_roles[1]
@@ -387,10 +398,16 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials1 = await service.create_credentials(
-            owner="test-user", name="test-credentials-1", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials-1",
+            bucket_ids=bucket_ids,
         )
         credentials2 = await service.create_credentials(
-            owner="test-user", name="test-credentials-2", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials-2",
+            bucket_ids=bucket_ids,
         )
         assert mock_provider.created_roles == [
             credentials1.role,
@@ -404,7 +421,10 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
-            owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials",
+            bucket_ids=bucket_ids,
         )
         credentials_get = await service.get_credentials(credentials.id)
         assert credentials == credentials_get
@@ -416,7 +436,10 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
-            owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials",
+            bucket_ids=bucket_ids,
         )
         credentials_get = await service.get_credentials_by_name(
             name="test-credentials",
@@ -431,13 +454,22 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials1 = await service.create_credentials(
-            owner="test-user", name="test-credentials1", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials1",
+            bucket_ids=bucket_ids,
         )
         credentials2 = await service.create_credentials(
-            owner="test-user", name="test-credentials2", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials2",
+            bucket_ids=bucket_ids,
         )
         credentials3 = await service.create_credentials(
-            owner="another-user", name="test-credentials3", bucket_ids=bucket_ids
+            namespace="default",
+            owner="another-user",
+            name="test-credentials3",
+            bucket_ids=bucket_ids,
         )
         async with service.list_user_credentials("test-user") as it:
             credentials = [credentials async for credentials in it]
@@ -453,9 +485,12 @@ class TestPersistentCredentialsService:
         bucket_ids: list[str],
     ) -> None:
         credentials = await service.create_credentials(
-            owner="test-user", name="test-credentials", bucket_ids=bucket_ids
+            namespace="default",
+            owner="test-user",
+            name="test-credentials",
+            bucket_ids=bucket_ids,
         )
-        await service.delete_credentials(credentials.id)
+        await service.delete_credentials(credentials)
         with pytest.raises(NotExistsError):
             await service.get_credentials(credentials.id)
 
@@ -469,31 +504,31 @@ class TestPersistentCredentialsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket-1",
-            org_name=None,
+            org_name="no-org",
         )
         bucket2_1 = await buckets_service.create_bucket(
             owner="test-user2",
             project_name="test-project",
             name="test-bucket-2-1",
-            org_name=None,
+            org_name="no-org",
         )
         bucket2_2 = await buckets_service.create_bucket(
             owner="test-user2",
             project_name="test-project",
             name="test-bucket-2-2",
-            org_name=None,
+            org_name="no-org",
         )
         bucket3_1 = await buckets_service.create_bucket(
             owner="test-user3",
             project_name="test-project",
             name="test-bucket-3-1",
-            org_name=None,
+            org_name="no-org",
         )
         bucket3_2 = await buckets_service.create_bucket(
             owner="test-user3",
             project_name="test-project",
             name="test-bucket-3-2",
-            org_name=None,
+            org_name="no-org",
         )
         all_buckets = [bucket1, bucket2_1, bucket2_2, bucket3_1, bucket3_2]
         all_buckets_ids = [bucket.id for bucket in all_buckets]
@@ -509,7 +544,10 @@ class TestPersistentCredentialsService:
             return False
 
         credentials = await service.create_credentials(
-            name=None, owner="test-user", bucket_ids=all_buckets_ids
+            namespace="default",
+            name=None,
+            owner="test-user",
+            bucket_ids=all_buckets_ids,
         )
         perms = mock_provider.role_to_permissions[credentials.role.name]
         assert all(_check_access(perms, bucket, write=True) for bucket in all_buckets)

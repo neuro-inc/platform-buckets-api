@@ -246,7 +246,7 @@ class TestProviderBase:
                 created_at=datetime.now(UTC),
                 owner="user",
                 name="not-important",
-                org_name=None,
+                org_name="no-org",
                 project_name="not-important",
                 public=False,
                 provider_bucket=bucket,

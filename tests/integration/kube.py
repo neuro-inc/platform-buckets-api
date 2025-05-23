@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from apolo_kube_client.client import KubeClient, KubeClientAuthType
+from apolo_kube_client.config import KubeConfig
+from apolo_kube_client.errors import ResourceNotFound
 
-from platform_buckets_api.config import KubeConfig
-from platform_buckets_api.kube_client import KubeClient, ResourceNotFound
+from platform_buckets_api.kube_client import KubeApi
 
 
 @pytest.fixture(scope="session")
@@ -56,6 +58,7 @@ async def kube_config(
     kube_config = KubeConfig(
         endpoint_url=cluster["server"],
         cert_authority_data_pem=cert_authority_data_pem,
+        auth_type=KubeClientAuthType.CERTIFICATE,
         auth_cert_path=user["client-certificate"],
         auth_cert_key_path=user["client-key"],
         namespace="default",
@@ -91,14 +94,15 @@ async def kube_client(
     client = kube_client_factory(kube_config)
 
     async def _clean_k8s(kube_client: KubeClient) -> None:
-        for bucket in await kube_client.list_user_buckets():
+        kube_api = KubeApi(kube_client)
+        for bucket in await kube_api.list_user_buckets():
             try:
-                await kube_client.remove_user_bucket(bucket)
+                await kube_api.remove_user_bucket(bucket)
             except ResourceNotFound:
                 pass
-        for creds in await kube_client.list_persistent_credentials():
+        for creds in await kube_api.list_persistent_credentials():
             try:
-                await kube_client.remove_persistent_credentials(creds)
+                await kube_api.remove_persistent_credentials(creds)
             except ResourceNotFound:
                 pass
 

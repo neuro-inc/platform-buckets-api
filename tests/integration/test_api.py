@@ -256,6 +256,7 @@ class TestApi:
         assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
         assert payload["project_name"] == "test-project"
+        assert payload["org_name"] == "no-org"
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 

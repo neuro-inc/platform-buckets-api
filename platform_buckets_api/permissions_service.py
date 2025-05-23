@@ -1,3 +1,4 @@
+from apolo_kube_client.apolo import NO_ORG, normalize_name
 from neuro_auth_client import AuthClient, ClientSubTreeViewRoot, Permission
 
 from platform_buckets_api.storage import BaseBucket
@@ -21,7 +22,9 @@ class PermissionsService:
 
     def _get_bucket_uris(self, bucket: BaseBucket) -> list[str]:
         base = self._bucket_cluster_uri
-        if bucket.org_name:
+        if bucket.org_name and normalize_name(bucket.org_name) != normalize_name(
+            NO_ORG
+        ):
             base = f"{base}/{bucket.org_name}"
         return [
             f"{base}/{bucket.project_name}/{bucket.name}",

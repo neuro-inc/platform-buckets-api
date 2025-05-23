@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar, Union
 
+from apolo_kube_client.apolo import generate_namespace_name
+
 from .config import BucketsProviderType
 from .utils.asyncio import asyncgeneratorcontextmanager
 
@@ -51,6 +53,7 @@ class PersistentCredentials:
     bucket_ids: list[str]
     role: ProviderRole
     read_only: bool = False
+    namespace: str | None = None
 
 
 @dataclass(frozen=True)
@@ -58,12 +61,16 @@ class BaseBucket(abc.ABC):
     id: str
     name: str | None
     owner: str
-    org_name: str | None
+    org_name: str
     project_name: str
     created_at: datetime
     provider_bucket: ProviderBucket
     public: bool
     imported: ClassVar[bool]
+
+    @property
+    def namespace(self) -> str:
+        return generate_namespace_name(self.org_name, self.project_name)
 
 
 @dataclass(frozen=True)
@@ -132,7 +139,7 @@ class CredentialsStorage(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def delete_credentials(self, id: str) -> None:
+    async def delete_credentials(self, credentials: PersistentCredentials) -> None:
         pass
 
     @abc.abstractmethod
@@ -252,9 +259,11 @@ class InMemoryCredentialsStorage(CredentialsStorage):
             f" exists"
         )
 
-    async def delete_credentials(self, id: str) -> None:
+    async def delete_credentials(self, credentials: PersistentCredentials) -> None:
         self._credentials = [
-            credentials for credentials in self._credentials if credentials.id != id
+            credentials
+            for credentials in self._credentials
+            if credentials.id != credentials.id
         ]
 
     async def update_credentials(self, credentials: PersistentCredentials) -> None:
