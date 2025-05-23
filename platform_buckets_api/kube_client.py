@@ -20,10 +20,10 @@ from .utils import datetime_dump, datetime_load
 logger = logging.getLogger(__name__)
 
 
-ID_LABEL = "platform.neuromation.io/id"
-OWNER_LABEL = "platform.neuromation.io/owner"
-CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
-BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
+ID_LABEL = "platform.apolo.us/id"
+OWNER_LABEL = "platform.apolo.us/owner"
+CREDENTIALS_NAME_LABEL = "platform.apolo.us/credentials_name"
+BUCKET_NAME_LABEL = "platform.apolo.us/bucket_name"
 APOLO_ORG_NAME_LABEL = "platform.apolo.us/org"
 APOLO_PROJECT_NAME_LABEL = "platform.apolo.us/project"
 
@@ -296,14 +296,14 @@ class KubeApi:
             if normalized_name != normalize_name(NO_ORG):
                 normalized_name = org_name
             label_selectors.append(f"{APOLO_ORG_NAME_LABEL}={normalized_name}")
+        if project_name:
+            label_selectors.append(f"{APOLO_PROJECT_NAME_LABEL}={project_name}")
         if label_selectors:
             params += [("labelSelector", ",".join(label_selectors))]
         payload = await self._kube.get(url=url, params=params)
         buckets = []
         for item in payload.get("items", []):
             bucket = BucketCRDMapper.from_primitive(item)
-            if project_name and project_name != bucket.project_name:
-                continue
             buckets.append(bucket)
         return buckets
 
