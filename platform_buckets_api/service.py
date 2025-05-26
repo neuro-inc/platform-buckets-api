@@ -145,7 +145,10 @@ class BucketsService:
             # It is important to check that it is a legacy bucket
             # before returning it since legacy buckets and project buckets
             # without org have the same name format.
-            bucket = await self._storage.get_bucket_by_name(name, None, project_name)
+            org_name = normalize_name(NO_ORG)
+            bucket = await self._storage.get_bucket_by_name(
+                name, org_name, project_name
+            )
             if bucket.owner != bucket.project_name:
                 raise
             return bucket
