@@ -111,9 +111,9 @@ class K8SCredentialsStorage(CredentialsStorage):
         res = await self._kube_client.list_persistent_credentials(
             owner=owner, name=name
         )
-        assert (
-            len(res) <= 1
-        ), f"Found multiple credentials for name = {name} and owner = {owner}"
+        assert len(res) <= 1, (
+            f"Found multiple credentials for name = {name} and owner = {owner}"
+        )
         if len(res) == 0:
             raise NotExistsError(
                 f"PersistentCredentials with name {name} and owner = {owner}"
