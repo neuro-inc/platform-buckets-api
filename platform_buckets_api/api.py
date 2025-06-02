@@ -47,6 +47,8 @@ from neuro_logging import (
     setup_sentry,
 )
 
+from platform_buckets_api import __version__
+
 from .config import (
     AWSProviderConfig,
     AzureProviderConfig,
@@ -1159,6 +1161,8 @@ async def create_app(
 
     app.add_subapp("/api/v1", api_v1_app)
 
+    app.on_response_prepare.append(add_version_to_header)
+
     if config.enable_docs:
         prefix = "/api/docs/v1/buckets"
         setup_aiohttp_apispec(
@@ -1174,6 +1178,10 @@ async def create_app(
             },
         )
     return app
+
+
+async def add_version_to_header(request: Request, response: StreamResponse) -> None:
+    response.headers["X-Service-Version"] = f"platform-buckets-api/{__version__}"
 
 
 def main() -> None:  # pragma: no coverage
