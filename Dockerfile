@@ -33,9 +33,9 @@ ENV PATH=/home/${SERVICE_NAME}/.local/bin:$PATH
 
 # Copy everything from the builder’s user‐site into your service’s user‐site
 COPY --from=builder /root/.local /home/${SERVICE_NAME}/.local
-COPY --from=builder /mc /usr/bin/mc
+COPY --from=builder /tmp/mc /usr/bin/mc
 
 ENV NP_BUCKETS_API_PORT=8080
 EXPOSE $NP_BUCKETS_API_PORT
 
-CMD platform-buckets-api
+CMD ["platform-buckets-api"]
