@@ -11,70 +11,8 @@ on:
 
 jobs:
   test:
-    name: Run tests
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Install python
-      uses: actions/setup-python@v5
-      with:
-        python-version-file: .python-version
-    - name: Cache packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-py-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
-    - name: Install dependencies
-      run: make setup
-    - name: Install MC (minio client)
-      run: |
-        sudo apt-get -q update
-        sudo apt-get -q install -y wget
-        wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
-        sudo chmod +x mc
-        sudo mv mc /usr/bin/mc
-    - name: Lint
-      run: |
-        echo "::add-matcher::.github/actionlint-matcher.json"
-        make lint
-    - name: Run unit tests
-      run: make test_unit
-    - name: Login to ghcr.io
-      uses: docker/login-action@v3.4.0
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-    - name: Setup minikube
-      run: |
-        make install_k8s
-        make start_k8s
-        make apply_configuration_k8s
-        make test_k8s
-    - name: Run integration tests
-      env:
-        # Azure account is disabled
-        # AZURE_STORAGE_ACCOUNT_URL: ${{ secrets.AZURE_STORAGE_ACCOUNT_URL }}
-        # AZURE_STORAGE_CREDENTIAL: ${{ secrets.AZURE_STORAGE_CREDENTIAL }}
-        GCLOUD_SA_KEY_JSON_B64: ${{ secrets.GCLOUD_SA_KEY_JSON_B64 }}
-      run: make test_integration
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: .coverage-integration.xml
-        flags: integration
-        name: codecov-integration
-    - name: Build Docker image
-      run: make docker_build
-    - name: Upload image artifact
-      uses: neuro-inc/upload-image-action@v24.4.0
-      with:
-        image: platformbucketsapi
-        token: ${{ secrets.GITHUB_TOKEN }}
+    name: All checks are passed
+    uses: ./.github/workflows/test.yaml
 
   approve:
     name: Approve bot PR
