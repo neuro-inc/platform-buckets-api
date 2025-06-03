@@ -36,6 +36,8 @@ from aiohttp_apispec import (
 )
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
+from apolo_kube_client.apolo import NO_ORG, normalize_name
+from apolo_kube_client.client import kube_client_from_config
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
@@ -60,7 +62,7 @@ from .config import (
 )
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
-from .kube_client import KubeClient
+from .kube_client import KubeApi, KubeClient
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import (
@@ -279,6 +281,8 @@ class BucketsApiHandler:
             request,
             self.permissions_service.get_create_bucket_perms(project_name, org_name),
         )
+
+        org_name = org_name or normalize_name(NO_ORG)
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name,
@@ -488,10 +492,10 @@ class BucketsApiHandler:
         ) as it:
             async for credential in it:
                 if len(credential.bucket_ids) == 1:
-                    await self.credentials_service.delete_credentials(credential.id)
+                    await self.credentials_service.delete_credentials(credential)
                 else:
                     await self.credentials_service.update_credentials(
-                        credential.id,
+                        credential,
                         bucket_ids=[
                             bucket_id
                             for bucket_id in credential.bucket_ids
@@ -761,7 +765,10 @@ class PersistentCredentialsApiHandler:
                     "Cannot create credential for imported "
                     f"bucket {bucket.name or bucket.id}"
                 )
+            namespace = bucket.namespace
+
         credentials = await self.credentials_service.create_credentials(
+            namespace=namespace,
             name=data.get("name"),
             bucket_ids=data["bucket_ids"],
             owner=username,
@@ -845,7 +852,7 @@ class PersistentCredentialsApiHandler:
         request: aiohttp.web.Request,
     ) -> aiohttp.web.Response:
         credentials = await self._resolve_credentials(request)
-        await self.credentials_service.delete_credentials(credentials.id)
+        await self.credentials_service.delete_credentials(credentials)
         raise HTTPNoContent
 
 
@@ -1109,9 +1116,12 @@ async def create_app(
                     )
 
             logger.info("Initializing Kubernetes client")
+
             kube_client = await exit_stack.enter_async_context(
-                create_kube_client(config.kube)
+                kube_client_from_config(config.kube)
             )
+
+            kube_api = KubeApi(kube_client=kube_client)
 
             logger.info("Initializing PermissionsService")
             permissions_service = PermissionsService(
@@ -1123,7 +1133,7 @@ async def create_app(
 
             logger.info("Initializing BucketsService")
             buckets_service = BucketsService(
-                storage=K8SBucketsStorage(kube_client),
+                storage=K8SBucketsStorage(kube_api),
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
@@ -1132,7 +1142,7 @@ async def create_app(
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
-                storage=K8SCredentialsStorage(kube_client),
+                storage=K8SCredentialsStorage(kube_api),
                 bucket_provider=bucket_provider,
                 buckets_service=buckets_service,
             )

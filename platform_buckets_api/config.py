@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from apolo_kube_client.config import KubeConfig
 from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL
 
@@ -83,29 +84,6 @@ class OpenStackProviderConfig:
     region_name: str
     endpoint_url: URL
     s3_endpoint_url: URL
-
-
-class KubeClientAuthType(str, enum.Enum):
-    NONE = "none"
-    TOKEN = "token"
-    CERTIFICATE = "certificate"
-
-
-@dataclass(frozen=True)
-class KubeConfig:
-    endpoint_url: str
-    cert_authority_data_pem: str | None = field(repr=False, default=None)
-    cert_authority_path: str | None = None
-    auth_type: KubeClientAuthType = KubeClientAuthType.CERTIFICATE
-    auth_cert_path: str | None = None
-    auth_cert_key_path: str | None = None
-    token: str | None = field(repr=False, default=None)
-    token_path: str | None = None
-    namespace: str = "default"
-    client_conn_timeout_s: int = 300
-    client_read_timeout_s: int = 300
-    client_watch_timeout_s: int = 1800
-    client_conn_pool_size: int = 100
 
 
 @dataclass(frozen=True)
