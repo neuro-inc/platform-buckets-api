@@ -30,6 +30,7 @@ from apolo_kube_client.apolo import (
 )
 from apolo_kube_client.client import KubeClient, kube_client_from_config
 from apolo_kube_client.config import KubeClientAuthType, KubeConfig
+from apolo_kube_client.errors import ResourceExists
 from neuro_logging import (
     init_logging,
 )
@@ -66,14 +67,17 @@ async def migrate(
     )
 
     async with kube_client_from_config(kube_config) as kube_client:
-        await migrate_buckets(kube_client, dry_run=dry_run, delete_old=delete_old)
-        await migrate_secrets(kube_client, dry_run=dry_run, delete_old=delete_old)
+        if delete_old:
+            await delete_old_buckets(kube_client, dry_run=dry_run)
+            await delete_old_secrets(kube_client, dry_run=dry_run)
+        else:
+            await migrate_buckets(kube_client, dry_run=dry_run)
+            await migrate_secrets(kube_client, dry_run=dry_run)
 
 
 async def migrate_buckets(
     kube_client: KubeClient,
     dry_run: bool = True,
-    delete_old: bool = False,
 ) -> None:
     # creds are not linked directly to org and proj, so we need this mapping
     bucket_id_to_namespace = await _ensure_credentials_namespaces_are_known(kube_client)
@@ -97,9 +101,6 @@ async def migrate_buckets(
             bucket_id_to_namespace=bucket_id_to_namespace,
             dry_run=dry_run,
         )
-
-    if delete_old:
-        await delete_old_buckets(kube_client, dry_run=dry_run)
 
 
 async def create_bucket(
@@ -226,16 +227,18 @@ async def create_secret(
     if dry_run:
         logger.info(f"dry_run: POST {secret_creation_url}. {payload}")
     else:
-        await kube_client.post(
-            secret_creation_url,
-            json=payload,
-        )
+        try:
+            await kube_client.post(
+                secret_creation_url,
+                json=payload,
+            )
+        except ResourceExists:
+            pass
 
 
 async def migrate_secrets(
     kube_client: KubeClient,
     dry_run: bool = True,
-    delete_old: bool = False,
 ) -> None:
     url = generate_secrets_url(kube_client, namespace=DEFAULT_NAMESPACE)
     response = await kube_client.get(url)
@@ -282,9 +285,6 @@ async def migrate_secrets(
             project_name=project_name,
             dry_run=dry_run,
         )
-
-    if delete_old:
-        await delete_old_secrets(kube_client, dry_run)
 
 
 def apis_url(kube_client: KubeClient) -> str:
@@ -446,7 +446,7 @@ def main() -> None:
     init_logging()
 
     parser = ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true", default=True)
+    parser.add_argument("--dry-run", action="store_true", default=False)
     parser.add_argument("--delete-old", action="store_true", default=False)
 
     subparsers = parser.add_subparsers(dest="kube")
