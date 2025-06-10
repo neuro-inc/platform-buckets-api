@@ -43,8 +43,26 @@ BUCKETS_CREDENTIALS_NAME_LABEL = "platform.neuromation.io/credentials_name"
 BUCKETS_BUCKET_NAME_LABEL = "platform.neuromation.io/bucket_name"
 ORG_NAME_LABEL = "platform.neuromation.io/org_name"
 PROJECT_LABEL = "platform.neuromation.io/project"
+NEW_ORG_NAME_LABEL = "platform.apolo.us/org"
 
 DEFAULT_NAMESPACE = "platform-jobs"
+
+
+def to_new_label_name(old_label_name: str) -> str | None:
+    if "platform.neuromation.io" not in old_label_name:
+        return None
+    if old_label_name.endswith("org_name"):
+        return NEW_ORG_NAME_LABEL
+    return old_label_name.replace("platform.neuromation.io", "platform.apolo.us")
+
+
+def gen_labels_from_original_labels(labels: dict[str, str]) -> dict[str, str]:
+    for label_name in list(labels):
+        new_label_name = to_new_label_name(label_name)
+        if not new_label_name:
+            continue
+        labels[new_label_name] = labels[label_name]
+    return labels
 
 
 async def migrate(
@@ -123,6 +141,7 @@ async def create_bucket(
     labels[PROJECT_LABEL] = project_name
 
     bucket_id = labels[BUCKETS_ID_LABEL]
+    labels = gen_labels_from_original_labels(labels)
 
     if dry_run:
         namespace_name = bucket_id_to_namespace[bucket_id]
@@ -172,10 +191,11 @@ async def create_credentials(
     if not namespace:
         raise RuntimeError()
 
+    labels = gen_labels_from_original_labels(labels=metadata["labels"])
     payload = {
         "kind": "PersistentBucketCredential",
         "apiVersion": "neuromation.io/v1",
-        "metadata": {"name": name, "labels": metadata["labels"]},
+        "metadata": {"name": name, "labels": labels},
         "spec": old_credentials["spec"],
     }
     credentials_creation_url = generate_persistent_bucket_credential_url(
@@ -185,55 +205,6 @@ async def create_credentials(
         logger.info(f"dry_run: POST {credentials_creation_url}. {payload}")
     else:
         await kube_client.post(credentials_creation_url, json=payload)
-
-
-async def create_secret(
-    kube_client: KubeClient,
-    old_secret: dict[str, Any],
-    org_name: str,
-    project_name: str,
-    *,
-    dry_run: bool,
-):
-    metadata = old_secret["metadata"]
-    secret_name = metadata["name"]
-
-    labels = metadata.get("labels", {}) or {}
-    labels[ORG_NAME_LABEL] = org_name
-    labels[PROJECT_LABEL] = project_name
-
-    payload = {
-        "kind": "Secret",
-        "apiVersion": "v1",
-        "type": old_secret["type"],
-        "data": old_secret["data"],
-        "metadata": {
-            "name": secret_name,
-            "labels": labels,
-        },
-    }
-    if "spec" in old_secret:
-        payload["spec"] = old_secret["spec"]
-    if dry_run:
-        org_name = normalize_name(org_name)
-        project_name = normalize_name(project_name)
-        namespace_name = generate_namespace_name(org_name, project_name)
-        logger.info(f"dry_run: will create namespace {namespace_name}")
-    else:
-        created_namespace = await create_namespace(kube_client, org_name, project_name)
-        namespace_name = created_namespace.name
-
-    secret_creation_url = generate_secrets_url(kube_client, namespace_name)
-    if dry_run:
-        logger.info(f"dry_run: POST {secret_creation_url}. {payload}")
-    else:
-        try:
-            await kube_client.post(
-                secret_creation_url,
-                json=payload,
-            )
-        except ResourceExists:
-            pass
 
 
 async def migrate_secrets(
@@ -285,6 +256,57 @@ async def migrate_secrets(
             project_name=project_name,
             dry_run=dry_run,
         )
+
+
+async def create_secret(
+    kube_client: KubeClient,
+    old_secret: dict[str, Any],
+    org_name: str,
+    project_name: str,
+    *,
+    dry_run: bool,
+):
+    metadata = old_secret["metadata"]
+    secret_name = metadata["name"]
+
+    labels = metadata.get("labels", {}) or {}
+    labels[ORG_NAME_LABEL] = org_name
+    labels[PROJECT_LABEL] = project_name
+
+    labels = gen_labels_from_original_labels(labels)
+
+    payload = {
+        "kind": "Secret",
+        "apiVersion": "v1",
+        "type": old_secret["type"],
+        "data": old_secret["data"],
+        "metadata": {
+            "name": secret_name,
+            "labels": labels,
+        },
+    }
+    if "spec" in old_secret:
+        payload["spec"] = old_secret["spec"]
+    if dry_run:
+        org_name = normalize_name(org_name)
+        project_name = normalize_name(project_name)
+        namespace_name = generate_namespace_name(org_name, project_name)
+        logger.info(f"dry_run: will create namespace {namespace_name}")
+    else:
+        created_namespace = await create_namespace(kube_client, org_name, project_name)
+        namespace_name = created_namespace.name
+
+    secret_creation_url = generate_secrets_url(kube_client, namespace_name)
+    if dry_run:
+        logger.info(f"dry_run: POST {secret_creation_url}. {payload}")
+    else:
+        try:
+            await kube_client.post(
+                secret_creation_url,
+                json=payload,
+            )
+        except ResourceExists:
+            pass
 
 
 def apis_url(kube_client: KubeClient) -> str:
