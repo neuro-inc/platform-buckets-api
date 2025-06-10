@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from uuid import uuid4
 
+from apolo_kube_client.apolo import NO_ORG, normalize_name
 from yarl import URL
 
 from platform_buckets_api.config import BucketsProviderType
@@ -36,17 +37,17 @@ logger = logging.getLogger()
 NEURO_BUCKET_PREFIX = "neuro-pl"
 
 
-def make_bucket_prefix(org_name: str | None, project_name: str) -> str:
+def make_bucket_prefix(org_name: str, project_name: str) -> str:
     hasher = hashlib.new("sha256")
-    if org_name:
+    if org_name and normalize_name(org_name) != normalize_name(NO_ORG):
         hasher.update(org_name.encode("utf-8"))
     hasher.update(project_name.encode("utf-8"))
     return f"{NEURO_BUCKET_PREFIX}-{hasher.hexdigest()[:10]}"
 
 
-def make_bucket_name(org_name: str | None, project_name: str, name: str | None) -> str:
+def make_bucket_name(org_name: str, project_name: str, name: str | None) -> str:
     res = make_bucket_prefix(org_name, project_name)
-    if org_name:
+    if org_name and normalize_name(org_name) != normalize_name(NO_ORG):
         res += f"-{org_name}"
     res += f"-{project_name}"
     if name is not None:
@@ -79,7 +80,7 @@ class BucketsService:
         self,
         owner: str,
         project_name: str,
-        org_name: str | None,
+        org_name: str,
         name: str | None = None,
     ) -> UserBucket:
         real_name = make_bucket_name(org_name, project_name, name)
@@ -111,6 +112,7 @@ class BucketsService:
         org_name: str | None,
         name: str | None = None,
     ) -> ImportedBucket:
+        org_name = org_name or normalize_name(NO_ORG)
         bucket = ImportedBucket(
             id=f"bucket-{uuid4()}",
             name=name,
@@ -137,12 +139,16 @@ class BucketsService:
         try:
             return await self._storage.get_bucket_by_name(name, org_name, project_name)
         except NotExistsError:
-            # project_name could be a username if user is searching for
-            # legacy bucket which does't have project. We need to search
-            # for user bucket also. It is important to check that it is a legacy bucket
+            # Project_name could be a username if a user is searching for
+            # legacy bucket which doesn't have a project.
+            # We need to search for user bucket also.
+            # It is important to check that it is a legacy bucket
             # before returning it since legacy buckets and project buckets
             # without org have the same name format.
-            bucket = await self._storage.get_bucket_by_name(name, None, project_name)
+            org_name = normalize_name(NO_ORG)
+            bucket = await self._storage.get_bucket_by_name(
+                name, org_name, project_name
+            )
             if bucket.owner != bucket.project_name:
                 raise
             return bucket
@@ -153,7 +159,9 @@ class BucketsService:
                 bucket_paths = [f"{bucket.project_name}/{bucket.id}"]
                 if bucket.name:
                     bucket_paths.append(f"{bucket.project_name}/{bucket.name}")
-                if bucket.org_name:
+                if bucket.org_name and normalize_name(
+                    bucket.org_name
+                ) != normalize_name(NO_ORG):
                     bucket_paths = [
                         f"{bucket.org_name}/{bucket_path}"
                         for bucket_path in bucket_paths
@@ -243,6 +251,7 @@ class PersistentCredentialsService:
 
     async def create_credentials(
         self,
+        namespace: str,
         bucket_ids: Iterable[str],
         owner: str,
         name: str | None = None,
@@ -261,6 +270,7 @@ class PersistentCredentialsService:
             bucket_ids=list(bucket_ids),
             role=role,
             read_only=read_only,
+            namespace=namespace,
         )
         try:
             await self._storage.create_credentials(credentials)
@@ -271,11 +281,11 @@ class PersistentCredentialsService:
 
     async def update_credentials(
         self,
-        credentials_id: str,
+        credentials: PersistentCredentials,
         bucket_ids: list[str],
         read_only: bool,
     ) -> PersistentCredentials:
-        credentials = await self._storage.get_credentials(credentials_id)
+        credentials = await self._storage.get_credentials(credentials.id)
         old_permissions = await self._make_permissions_list(
             credentials.bucket_ids, credentials.read_only
         )
@@ -315,11 +325,14 @@ class PersistentCredentialsService:
             async for credentials in it:
                 yield credentials
 
-    async def delete_credentials(self, credentials_id: str) -> None:
+    async def delete_credentials(
+        self,
+        credentials: PersistentCredentials,
+    ) -> None:
         try:
-            credentials = await self.get_credentials(credentials_id)
+            credentials = await self.get_credentials(credentials.id)
             await self._provider.delete_role(credentials.role)
-            await self._storage.delete_credentials(credentials_id)
+            await self._storage.delete_credentials(credentials)
         except NotExistsError:
             pass  # Already removed
 
