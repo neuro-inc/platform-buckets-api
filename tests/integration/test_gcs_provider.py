@@ -211,8 +211,7 @@ async def iam_client_2(
 
 
 @pytest.mark.skip(
-    "Disable google test as because they are slow "
-    "and unstable when running in parallel"
+    "Disable google test as because they are slow and unstable when running in parallel"
 )
 class TestGoogleProvider(TestProviderBase):
     __test__ = True
