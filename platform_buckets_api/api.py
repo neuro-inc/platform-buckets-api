@@ -1183,6 +1183,12 @@ async def create_app(
                 "jwt": {"type": "apiKey", "name": "Authorization", "in": "header"},
             },
         )
+
+    async def handle_ping(request: aiohttp.web.Request) -> aiohttp.web.Response:
+        return aiohttp.web.Response(text="Pong")
+
+    app.router.add_get("/ping", handle_ping)
+
     return app
 
 
