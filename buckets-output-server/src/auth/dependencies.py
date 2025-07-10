@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-
 logger = logging.getLogger(__name__)
 
 

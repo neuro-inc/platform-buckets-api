@@ -1,8 +1,7 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from apolo_app_types.protocols.common.buckets import Bucket
+from pydantic import BaseModel, Field
 
 
 class IdResponse(BaseModel):

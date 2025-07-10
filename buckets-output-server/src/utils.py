@@ -1,7 +1,6 @@
 from typing import Any, TypedDict
 
 import apolo_sdk
-
 from apolo_app_types.protocols.common.buckets import (
     Bucket as BucketType,
     BucketProvider,
@@ -71,9 +70,11 @@ def parse_creds(
                     aws_creds: AwsS3Credentials = c.credentials  # type: ignore
                     output.append(
                         S3BucketCredentials(
-                            type=CredentialsType.READ_ONLY
-                            if credentials.read_only
-                            else CredentialsType.READ_WRITE,
+                            type=(
+                                CredentialsType.READ_ONLY
+                                if credentials.read_only
+                                else CredentialsType.READ_WRITE
+                            ),
                             name=aws_creds["bucket_name"],
                             access_key_id=aws_creds["access_key_id"],
                             secret_access_key=aws_creds["secret_access_key"],
@@ -85,9 +86,11 @@ def parse_creds(
                     minio_creds: MinioCredentials = c.credentials  # type: ignore
                     output.append(
                         MinioBucketCredentials(
-                            type=CredentialsType.READ_ONLY
-                            if credentials.read_only
-                            else CredentialsType.READ_WRITE,
+                            type=(
+                                CredentialsType.READ_ONLY
+                                if credentials.read_only
+                                else CredentialsType.READ_WRITE
+                            ),
                             name=minio_creds["bucket_name"],
                             access_key_id=minio_creds["access_key_id"],
                             secret_access_key=minio_creds["secret_access_key"],
@@ -99,9 +102,11 @@ def parse_creds(
                     gcp_creds: GCPCredentials = c.credentials  # type: ignore
                     output.append(
                         GCPBucketCredentials(
-                            type=CredentialsType.READ_ONLY
-                            if credentials.read_only
-                            else CredentialsType.READ_WRITE,
+                            type=(
+                                CredentialsType.READ_ONLY
+                                if credentials.read_only
+                                else CredentialsType.READ_WRITE
+                            ),
                             name=gcp_creds["bucket_name"],
                             key_data=gcp_creds["key_data"],
                         )
