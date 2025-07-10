@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     name: All checks are passed
-    uses: ./.github/workflows/outputs-server/test.yaml
+    uses: ./.github/workflows/outputs-test.yaml
     secrets: inherit
 
   release:
