@@ -1,0 +1,60 @@
+[project]
+name = "mlops-buckets-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+apolo-app-types = "^25.6.8"
+apolo-cli = "^25.6.0"
+fastapi = "^0.115.13"
+typeguard = "^4.4.4"
+uvicorn = "^0.34.3"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.16.0"
+pre-commit = "^4.2.0"
+ruff = "^0.11.12"
+
+
+[tool.ruff]
+target-version = "py311"
+lint.select = [
+    "E", "F", "I", "C90", "UP", "B", "ASYNC", "N", "FBT", "A", "C4", "EM", "FA", "ICN",
+    "G", "PIE", "T20", "PYI", "PT", "RET", "PTH"
+]
+lint.ignore = [
+  "A003",  # Class attribute "..." is shadowing a Python builtin
+  "N818"
+]
+
+[tool.ruff.lint.isort.sections]
+ApoloSDK = ["apolo-sdk"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+lines-after-imports = 2
+#profile = "black"
+section-order = ["future", "standard-library", "third-party", "ApoloSDK", "first-party", "local-folder"]
+known-first-party = ["apolo_app_types"]
+known-local-folder = ["tests"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+plugins = ['pydantic.mypy']
+
+[[tool.mypy.overrides]]
+module = "kubernetes.*"
+ignore_missing_imports = true
