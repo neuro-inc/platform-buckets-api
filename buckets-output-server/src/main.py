@@ -1,7 +1,8 @@
 import os
 from typing import Annotated
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import JSONResponse
 
 from src.config import Config
 from src.dependencies import DepApoloClient
@@ -59,6 +60,14 @@ async def get_output(bucket_id: str, apolo_client: DepApoloClient) -> BucketResp
     if bucket:
         return BucketResponse(status="success", data=bucket)
     return BucketResponse(status="error", data=None)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An unexpected error occurred.", "details": str(exc)},
+    )
 
 
 if __name__ == "__main__":
