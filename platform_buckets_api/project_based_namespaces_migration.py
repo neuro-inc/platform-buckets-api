@@ -1,3 +1,8 @@
+# k run -it migration --image=python --restart=Never --command -- bash
+#
+# apt-get update && apt-get install -y vim & \
+# pip install 'apolo-kube-client==25.7.0' neuro-logging
+#
 # example usage:
 #
 # python \
@@ -67,6 +72,7 @@ def gen_labels_from_original_labels(labels: dict[str, str]) -> dict[str, str]:
 
 async def migrate(
     args: argparse.Namespace,
+    targets: list[str],
     dry_run: bool = True,
     delete_old: bool = False,
 ) -> None:
@@ -86,11 +92,15 @@ async def migrate(
 
     async with kube_client_from_config(kube_config) as kube_client:
         if delete_old:
-            await delete_old_buckets(kube_client, dry_run=dry_run)
-            await delete_old_secrets(kube_client, dry_run=dry_run)
+            if "buckets" in targets:
+                await delete_old_buckets(kube_client, dry_run=dry_run)
+            if "secrets" in targets:
+                await delete_old_secrets(kube_client, dry_run=dry_run)
         else:
-            await migrate_buckets(kube_client, dry_run=dry_run)
-            await migrate_secrets(kube_client, dry_run=dry_run)
+            if "buckets" in targets:
+                await migrate_buckets(kube_client, dry_run=dry_run)
+            if "secrets" in targets:
+                await migrate_secrets(kube_client, dry_run=dry_run)
 
 
 async def migrate_buckets(
@@ -478,10 +488,20 @@ def main() -> None:
     kube_parser.add_argument("--auth-type", type=str, required=True, default="token")
     kube_parser.add_argument("--ca-path", type=str, required=True)
     kube_parser.add_argument("--token-path", type=str, required=True)
+    kube_parser.add_argument(
+        "--targets", type=str, required=False, default="secrets,buckets"
+    )
 
     args = parser.parse_args()
 
-    asyncio.run(migrate(args, dry_run=args.dry_run, delete_old=args.delete_old))
+    asyncio.run(
+        migrate(
+            args,
+            targets=args.targets.split(","),
+            dry_run=args.dry_run,
+            delete_old=args.delete_old,
+        )
+    )
 
 
 if __name__ == "__main__":
