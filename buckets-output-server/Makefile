@@ -35,3 +35,8 @@ push: build
 run:
 	@echo "Running the container..."
 	docker run --rm -it -v ${HOME}/.apolo:/root/.apolo -p 8080:8000 $(IMAGE):$(TAG)
+
+.PHONY: test
+test: ### Run tests
+	@echo "Running tests..."
+	poetry run pytest -vv --cov=src --cov-report=xml:coverage.xml
