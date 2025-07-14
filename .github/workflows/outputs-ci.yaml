@@ -13,14 +13,6 @@ jobs:
     uses: ./.github/workflows/outputs-test.yaml
     secrets: inherit
 
-  release-test:
-    name: Create test release
-    needs: test
-    if: github.event_name == 'pull_request'
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
-    with:
-      image: buckets-app
-      helm_charts: buckets-output-server
   release:
     name: Create release
     needs: test
