@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   name: {{ include "platformBuckets.fullname" . }}
   labels: {{ include "platformBuckets.labels.standard" . | nindent 4 }}
-    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    platform.apolo.us/aggregate: "true"
 rules:
 - apiGroups:
   - "neuromation.io"
@@ -19,19 +19,3 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - create
-- apiGroups:
-  - "networking.k8s.io"
-  resources:
-  - networkpolicies
-  verbs:
-  - get
-  - list
-  - create
