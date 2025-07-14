@@ -38,6 +38,44 @@ jobs:
         env:
           CI_LINT_RUN: 1
 
+  upload-image:
+    name: Upload image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+      - name: Purge old artifacts
+        uses: kolpav/purge-artifacts-action@v1
+        with:
+          token: ${{ github.token }}
+          expire-in: 30mins
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build Docker image
+        working-directory: buckets-output-server
+        run: make build
+      - name: Upload image artifact
+        uses: neuro-inc/upload-image-action@v24.4.0
+        with:
+          image: outputs-proxy
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Extract metadata (tags, labels) for Docker
+      #   id: meta
+      #   uses: docker/metadata-action@v4
+      #   with:
+      #     images: ghcr.io/neuro-inc/outputs-proxy
+      #     tags: |
+      #       type=ref,event=pr
+      # - name: Push release for testing
+      #   working-directory: buckets-output-server
+      #   run: |
+      #     FULL_IMAGE_NAME=${{ steps.meta.outputs.tags }}
+      #     export TAG=${FULL_IMAGE_NAME##*:}
+      #     make push
   # test-unit:
   #   name: Unit tests
   #   runs-on: ubuntu-latest
