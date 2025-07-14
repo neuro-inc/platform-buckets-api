@@ -61,7 +61,7 @@ jobs:
       - name: Upload image artifact
         uses: neuro-inc/upload-image-action@v24.4.0
         with:
-          image: outputs-proxy
+          image: buckets-app
           token: ${{ secrets.GITHUB_TOKEN }}
       # - name: Extract metadata (tags, labels) for Docker
       #   id: meta
