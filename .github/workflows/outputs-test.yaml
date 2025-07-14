@@ -26,11 +26,13 @@ jobs:
         with:
           path: ~/.cache/pre-commit
           key: pre-commit|py3.12|${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Install uv
-        run: pip install uv
+      - name: Install poetry
+        run: pip install poetry
       - name: Install dependencies
+        working-directory: buckets-output-server
         run: make setup
       - name: Run linters
+        working-directory: buckets-output-server
         run: |
           make lint
         env:
@@ -48,8 +50,10 @@ jobs:
   #         python-version-file: .python-version
   #         cache: pip
   #     - name: Install uv
-  #       run: pip install uv
+  #       run: pip install poetry
   #     - name: Install dependencies
+  #       working-directory: buckets-output-server
   #       run: make setup
   #     - name: Run unit tests
+  #       working-directory: buckets-output-server
   #       run: make test-unit
