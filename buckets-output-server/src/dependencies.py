@@ -5,9 +5,10 @@ from typing import Annotated
 
 import apolo_sdk
 from fastapi import Depends, HTTPException
-from src.auth.dependencies import Token
 from starlette.requests import Request
 from yarl import URL
+
+from src.auth.dependencies import Token
 
 
 async def dep_get_apolo_client(

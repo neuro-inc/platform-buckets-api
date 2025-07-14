@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 import apolo_sdk
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
 from apolo_app_types.protocols.common.buckets import (
     Bucket,
     BucketProvider,
@@ -12,7 +14,6 @@ from apolo_app_types.protocols.common.buckets import (
     MinioBucketCredentials,
     S3BucketCredentials,
 )
-from httpx import ASGITransport, AsyncClient
 from src.main import app
 
 
