@@ -1,6 +1,7 @@
 from typing import Any, TypedDict
 
 import apolo_sdk
+
 from apolo_app_types.protocols.common.buckets import (
     Bucket as BucketType,
     BucketProvider,

@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
+
 from src.config import Config
 from src.dependencies import DepApoloClient
 from src.models import (

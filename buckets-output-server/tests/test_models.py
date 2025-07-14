@@ -1,9 +1,10 @@
 import pytest
+from pydantic import ValidationError
+
 from apolo_app_types.protocols.common.buckets import (
     Bucket,
     BucketProvider,
 )
-from pydantic import ValidationError
 from src.models import (
     BasicResponse,
     BucketResponse,

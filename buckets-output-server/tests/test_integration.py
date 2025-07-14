@@ -1,13 +1,14 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+
 from apolo_app_types.protocols.common.buckets import (
     Bucket,
     BucketProvider,
     CredentialsType,
     S3BucketCredentials,
 )
-from httpx import ASGITransport, AsyncClient
 from src.main import app
 
 

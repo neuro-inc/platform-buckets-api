@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+
 from src.main import app
 
 
