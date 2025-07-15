@@ -37,7 +37,7 @@ apolo-kube-client ="25.7.2"
 platform-buckets-api = "platform_buckets_api.api:main"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "1.15.0"
+mypy = "1.17.0"
 pre-commit = "4.2.0"
 codecov = "2.1.13"
 docker = "7.1.0"
