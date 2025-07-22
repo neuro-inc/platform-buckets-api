@@ -11,13 +11,13 @@ from tests.unit.test_storage import (
 
 class TestK8SBucketsStorage(_TestBucketsStorage):
     @pytest.fixture()
-    def storage(self, kube_client: KubeClient) -> BucketsStorage:  # type: ignore
+    def storage(self, kube_client: KubeClient) -> BucketsStorage:
         kube_api = KubeApi(kube_client)
         return K8SBucketsStorage(kube_api)
 
 
 class TestK8SCredentialsStorage(_TestCredentialsStorage):
     @pytest.fixture()
-    def storage(self, kube_client: KubeClient) -> CredentialsStorage:  # type: ignore
+    def storage(self, kube_client: KubeClient) -> CredentialsStorage:
         kube_api = KubeApi(kube_client)
         return K8SCredentialsStorage(kube_api)
