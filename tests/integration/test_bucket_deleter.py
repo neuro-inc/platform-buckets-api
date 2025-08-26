@@ -6,7 +6,15 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from apolo_events_client import EventType, RecvEvent, RecvEvents, StreamType, Tag
+from apolo_events_client import (
+    Ack,
+    EventType,
+    EventsClientConfig,
+    RecvEvent,
+    RecvEvents,
+    StreamType,
+    Tag,
+)
 from apolo_events_client.pytest import EventsQueues
 
 from platform_buckets_api.bucket_deleter import BucketDeleter
@@ -15,7 +23,7 @@ from platform_buckets_api.service import BucketsService, PersistentCredentialsSe
 
 @pytest.fixture
 async def bucket_deleter(
-    events_config,
+    events_config: EventsClientConfig,
     buckets_service: BucketsService,
     credentials_service: PersistentCredentialsService,
 ) -> AsyncIterator[BucketDeleter]:
@@ -39,24 +47,19 @@ async def test_bucket_deleter_processes_project_remove_event(
     project = "test-project"
 
     # Create a test bucket
-    bucket = await buckets_service.create_user_bucket(
-        cluster_name=cluster,
-        org_name=org,
+    bucket = await buckets_service.create_bucket(
+        owner="test-user",
         project_name=project,
-        bucket_name="test-bucket",
-        org_role=None,
-        project_role=None,
+        name="test-bucket",
+        org_name=org,
     )
 
     # Create a test credential that references the bucket
     credential = await credentials_service.create_credentials(
-        cluster_name=cluster,
-        org_name=org,
-        project_name=project,
-        credential_name="test-credential",
+        namespace="test-namespace",
+        owner="test-user",
+        name="test-credential",
         bucket_ids=[bucket.id],
-        org_role=None,
-        project_role=None,
     )
 
     # Verify bucket and credential exist
@@ -85,6 +88,7 @@ async def test_bucket_deleter_processes_project_remove_event(
 
     # Wait for the event to be processed
     ack_event = await asyncio.wait_for(events_queues.income.get(), timeout=5.0)
+    assert isinstance(ack_event, Ack)
     assert ack_event.events[StreamType("platform-admin")] == ["test-tag-123"]
 
     # Verify bucket and credential have been deleted
@@ -107,33 +111,26 @@ async def test_bucket_deleter_updates_multi_bucket_credentials(
     other_project = "other-project"
 
     # Create two buckets - one in the project to be deleted, one in another project
-    bucket_to_delete = await buckets_service.create_user_bucket(
-        cluster_name=cluster,
-        org_name=org,
+    bucket_to_delete = await buckets_service.create_bucket(
+        owner="test-user",
         project_name=project,
-        bucket_name="bucket-to-delete",
-        org_role=None,
-        project_role=None,
+        name="bucket-to-delete",
+        org_name=org,
     )
 
-    bucket_to_keep = await buckets_service.create_user_bucket(
-        cluster_name=cluster,
-        org_name=org,
+    bucket_to_keep = await buckets_service.create_bucket(
+        owner="test-user",
         project_name=other_project,
-        bucket_name="bucket-to-keep",
-        org_role=None,
-        project_role=None,
+        name="bucket-to-keep",
+        org_name=org,
     )
 
     # Create a credential that references both buckets
     credential = await credentials_service.create_credentials(
-        cluster_name=cluster,
-        org_name=org,
-        project_name=project,
-        credential_name="multi-bucket-credential",
+        namespace="test-namespace",
+        owner="test-user",
+        name="multi-bucket-credential",
         bucket_ids=[bucket_to_delete.id, bucket_to_keep.id],
-        org_role=None,
-        project_role=None,
     )
 
     # Send project-remove event
@@ -158,6 +155,7 @@ async def test_bucket_deleter_updates_multi_bucket_credentials(
 
     # Wait for the event to be processed
     ack_event = await asyncio.wait_for(events_queues.income.get(), timeout=5.0)
+    assert isinstance(ack_event, Ack)
     assert ack_event.events[StreamType("platform-admin")] == ["test-tag-456"]
 
     # Verify the bucket from deleted project is gone
@@ -185,13 +183,11 @@ async def test_bucket_deleter_ignores_other_events(
     project = "test-project"
 
     # Create a test bucket
-    bucket = await buckets_service.create_user_bucket(
-        cluster_name=cluster,
-        org_name=org,
+    bucket = await buckets_service.create_bucket(
+        owner="test-user",
         project_name=project,
-        bucket_name="test-bucket",
-        org_role=None,
-        project_role=None,
+        name="test-bucket",
+        org_name=org,
     )
 
     # Send a different event type (not project-remove)
@@ -216,6 +212,7 @@ async def test_bucket_deleter_ignores_other_events(
 
     # Wait for the event to be processed
     ack_event = await asyncio.wait_for(events_queues.income.get(), timeout=5.0)
+    assert isinstance(ack_event, Ack)
     assert ack_event.events[StreamType("platform-admin")] == ["test-tag-789"]
 
     # Verify bucket still exists (not deleted)

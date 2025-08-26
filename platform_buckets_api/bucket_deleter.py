@@ -103,9 +103,7 @@ class BucketDeleter:
             async for credential in credential_iterator:
                 try:
                     if len(credential.bucket_ids) == 1:
-                        await self._credentials_service.delete_credentials(
-                            credential.id
-                        )
+                        await self._credentials_service.delete_credentials(credential)
                         logger.debug(
                             "Deleted credential %s (id=%s) that only referenced bucket %s",
                             credential.name,
@@ -117,8 +115,9 @@ class BucketDeleter:
                             bid for bid in credential.bucket_ids if bid != bucket.id
                         ]
                         await self._credentials_service.update_credentials(
-                            credential.id,
+                            credential,
                             bucket_ids=updated_bucket_ids,
+                            read_only=credential.read_only,
                         )
                         logger.debug(
                             "Updated credential %s (id=%s) to remove bucket %s reference",
