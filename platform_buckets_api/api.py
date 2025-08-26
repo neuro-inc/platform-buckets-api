@@ -51,6 +51,7 @@ from neuro_logging import (
 
 from platform_buckets_api import __version__
 
+from .bucket_deleter import BucketDeleter
 from .config import (
     AWSProviderConfig,
     AzureProviderConfig,
@@ -1153,6 +1154,16 @@ async def create_app(
             app[CREDENTIALS_APP_KEY][BUCKETS_SERVICE_KEY] = buckets_service
             app[CREDENTIALS_APP_KEY][CREDENTIALS_SERVICE_APP_KEY] = credentials_service
             app[CREDENTIALS_APP_KEY][DISABLE_CREATION_KEY] = config.disable_creation
+
+            if config.events:
+                logger.info("Initializing BucketDeleter")
+                await exit_stack.enter_async_context(
+                    BucketDeleter(
+                        config.events,
+                        buckets_service,
+                        credentials_service,
+                    )
+                )
 
             yield
 

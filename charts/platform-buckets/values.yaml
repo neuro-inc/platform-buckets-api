@@ -76,6 +76,7 @@ annotations: {}
 platform:
   clusterName: ""
   authUrl: http://platform-auth:8080
+  eventsUrl: http://platform-events:8080/apis/events
   token: {}
 
 bucketNamespace: default

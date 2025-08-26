@@ -12,6 +12,7 @@ import aiohttp
 import aiohttp.web
 import pytest
 from aiobotocore.client import AioBaseClient
+from apolo_events_client import EventsClientConfig
 from yarl import URL
 
 from platform_buckets_api.config import (
@@ -32,6 +33,7 @@ pytest_plugins = [
     "tests.integration.moto_server",
     "tests.integration.minio",
     "tests.integration.kube",
+    "apolo_events_client.pytest",
 ]
 
 
@@ -133,6 +135,20 @@ def config_creation_disabled(
     config_factory: Callable[..., Config],
 ) -> Config:
     return config_factory(disable_creation=True)
+
+
+@pytest.fixture
+def events_client_name() -> str:
+    return "platform-buckets"
+
+
+@pytest.fixture
+def events_config() -> EventsClientConfig:
+    return EventsClientConfig(
+        url=URL("http://platform-events:8080/apis/events"),
+        token="test-token",
+        name="platform-buckets",
+    )
 
 
 @dataclass(frozen=True)

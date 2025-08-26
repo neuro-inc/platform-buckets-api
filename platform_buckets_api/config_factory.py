@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+from apolo_events_client import EventsClientConfig
 from apolo_kube_client.config import KubeClientAuthType
 from yarl import URL
 
@@ -49,6 +50,7 @@ class EnvironConfigFactory:
             disable_creation=disable_creation,
             cluster_name=cluster_name,
             bucket_provider=self.create_bucket_provider(),
+            events=self.create_events(),
         )
 
     def _create_server(self) -> ServerConfig:
@@ -165,4 +167,14 @@ class EnvironConfigFactory:
                 self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE")
                 or KubeConfig.client_conn_pool_size
             ),
+        )
+
+    def create_events(self) -> EventsClientConfig | None:
+        events_url = self._environ.get("NP_PLATFORM_EVENTS_URL")
+        if not events_url:
+            return None
+        return EventsClientConfig(
+            url=URL(events_url),
+            token=self._environ["NP_PLATFORM_EVENTS_TOKEN"],
+            name="platform-buckets",
         )
