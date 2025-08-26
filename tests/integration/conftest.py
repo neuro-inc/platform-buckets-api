@@ -33,7 +33,6 @@ pytest_plugins = [
     "tests.integration.moto_server",
     "tests.integration.minio",
     "tests.integration.kube",
-    "apolo_events_client.pytest",
 ]
 
 
