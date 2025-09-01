@@ -162,7 +162,7 @@ async def app_with_services(config: Config) -> AsyncIterator[aiohttp.web.Applica
 
     app = await create_app(config)
     # Initialize the app to start services
-    async with app:
+    async with app:  # type: ignore[attr-defined]
         yield app
 
 

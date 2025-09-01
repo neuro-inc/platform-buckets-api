@@ -10,7 +10,7 @@ from apolo_events_client import (
 )
 
 from .service import BucketsService, PersistentCredentialsService
-from .storage import BaseBucket
+from .storage import BucketType
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,13 @@ class BucketDeleter:
             project,
         )
 
-        buckets_to_delete: list[BaseBucket] = []
+        buckets_to_delete: list[BucketType] = []
         # Use storage directly to bypass permission checks for system cleanup
-        async for bucket in self._buckets_service._storage.list_buckets(
+        async with self._buckets_service._storage.list_buckets(
             org_name=org, project_name=project
-        ):
-            buckets_to_delete.append(bucket)
+        ) as bucket_iterator:
+            async for bucket in bucket_iterator:
+                buckets_to_delete.append(bucket)
 
         logger.info(
             "Found %d buckets to delete for project %s/%s in cluster %s",
@@ -96,7 +97,7 @@ class BucketDeleter:
                     cluster,
                 )
 
-    async def _delete_bucket_and_credentials(self, bucket: BaseBucket) -> None:
+    async def _delete_bucket_and_credentials(self, bucket: BucketType) -> None:
         async with self._credentials_service.list_credentials_with_bucket(
             bucket.id
         ) as credential_iterator:

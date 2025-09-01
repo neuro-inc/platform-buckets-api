@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 from datetime import UTC, datetime
+from contextlib import asynccontextmanager
 
 import pytest
 from apolo_events_client import (
@@ -73,27 +74,38 @@ class TestBucketDeleter:
         )
 
         # Mock bucket storage to return our test bucket
-        async def mock_list_buckets(org_name, project_name):
-            if org_name == "test-org" and project_name == "test-project":
-                yield test_bucket
-
-        mock_buckets_service._storage = MagicMock()
-        mock_buckets_service._storage.list_buckets.side_effect = mock_list_buckets
-
-        # Mock credentials service to return our test credential
         from contextlib import asynccontextmanager
 
         @asynccontextmanager
-        async def mock_list_credentials_with_bucket(bucket_id):
-            async def mock_iterator():
+        async def mock_list_buckets(  # type: ignore[no-untyped-def]
+            org_name: str | None = None, project_name: str | None = None
+        ):
+            async def mock_iterator():  # type: ignore[no-untyped-def]
+                if org_name == "test-org" and project_name == "test-project":
+                    yield test_bucket
+
+            yield mock_iterator()
+
+        mock_buckets_service._storage = MagicMock()
+        mock_buckets_service._storage.list_buckets = MagicMock(
+            side_effect=mock_list_buckets
+        )
+
+        # Mock credentials service to return our test credential
+        @asynccontextmanager
+        async def mock_list_credentials_with_bucket(bucket_id: str):  # type: ignore[no-untyped-def]
+            async def mock_iterator():  # type: ignore[no-untyped-def]
                 if bucket_id == "bucket-123":
                     yield test_credential
 
             yield mock_iterator()
 
-        mock_credentials_service.list_credentials_with_bucket = (
+        mock_credentials_service.list_credentials_with_bucket = (  # type: ignore[method-assign]
             mock_list_credentials_with_bucket
         )
+        mock_credentials_service.delete_credentials = AsyncMock()  # type: ignore[method-assign]
+        mock_credentials_service.update_credentials = AsyncMock()  # type: ignore[method-assign]
+        mock_buckets_service.delete_bucket = AsyncMock()  # type: ignore[method-assign]
 
         # Create BucketDeleter instance
         deleter = BucketDeleter(
@@ -161,26 +173,35 @@ class TestBucketDeleter:
         )
 
         # Mock services
-        async def mock_list_buckets(org_name, project_name):
-            if org_name == "test-org" and project_name == "test-project":
-                yield test_bucket
+        @asynccontextmanager
+        async def mock_list_buckets(  # type: ignore[no-untyped-def]
+            org_name: str | None = None, project_name: str | None = None
+        ):
+            async def mock_iterator():  # type: ignore[no-untyped-def]
+                if org_name == "test-org" and project_name == "test-project":
+                    yield test_bucket
+
+            yield mock_iterator()
 
         mock_buckets_service._storage = MagicMock()
-        mock_buckets_service._storage.list_buckets.side_effect = mock_list_buckets
-
-        from contextlib import asynccontextmanager
+        mock_buckets_service._storage.list_buckets = MagicMock(
+            side_effect=mock_list_buckets
+        )
 
         @asynccontextmanager
-        async def mock_list_credentials_with_bucket(bucket_id):
-            async def mock_iterator():
+        async def mock_list_credentials_with_bucket(bucket_id: str):  # type: ignore[no-untyped-def]
+            async def mock_iterator():  # type: ignore[no-untyped-def]
                 if bucket_id == "bucket-to-delete":
                     yield multi_bucket_credential
 
             yield mock_iterator()
 
-        mock_credentials_service.list_credentials_with_bucket = (
+        mock_credentials_service.list_credentials_with_bucket = (  # type: ignore[method-assign]
             mock_list_credentials_with_bucket
         )
+        mock_credentials_service.delete_credentials = AsyncMock()  # type: ignore[method-assign]
+        mock_credentials_service.update_credentials = AsyncMock()  # type: ignore[method-assign]
+        mock_buckets_service.delete_bucket = AsyncMock()  # type: ignore[method-assign]
 
         # Create BucketDeleter instance
         deleter = BucketDeleter(
@@ -223,6 +244,10 @@ class TestBucketDeleter:
         mock_credentials_service: PersistentCredentialsService,
     ) -> None:
         """Test that non-project-remove events are ignored."""
+        # Setup mocks for services (though they shouldn't be called)
+        mock_credentials_service.delete_credentials = AsyncMock()  # type: ignore[method-assign]
+        mock_buckets_service.delete_bucket = AsyncMock()  # type: ignore[method-assign]
+
         # Create BucketDeleter instance
         deleter = BucketDeleter(
             config=events_config,
@@ -281,34 +306,40 @@ class TestBucketDeleter:
         )
 
         # Mock bucket service to return both buckets
-        async def mock_list_buckets(org_name, project_name):
-            yield bucket1
-            yield bucket2
+        @asynccontextmanager
+        async def mock_list_buckets(  # type: ignore[no-untyped-def]
+            org_name: str | None = None, project_name: str | None = None
+        ):
+            async def mock_iterator():  # type: ignore[no-untyped-def]
+                yield bucket1
+                yield bucket2
+
+            yield mock_iterator()
 
         mock_buckets_service._storage = MagicMock()
-        mock_buckets_service._storage.list_buckets.side_effect = mock_list_buckets
+        mock_buckets_service._storage.list_buckets = MagicMock(
+            side_effect=mock_list_buckets
+        )
 
         # Mock credentials service to not find any credentials
-        from contextlib import asynccontextmanager
-
         @asynccontextmanager
-        async def mock_list_credentials_with_bucket(bucket_id):
-            async def mock_iterator():
+        async def mock_list_credentials_with_bucket(bucket_id: str):  # type: ignore[no-untyped-def]
+            async def mock_iterator():  # type: ignore[no-untyped-def]
                 return
                 yield  # This won't execute
 
             yield mock_iterator()
 
-        mock_credentials_service.list_credentials_with_bucket = (
+        mock_credentials_service.list_credentials_with_bucket = (  # type: ignore[method-assign]
             mock_list_credentials_with_bucket
         )
 
         # Make bucket deletion fail for the first bucket
-        def mock_delete_bucket(bucket_id):
+        def mock_delete_bucket(bucket_id: str) -> None:
             if bucket_id == "bucket-1":
                 raise Exception("Simulated deletion error")
 
-        mock_buckets_service.delete_bucket.side_effect = mock_delete_bucket
+        mock_buckets_service.delete_bucket = AsyncMock(side_effect=mock_delete_bucket)  # type: ignore[method-assign]
 
         # Create BucketDeleter instance
         deleter = BucketDeleter(
