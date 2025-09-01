@@ -64,11 +64,11 @@ class BucketDeleter:
         )
 
         buckets_to_delete: list[BaseBucket] = []
-        async with self._buckets_service.get_buckets(
-            cluster_name=cluster, org_name=org, project_name=project
-        ) as bucket_iterator:
-            async for bucket in bucket_iterator:
-                buckets_to_delete.append(bucket)
+        # Use storage directly to bypass permission checks for system cleanup
+        async for bucket in self._buckets_service._storage.list_buckets(
+            org_name=org, project_name=project
+        ):
+            buckets_to_delete.append(bucket)
 
         logger.info(
             "Found %d buckets to delete for project %s/%s in cluster %s",
