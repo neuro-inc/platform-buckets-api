@@ -12,14 +12,8 @@ import aiohttp
 import aiohttp.web
 import pytest
 from aiobotocore.client import AioBaseClient
-from apolo_events_client import EventsClientConfig
 from yarl import URL
 
-from platform_buckets_api.api import (
-    BUCKETS_APP_KEY,
-    BUCKETS_SERVICE_KEY,
-    CREDENTIALS_SERVICE_APP_KEY,
-)
 from platform_buckets_api.config import (
     AWSProviderConfig,
     Config,
@@ -28,7 +22,6 @@ from platform_buckets_api.config import (
     PlatformAuthConfig,
     ServerConfig,
 )
-from platform_buckets_api.service import BucketsService, PersistentCredentialsService
 
 logger = logging.getLogger(__name__)
 
@@ -140,42 +133,6 @@ def config_creation_disabled(
     config_factory: Callable[..., Config],
 ) -> Config:
     return config_factory(disable_creation=True)
-
-
-@pytest.fixture
-def events_client_name() -> str:
-    return "platform-buckets"
-
-
-@pytest.fixture
-def events_config() -> EventsClientConfig:
-    return EventsClientConfig(
-        url=URL("http://platform-events:8080/apis/events"),
-        token="test-token",
-        name="platform-buckets",
-    )
-
-
-@pytest.fixture
-async def app_with_services(config: Config) -> AsyncIterator[aiohttp.web.Application]:
-    from platform_buckets_api.api import create_app
-
-    app = await create_app(config)
-    # Initialize the app to start services
-    async with app:  # type: ignore[attr-defined]
-        yield app
-
-
-@pytest.fixture
-def buckets_service(app_with_services: aiohttp.web.Application) -> BucketsService:
-    return app_with_services[BUCKETS_APP_KEY][BUCKETS_SERVICE_KEY]
-
-
-@pytest.fixture
-def credentials_service(
-    app_with_services: aiohttp.web.Application,
-) -> PersistentCredentialsService:
-    return app_with_services[BUCKETS_APP_KEY][CREDENTIALS_SERVICE_APP_KEY]
 
 
 @dataclass(frozen=True)
