@@ -43,10 +43,7 @@ class ProjectDeleter:
         if ev.event_type != self.PROJECT_REMOVE:
             return
 
-        try:
-            await self._process_project_deletion(ev)
-        except Exception:
-            logger.exception("Error in _on_admin_event")
+        await self._process_project_deletion(ev)
 
     async def _process_project_deletion(self, ev: RecvEvent) -> None:
         cluster = ev.cluster
