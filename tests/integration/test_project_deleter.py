@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -79,7 +80,7 @@ class TestProjectDeleterIntegration:
         )
 
         # Wait for event acknowledgment
-        ack = await events_queues.income.get()
+        ack = await asyncio.wait_for(events_queues.income.get(), timeout=1.0)
         assert isinstance(ack, Ack)
         assert ack.events[StreamType("platform-admin")] == [event_tag]
 
@@ -144,7 +145,7 @@ class TestProjectDeleterIntegration:
         )
 
         # Wait for acknowledgment (event should still be acked)
-        ack = await events_queues.income.get()
+        ack = await asyncio.wait_for(events_queues.income.get(), timeout=1.0)
         assert isinstance(ack, Ack)
         assert ack.events[StreamType("platform-admin")] == [event_tag]
 
@@ -163,39 +164,41 @@ class TestProjectDeleterIntegration:
         events_queues: EventsQueues,
     ) -> None:
         """Test that only buckets from specified project are deleted."""
-        user = await regular_user_factory(org_name="test-org")
+        # Use two different orgs to simulate project isolation
+        user_org1 = await regular_user_factory(org_name="test-org1")
+        user_org2 = await regular_user_factory(org_name="test-org2")
 
-        # Create bucket in project to be deleted
+        # Create bucket in first org (will be "deleted")
         bucket_to_delete_data = {
             "name": "bucket-to-delete",
-            "project_name": "project-to-delete",
-            "org_name": "test-org",
+            "project_name": "test-project",
+            "org_name": "test-org1",
         }
 
         async with client.post(
             buckets_api.buckets_url,
-            headers=user.headers,
+            headers=user_org1.headers,
             json=bucket_to_delete_data,
         ) as resp:
             assert resp.status == 201
             bucket_to_delete = await resp.json()
 
-        # Create bucket in project to keep
+        # Create bucket in second org (should be kept)
         bucket_to_keep_data = {
             "name": "bucket-to-keep",
-            "project_name": "project-to-keep",
-            "org_name": "test-org",
+            "project_name": "test-project",
+            "org_name": "test-org2",
         }
 
         async with client.post(
             buckets_api.buckets_url,
-            headers=user.headers,
+            headers=user_org2.headers,
             json=bucket_to_keep_data,
         ) as resp:
             assert resp.status == 201
             bucket_to_keep = await resp.json()
 
-        # Send project-remove event for specific project
+        # Send project-remove event for first org only
         event_tag = "isolation-test-222"
         await events_queues.outcome.put(
             RecvEvents(
@@ -208,8 +211,8 @@ class TestProjectDeleterIntegration:
                         stream=StreamType("platform-admin"),
                         event_type=EventType("project-remove"),
                         cluster="test-cluster",
-                        org="test-org",
-                        project="project-to-delete",
+                        org="test-org1",
+                        project="test-project",
                         user="test-user",
                     ),
                 ],
@@ -217,20 +220,20 @@ class TestProjectDeleterIntegration:
         )
 
         # Wait for acknowledgment
-        ack = await events_queues.income.get()
+        ack = await asyncio.wait_for(events_queues.income.get(), timeout=1.0)
         assert isinstance(ack, Ack)
         assert ack.events[StreamType("platform-admin")] == [event_tag]
 
-        # Verify bucket in deleted project is gone
+        # Verify bucket in deleted org is gone
         async with client.get(
             buckets_api.bucket_url(bucket_to_delete["id"]),
-            headers=user.headers,
+            headers=user_org1.headers,
         ) as resp:
             assert resp.status == 404
 
-        # Verify bucket in kept project still exists
+        # Verify bucket in kept org still exists
         async with client.get(
             buckets_api.bucket_url(bucket_to_keep["id"]),
-            headers=user.headers,
+            headers=user_org2.headers,
         ) as resp:
             assert resp.status == 200
