@@ -15,7 +15,7 @@ from .storage import BucketType
 logger = logging.getLogger(__name__)
 
 
-class BucketDeleter:
+class ProjectDeleter:
     ADMIN_STREAM = StreamType("platform-admin")
     PROJECT_REMOVE = EventType("project-remove")
 

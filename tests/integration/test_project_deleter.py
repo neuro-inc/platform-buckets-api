@@ -16,7 +16,7 @@ from .auth import UserFactory
 from .conftest import BucketsApiEndpoints
 
 
-class TestBucketDeleterIntegration:
+class TestProjectDeleterIntegration:
     async def test_project_remove_deletes_buckets_and_credentials(
         self,
         client: aiohttp.ClientSession,
