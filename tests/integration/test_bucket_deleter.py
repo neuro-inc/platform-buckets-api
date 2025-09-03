@@ -1,9 +1,7 @@
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import aiohttp
-import pytest
 from apolo_events_client import (
     Ack,
     EventType,
@@ -14,19 +12,8 @@ from apolo_events_client import (
 )
 from apolo_events_client.pytest import EventsQueues
 
-from platform_buckets_api.api import create_app
-from platform_buckets_api.config import Config
-
 from .auth import UserFactory
-from .conftest import create_local_app_server
-from .test_api import BucketsApiEndpoints
-
-
-@pytest.fixture
-async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
-    app = await create_app(config)
-    async with create_local_app_server(app, port=8080) as address:
-        yield BucketsApiEndpoints(address=address)
+from .conftest import BucketsApiEndpoints
 
 
 class TestBucketDeleterIntegration:
@@ -41,7 +28,11 @@ class TestBucketDeleterIntegration:
         user = await regular_user_factory(org_name="test-org")
 
         # Create bucket
-        bucket_data = {"name": "test-bucket", "project_name": "test-project"}
+        bucket_data = {
+            "name": "test-bucket",
+            "project_name": "test-project",
+            "org_name": "test-org",
+        }
 
         async with client.post(
             buckets_api.buckets_url,
