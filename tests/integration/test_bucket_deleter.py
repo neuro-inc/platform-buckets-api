@@ -108,7 +108,11 @@ class TestBucketDeleterIntegration:
         user = await regular_user_factory(org_name="test-org")
 
         # Create bucket
-        bucket_data = {"name": "ignore-test-bucket", "project_name": "test-project"}
+        bucket_data = {
+            "name": "ignore-test-bucket",
+            "project_name": "test-project",
+            "org_name": "test-org",
+        }
 
         async with client.post(
             buckets_api.buckets_url,
@@ -165,6 +169,7 @@ class TestBucketDeleterIntegration:
         bucket_to_delete_data = {
             "name": "bucket-to-delete",
             "project_name": "project-to-delete",
+            "org_name": "test-org",
         }
 
         async with client.post(
@@ -179,6 +184,7 @@ class TestBucketDeleterIntegration:
         bucket_to_keep_data = {
             "name": "bucket-to-keep",
             "project_name": "project-to-keep",
+            "org_name": "test-org",
         }
 
         async with client.post(
