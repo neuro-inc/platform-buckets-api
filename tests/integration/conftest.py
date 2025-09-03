@@ -14,6 +14,8 @@ import pytest
 from aiobotocore.client import AioBaseClient
 from yarl import URL
 
+from apolo_events_client import EventsClientConfig
+
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import (
     AWSProviderConfig,
@@ -87,6 +89,7 @@ def config_factory(
     moto_server: MotoConfig,
     kube_client: None,  # Force cleanup
     s3_role: str,
+    events_config: EventsClientConfig,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = {
@@ -94,6 +97,7 @@ def config_factory(
             "platform_auth": auth_config,
             "kube": kube_config,
             "cluster_name": cluster_name,
+            "events": events_config,
             "bucket_provider": AWSProviderConfig(
                 endpoint_url=moto_server.url,
                 access_key_id=moto_server.admin_access_key_id,
@@ -244,6 +248,11 @@ async def buckets_api_creation_disabled(
     app = await create_app(config_creation_disabled)
     async with create_local_app_server(app, port=8080) as address:
         yield BucketsApiEndpoints(address=address)
+
+
+@pytest.fixture
+def events_client_name() -> str:
+    return "platform-buckets"
 
 
 @pytest.fixture
