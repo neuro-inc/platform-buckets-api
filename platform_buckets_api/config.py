@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from apolo_events_client import EventsClientConfig
 from apolo_kube_client.config import KubeConfig
 from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL
@@ -100,5 +101,6 @@ class Config:
         | EMCECSProviderConfig
         | OpenStackProviderConfig
     )
+    events: EventsClientConfig | None = None
     enable_docs: bool = False
     disable_creation: bool = False

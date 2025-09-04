@@ -14,6 +14,9 @@ import pytest
 from aiobotocore.client import AioBaseClient
 from yarl import URL
 
+from apolo_events_client import EventsClientConfig
+
+from platform_buckets_api.api import create_app
 from platform_buckets_api.config import (
     AWSProviderConfig,
     Config,
@@ -86,6 +89,7 @@ def config_factory(
     moto_server: MotoConfig,
     kube_client: None,  # Force cleanup
     s3_role: str,
+    events_config: EventsClientConfig,
 ) -> Callable[..., Config]:
     def _f(**kwargs: Any) -> Config:
         defaults = {
@@ -93,6 +97,7 @@ def config_factory(
             "platform_auth": auth_config,
             "kube": kube_config,
             "cluster_name": cluster_name,
+            "events": events_config,
             "bucket_provider": AWSProviderConfig(
                 endpoint_url=moto_server.url,
                 access_key_id=moto_server.admin_access_key_id,
@@ -182,6 +187,72 @@ def get_service_url(service_name: str, namespace: str = "default") -> str:
         timeout_s -= interval_s
 
     pytest.fail(f"Service {service_name} is unavailable.")
+
+
+@dataclass(frozen=True)
+class BucketsApiEndpoints:
+    address: ApiAddress
+
+    @property
+    def api_v1_endpoint(self) -> str:
+        return f"http://{self.address.host}:{self.address.port}/api/v1"
+
+    @property
+    def ping_url(self) -> str:
+        return f"{self.api_v1_endpoint}/ping"
+
+    @property
+    def secured_ping_url(self) -> str:
+        return f"{self.api_v1_endpoint}/secured-ping"
+
+    @property
+    def buckets_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/buckets"
+
+    @property
+    def bucket_import_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/buckets/import/external"
+
+    @property
+    def bucket_by_path(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/buckets/find/by_path"
+
+    def bucket_url(self, name: str) -> str:
+        return f"{self.buckets_url}/{name}"
+
+    def bucket_make_tmp_credentials_url(self, name: str) -> str:
+        return f"{self.bucket_url(name)}/make_tmp_credentials"
+
+    def bucket_sign_blob_url(self, name: str) -> str:
+        return f"{self.bucket_url(name)}/sign_blob_url"
+
+    @property
+    def credentials_url(self) -> str:
+        return f"{self.api_v1_endpoint}/buckets/persistent_credentials"
+
+    def credential_url(self, name: str) -> str:
+        return f"{self.credentials_url}/{name}"
+
+
+@pytest.fixture
+async def buckets_api(config: Config) -> AsyncIterator[BucketsApiEndpoints]:
+    app = await create_app(config)
+    async with create_local_app_server(app, port=8080) as address:
+        yield BucketsApiEndpoints(address=address)
+
+
+@pytest.fixture
+async def buckets_api_creation_disabled(
+    config_creation_disabled: Config,
+) -> AsyncIterator[BucketsApiEndpoints]:
+    app = await create_app(config_creation_disabled)
+    async with create_local_app_server(app, port=8080) as address:
+        yield BucketsApiEndpoints(address=address)
+
+
+@pytest.fixture
+def events_client_name() -> str:
+    return "platform-buckets"
 
 
 @pytest.fixture
