@@ -44,7 +44,7 @@ codecov = "2.1.13"
 docker = "7.1.0"
 pytest = "8.4.1"
 pytest-asyncio = "1.1.0"
-pytest-cov = "6.2.1"
+pytest-cov = "6.3.0"
 apolo-events-client = {extras = ["pytest"], version = "25.8.0"}
 
 [tool.poetry.requires-plugins]
