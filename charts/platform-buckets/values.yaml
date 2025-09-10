@@ -38,6 +38,14 @@ imagePullSecrets: []
 port: 8080
 
 replicas: 2
+
+securityContext:
+  enabled: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+
 resources:
   requests:
     cpu: "0.1"
