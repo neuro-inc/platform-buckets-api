@@ -179,13 +179,14 @@ spec:
         - mountPath: {{ include "platformBuckets.kubeAuthMountRoot" . }}
           name: kube-api-token
           readOnly: true
+      {{- if .Values.securityContext.enabled }}
       securityContext:
-        {{- if .Values.securityContext.enabled }}
         runAsUser: {{ .Values.securityContext.runAsUser }}
         runAsGroup: {{ .Values.securityContext.runAsGroup }}
         runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
         allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
-        {{- end }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy}}
+      {{- end }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}
       {{- end }}
