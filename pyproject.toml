@@ -38,7 +38,7 @@ apolo-events-client = "25.8.0"
 platform-buckets-api = "platform_buckets_api.api:main"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "1.17.1"
+mypy = "1.18.1"
 pre-commit = "4.3.0"
 codecov = "2.1.13"
 docker = "7.1.0"
