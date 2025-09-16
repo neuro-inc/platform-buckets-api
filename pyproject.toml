@@ -43,7 +43,7 @@ pre-commit = "4.3.0"
 codecov = "2.1.13"
 docker = "7.1.0"
 pytest = "8.4.2"
-pytest-asyncio = "1.1.0"
+pytest-asyncio = "1.2.0"
 pytest-cov = "7.0.0"
 apolo-events-client = {extras = ["pytest"], version = "25.8.0"}
 
