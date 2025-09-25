@@ -42,7 +42,6 @@ COPY --from=builder /tmp/mc /usr/bin/mc
 
 WORKDIR /app
 
-USER $SERVICE_NAME
 ENV NP_BUCKETS_API_PORT=8080
 EXPOSE $NP_BUCKETS_API_PORT
 
