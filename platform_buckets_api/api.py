@@ -292,7 +292,6 @@ class BucketsApiHandler:
                 org_name=org_name,
                 project_name=project_name,
             )
-            # await asyncio.sleep(100)
         except ExistsError:
             return json_response(
                 {
