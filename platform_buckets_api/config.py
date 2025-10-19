@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 from apolo_events_client import EventsClientConfig
-from apolo_kube_client.config import KubeConfig
+
+from apolo_kube_client import KubeConfig
 from google.oauth2.service_account import Credentials as SACredentials
 from yarl import URL
 

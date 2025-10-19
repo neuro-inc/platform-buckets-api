@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from apolo_kube_client.client import KubeClient, KubeClientAuthType
-from apolo_kube_client.config import KubeConfig
-from apolo_kube_client.errors import ResourceNotFound
 
-from platform_buckets_api.kube_client import KubeApi
+from apolo_kube_client import (
+    KubeClient,
+    KubeClientAuthType,
+    KubeConfig,
+    ResourceNotFound,
+)
 
 
 @pytest.fixture(scope="session")
@@ -69,19 +71,7 @@ async def kube_config(
 @pytest.fixture
 def kube_client_factory() -> Callable[[KubeConfig], KubeClient]:
     def make_kube_client(kube_config: KubeConfig) -> KubeClient:
-        return KubeClient(
-            base_url=kube_config.endpoint_url,
-            auth_type=kube_config.auth_type,
-            cert_authority_data_pem=kube_config.cert_authority_data_pem,
-            cert_authority_path=None,  # disabled, see `cert_authority_data_pem`
-            auth_cert_path=kube_config.auth_cert_path,
-            auth_cert_key_path=kube_config.auth_cert_key_path,
-            namespace=kube_config.namespace,
-            conn_timeout_s=kube_config.client_conn_timeout_s,
-            read_timeout_s=kube_config.client_read_timeout_s,
-            watch_timeout_s=kube_config.client_watch_timeout_s,
-            conn_pool_size=kube_config.client_conn_pool_size,
-        )
+        return KubeClient(config=kube_config)
 
     return make_kube_client
 
@@ -94,15 +84,29 @@ async def kube_client(
     client = kube_client_factory(kube_config)
 
     async def _clean_k8s(kube_client: KubeClient) -> None:
-        kube_api = KubeApi(kube_client)
-        for bucket in await kube_api.list_user_buckets():
+        bucket_list = await kube_client.neuromation_io_v1.user_bucket.get_list(
+            all_namespaces=True
+        )
+        for bucket in bucket_list.items:
             try:
-                await kube_api.remove_user_bucket(bucket)
+                await kube_client.neuromation_io_v1.user_bucket.delete(
+                    name=bucket.metadata.name,
+                    namespace=bucket.metadata.namespace,
+                )
             except ResourceNotFound:
                 pass
-        for creds in await kube_api.list_persistent_credentials():
+
+        creds_list = (
+            await kube_client.neuromation_io_v1.persistent_bucket_credential.get_list(
+                all_namespaces=True
+            )
+        )
+        for creds in creds_list.items:
             try:
-                await kube_api.remove_persistent_credentials(creds)
+                await kube_client.neuromation_io_v1.persistent_bucket_credential.delete(
+                    name=creds.metadata.name,
+                    namespace=creds.metadata.namespace,
+                )
             except ResourceNotFound:
                 pass
 

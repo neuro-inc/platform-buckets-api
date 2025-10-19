@@ -631,10 +631,11 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"org_name": "NO_ORG"},
+            params={"org_name": "no-org"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
+            assert payload == [bucket]
             assert payload == [bucket]
         async with client.get(
             buckets_api.buckets_url,
