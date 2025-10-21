@@ -138,6 +138,26 @@ class EnvironConfigFactory:
         token_path = self._environ.get("NP_BUCKETS_API_K8S_TOKEN_PATH")
         token = Path(token_path).read_text() if token_path else None
 
+        kube_config_kwargs = {}
+        if namespace := self._environ.get("NP_BUCKETS_API_K8S_NAMESPACE"):
+            kube_config_kwargs["namespace"] = namespace
+        if client_conn_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT"
+        ):
+            kube_config_kwargs["client_conn_timeout_s"] = int(client_conn_timeout_s)  # type: ignore
+        if client_read_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT"
+        ):
+            kube_config_kwargs["client_read_timeout_s"] = int(client_read_timeout_s)  # type: ignore
+        if client_watch_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT"
+        ):
+            kube_config_kwargs["client_watch_timeout_s"] = int(client_watch_timeout_s)  # type: ignore
+        if client_conn_pool_size := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE"
+        ):
+            kube_config_kwargs["client_conn_pool_size"] = int(client_conn_pool_size)  # type: ignore
+
         return KubeConfig(
             endpoint_url=endpoint_url,
             cert_authority_data_pem=ca_data,
@@ -148,25 +168,7 @@ class EnvironConfigFactory:
             ),
             token=token,
             token_path=token_path,
-            namespace=self._environ.get(
-                "NP_BUCKETS_API_K8S_NS", KubeConfig.model_fields["namespace"].default
-            ),
-            client_conn_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT")
-                or KubeConfig.model_fields["client_conn_timeout_s"].default
-            ),
-            client_read_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT")
-                or KubeConfig.model_fields["client_read_timeout_s"].default
-            ),
-            client_watch_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT")
-                or KubeConfig.model_fields["client_watch_timeout_s"].default
-            ),
-            client_conn_pool_size=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE")
-                or KubeConfig.model_fields["client_conn_pool_size"].default
-            ),
+            **kube_config_kwargs,  # type: ignore
         )
 
     def create_events(self) -> EventsClientConfig | None:
