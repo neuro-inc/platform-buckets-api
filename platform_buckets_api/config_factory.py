@@ -139,7 +139,7 @@ class EnvironConfigFactory:
         token = Path(token_path).read_text() if token_path else None
 
         kube_config_kwargs = {}
-        if namespace := self._environ.get("NP_BUCKETS_API_K8S_NAMESPACE"):
+        if namespace := self._environ.get("NP_BUCKETS_API_K8S_NS"):
             kube_config_kwargs["namespace"] = namespace
         if client_conn_timeout_s := self._environ.get(
             "NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT"
