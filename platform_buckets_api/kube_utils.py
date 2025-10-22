@@ -1,7 +1,6 @@
 import hashlib
 import json
 import logging
-from typing import Any
 
 
 from .config import BucketsProviderType
@@ -12,6 +11,14 @@ from .storage import (
     ProviderBucket,
     ProviderRole,
     UserBucket,
+)
+from apolo_kube_client import (
+    V1UserBucketCRD,
+    V1PersistentBucketCredentialCRD,
+    V1PersistentBucketCredentialCRDMetadata,
+    V1PersistentBucketCredentialCRDSpec,
+    V1UserBucketCRDMetadata,
+    V1UserBucketCRDSpec,
 )
 from .utils import datetime_dump, datetime_load
 
@@ -37,23 +44,23 @@ def _k8s_name_safe(**kwargs: str) -> str:
 
 class PersistentCredentialsCRDMapper:
     @staticmethod
-    def from_primitive(payload: dict[str, Any]) -> PersistentCredentials:
+    def from_model(model: V1PersistentBucketCredentialCRD) -> PersistentCredentials:
         return PersistentCredentials(
-            id=payload["metadata"]["labels"][ID_LABEL],
-            name=payload["metadata"]["labels"].get(CREDENTIALS_NAME_LABEL),
-            owner=payload["metadata"]["labels"][OWNER_LABEL],
+            id=model.metadata.labels[ID_LABEL],
+            name=model.metadata.labels.get(CREDENTIALS_NAME_LABEL),
+            owner=model.metadata.labels[OWNER_LABEL],
             role=ProviderRole(
-                name=payload["spec"]["provider_name"],
-                provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
-                credentials=payload["spec"]["credentials"],
+                name=model.spec.provider_name,
+                provider_type=BucketsProviderType(model.spec.provider_type),
+                credentials=model.spec.credentials,
             ),
-            bucket_ids=payload["spec"]["bucket_ids"],
-            read_only=payload["spec"].get("read_only", False),
-            namespace=payload["metadata"]["namespace"],
+            bucket_ids=model.spec.bucket_ids,
+            read_only=model.spec.read_only,
+            namespace=model.metadata.namespace,
         )
 
     @staticmethod
-    def to_primitive(entry: PersistentCredentials) -> dict[str, Any]:
+    def to_model(entry: PersistentCredentials) -> V1PersistentBucketCredentialCRD:
         if entry.name:
             name = (
                 "persistent-bucket-credentials-"
@@ -67,55 +74,52 @@ class PersistentCredentialsCRDMapper:
         }
         if entry.name:
             labels[CREDENTIALS_NAME_LABEL] = entry.name
-        return {
-            "kind": "PersistentBucketCredential",
-            "apiVersion": "neuromation.io/v1",
-            "metadata": {
-                "name": name,
-                "labels": labels,
-            },
-            "spec": {
-                "provider_name": entry.role.name,
-                "provider_type": entry.role.provider_type.value,
-                "credentials": entry.role.credentials,
-                "bucket_ids": entry.bucket_ids,
-                "read_only": entry.read_only,
-            },
-        }
+
+        return V1PersistentBucketCredentialCRD(
+            metadata=V1PersistentBucketCredentialCRDMetadata(
+                name=name,
+                labels=labels,
+            ),
+            spec=V1PersistentBucketCredentialCRDSpec(
+                provider_name=entry.role.name,
+                provider_type=entry.role.provider_type.value,
+                credentials=entry.role.credentials,  # type: ignore
+                bucket_ids=entry.bucket_ids,
+                read_only=entry.read_only,
+            ),
+        )
 
 
 class BucketCRDMapper:
     @staticmethod
-    def from_primitive(payload: dict[str, Any]) -> BucketType:
-        owner = payload["metadata"]["labels"][OWNER_LABEL]
+    def from_model(model: V1UserBucketCRD) -> BucketType:
+        owner = model.metadata.labels[OWNER_LABEL]
         common_kwargs = {
-            "id": payload["metadata"]["labels"][ID_LABEL],
-            "name": payload["metadata"]["labels"].get(BUCKET_NAME_LABEL),
+            "id": model.metadata.labels[ID_LABEL],
+            "name": model.metadata.labels.get(BUCKET_NAME_LABEL),
             "owner": owner,
-            "org_name": payload["metadata"]["labels"].get(APOLO_ORG_NAME_LABEL),
-            "project_name": payload["metadata"]["labels"].get(
-                APOLO_PROJECT_NAME_LABEL, owner
-            ),
-            "created_at": datetime_load(payload["spec"]["created_at"]),
+            "org_name": model.metadata.labels.get(APOLO_ORG_NAME_LABEL),
+            "project_name": model.metadata.labels.get(APOLO_PROJECT_NAME_LABEL, owner),
+            "created_at": datetime_load(model.spec.created_at),  # type: ignore
             "provider_bucket": ProviderBucket(
-                provider_type=BucketsProviderType(payload["spec"]["provider_type"]),
-                name=payload["spec"]["provider_name"],
-                metadata=payload["spec"].get("metadata"),
+                provider_type=BucketsProviderType(model.spec.provider_type),
+                name=model.spec.provider_name,  # type: ignore
+                metadata=model.spec.metadata,
             ),
-            "public": payload["spec"].get("public", False),
+            "public": model.spec.public if model.spec.public is not None else False,
         }
-        if payload["spec"].get("imported", False):
+        if model.spec.imported:
             return ImportedBucket(
-                **common_kwargs,
-                credentials=payload["spec"]["credentials"],
+                **common_kwargs,  # type: ignore
+                credentials=model.spec.credentials,  # type: ignore
             )
         else:
             return UserBucket(
-                **common_kwargs,
+                **common_kwargs,  # type: ignore
             )
 
     @staticmethod
-    def to_primitive(entry: BucketType) -> dict[str, Any]:
+    def to_model(entry: BucketType) -> V1UserBucketCRD:
         labels = {
             ID_LABEL: entry.id,
             OWNER_LABEL: entry.owner,
@@ -150,12 +154,10 @@ class BucketCRDMapper:
             spec["imported"] = True
             spec["credentials"] = entry.credentials
 
-        return {
-            "kind": "UserBucket",
-            "apiVersion": "neuromation.io/v1",
-            "metadata": {
-                "name": name,
-                "labels": labels,
-            },
-            "spec": spec,
-        }
+        return V1UserBucketCRD(
+            metadata=V1UserBucketCRDMetadata(
+                name=name,
+                labels=labels,
+            ),
+            spec=V1UserBucketCRDSpec(**spec),  # type: ignore
+        )

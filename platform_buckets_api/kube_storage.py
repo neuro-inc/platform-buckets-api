@@ -5,12 +5,6 @@ from apolo_kube_client import (
     KubeClient,
     ResourceExists,
     ResourceNotFound,
-    V1UserBucketCRD,
-    V1UserBucketCRDSpec,
-    V1UserBucketCRDMetadata,
-    V1PersistentBucketCredentialCRD,
-    V1PersistentBucketCredentialCRDSpec,
-    V1PersistentBucketCredentialCRDMetadata,
 )
 
 from platform_buckets_api.kube_utils import (
@@ -41,31 +35,6 @@ class K8SBucketsStorage(BucketsStorage):
     def __init__(self, kube_client: KubeClient) -> None:
         self._kube_client = kube_client
 
-    def _bucket_to_k8s_model(self, bucket: BucketType) -> V1UserBucketCRD:
-        bucket_crd_mapper = BucketCRDMapper.to_primitive(bucket)
-
-        user_bucket_crd = V1UserBucketCRD(
-            metadata=V1UserBucketCRDMetadata(
-                name=bucket_crd_mapper.get("metadata", {}).get("name", ""),
-                labels=bucket_crd_mapper.get("metadata", {}).get("labels", {}),
-            ),
-            spec=V1UserBucketCRDSpec(
-                provider_type=bucket_crd_mapper.get("spec", {}).get(
-                    "provider_type", None
-                ),
-                provider_name=bucket_crd_mapper.get("spec", {}).get(
-                    "provider_name", None
-                ),
-                created_at=bucket_crd_mapper.get("spec", {}).get("created_at", None),
-                public=bucket_crd_mapper.get("spec", {}).get("public", None),
-                metadata=bucket_crd_mapper.get("spec", {}).get("metadata", None),
-                imported=bucket_crd_mapper.get("spec", {}).get("imported", None),
-                credentials=bucket_crd_mapper.get("spec", {}).get("credentials", None),
-            ),
-        )
-
-        return user_bucket_crd
-
     async def create_bucket(self, bucket: BucketType) -> None:
         namespace = await create_namespace(
             kube_client=self._kube_client,
@@ -74,7 +43,7 @@ class K8SBucketsStorage(BucketsStorage):
         )
         try:
             await self._kube_client.neuromation_io_v1.user_bucket.create(
-                model=self._bucket_to_k8s_model(bucket),
+                model=BucketCRDMapper.to_model(bucket),
                 namespace=namespace.metadata.name,
             )
         except ResourceExists:
@@ -90,7 +59,7 @@ class K8SBucketsStorage(BucketsStorage):
         if len(bucket_list.items) == 0:
             raise NotExistsError(f"UserBucket with id {id} doesn't exist")
 
-        return BucketCRDMapper.from_primitive(bucket_list.items[0].model_dump())
+        return BucketCRDMapper.from_model(bucket_list.items[0])
 
     async def get_bucket_by_name(
         self, name: str, org_name: str | None, project_name: str
@@ -111,7 +80,7 @@ class K8SBucketsStorage(BucketsStorage):
                 f"name {name} doesn't exist"
             )
 
-        return BucketCRDMapper.from_primitive(bucket_list.items[0].model_dump())
+        return BucketCRDMapper.from_model(bucket_list.items[0])
 
     @asyncgeneratorcontextmanager
     async def list_buckets(
@@ -130,7 +99,7 @@ class K8SBucketsStorage(BucketsStorage):
         )
 
         for user_bucket in user_bucket_list.items:
-            yield BucketCRDMapper.from_primitive(user_bucket.model_dump())
+            yield BucketCRDMapper.from_model(user_bucket)
 
     async def delete_bucket(self, id: str) -> None:
         try:
@@ -150,17 +119,17 @@ class K8SBucketsStorage(BucketsStorage):
                     "Cannot remove UserBucket that is mentioned "
                     f"in PersistentCredentials with id {credential.metadata.name}"
                 )
-        name = BucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
+        name = BucketCRDMapper.to_model(bucket).metadata.name
         await self._kube_client.neuromation_io_v1.user_bucket.delete(
             name=name, namespace=bucket.namespace
         )
 
     async def update_bucket(self, bucket: BucketType) -> None:
-        name = BucketCRDMapper.to_primitive(bucket)["metadata"]["name"]
+        name = BucketCRDMapper.to_model(bucket).metadata.name
         k8s_bucket = await self._kube_client.neuromation_io_v1.user_bucket.get(
             name=name, namespace=bucket.namespace
         )
-        update_model = self._bucket_to_k8s_model(bucket)
+        update_model = BucketCRDMapper.to_model(bucket)
         update_model.metadata.resourceVersion = k8s_bucket.metadata.resourceVersion
 
         try:
@@ -175,31 +144,11 @@ class K8SCredentialsStorage(CredentialsStorage):
     def __init__(self, kube_client: KubeClient) -> None:
         self._kube_client = kube_client
 
-    def _ps_to_k8s_model(
-        self, credentials: PersistentCredentials
-    ) -> V1PersistentBucketCredentialCRD:
-        ps_crd_mapper = PersistentCredentialsCRDMapper.to_primitive(credentials)
-
-        pbc = V1PersistentBucketCredentialCRD(
-            metadata=V1PersistentBucketCredentialCRDMetadata(
-                name=ps_crd_mapper["metadata"]["name"],
-                labels=ps_crd_mapper["metadata"]["labels"],
-            ),
-            spec=V1PersistentBucketCredentialCRDSpec(
-                provider_name=ps_crd_mapper["spec"]["provider_name"],
-                provider_type=ps_crd_mapper["spec"]["provider_type"],
-                credentials=ps_crd_mapper["spec"]["credentials"],
-                bucket_ids=ps_crd_mapper["spec"]["bucket_ids"],
-                read_only=ps_crd_mapper["spec"]["read_only"],
-            ),
-        )
-        return pbc
-
     async def create_credentials(self, credentials: PersistentCredentials) -> None:
         try:
             await (
                 self._kube_client.neuromation_io_v1.persistent_bucket_credential.create(
-                    model=self._ps_to_k8s_model(credentials),
+                    model=PersistentCredentialsCRDMapper.to_model(credentials),
                     namespace=credentials.namespace,
                 )
             )
@@ -217,9 +166,7 @@ class K8SCredentialsStorage(CredentialsStorage):
         if len(pc_list.items) == 0:
             raise NotExistsError(f"PersistentCredentials with id {id} doesn't exist")
 
-        return PersistentCredentialsCRDMapper.from_primitive(
-            pc_list.items[0].model_dump()
-        )
+        return PersistentCredentialsCRDMapper.from_model(pc_list.items[0])
 
     async def get_credentials_by_name(
         self,
@@ -237,9 +184,7 @@ class K8SCredentialsStorage(CredentialsStorage):
                 f" doesn't exist"
             )
 
-        return PersistentCredentialsCRDMapper.from_primitive(
-            pc_list.items[0].model_dump()
-        )
+        return PersistentCredentialsCRDMapper.from_model(pc_list.items[0])
 
     @asyncgeneratorcontextmanager
     async def list_credentials(
@@ -254,7 +199,7 @@ class K8SCredentialsStorage(CredentialsStorage):
         )
 
         for pc in pc_list.items:
-            yield PersistentCredentialsCRDMapper.from_primitive(pc.model_dump())
+            yield PersistentCredentialsCRDMapper.from_model(pc)
 
     async def delete_credentials(self, credentials: PersistentCredentials) -> None:
         try:
@@ -262,23 +207,19 @@ class K8SCredentialsStorage(CredentialsStorage):
         except ResourceNotFound:
             return
 
-        name = PersistentCredentialsCRDMapper.to_primitive(credentials)["metadata"][
-            "name"
-        ]
+        name = PersistentCredentialsCRDMapper.to_model(credentials).metadata.name
         await self._kube_client.neuromation_io_v1.persistent_bucket_credential.delete(
             name=name, namespace=credentials.namespace
         )
 
     async def update_credentials(self, credentials: PersistentCredentials) -> None:
-        name = PersistentCredentialsCRDMapper.to_primitive(credentials)["metadata"][
-            "name"
-        ]
+        name = PersistentCredentialsCRDMapper.to_model(credentials).metadata.name
         k8s_pc = (
             await self._kube_client.neuromation_io_v1.persistent_bucket_credential.get(
                 name=name, namespace=credentials.namespace
             )
         )
-        update_model = self._ps_to_k8s_model(credentials)
+        update_model = PersistentCredentialsCRDMapper.to_model(credentials)
         update_model.metadata.resourceVersion = k8s_pc.metadata.resourceVersion
 
         try:
