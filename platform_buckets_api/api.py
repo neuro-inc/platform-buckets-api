@@ -37,7 +37,6 @@ from aiohttp_apispec import (
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
 from apolo_kube_client.apolo import NO_ORG, normalize_name
-from apolo_kube_client.client import kube_client_from_config
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
@@ -58,14 +57,14 @@ from .config import (
     Config,
     EMCECSProviderConfig,
     GCPProviderConfig,
-    KubeConfig,
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
 )
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
-from .kube_client import KubeApi, KubeClient
+
+from apolo_kube_client import KubeClient
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import (
@@ -905,33 +904,6 @@ async def create_auth_client(config: PlatformAuthConfig) -> AsyncIterator[AuthCl
 
 
 @asynccontextmanager
-async def create_kube_client(
-    config: KubeConfig, trace_configs: list[aiohttp.TraceConfig] | None = None
-) -> AsyncIterator[KubeClient]:
-    client = KubeClient(
-        base_url=config.endpoint_url,
-        namespace=config.namespace,
-        cert_authority_path=config.cert_authority_path,
-        cert_authority_data_pem=config.cert_authority_data_pem,
-        auth_type=config.auth_type,
-        auth_cert_path=config.auth_cert_path,
-        auth_cert_key_path=config.auth_cert_key_path,
-        token=config.token,
-        token_path=config.token_path,
-        conn_timeout_s=config.client_conn_timeout_s,
-        read_timeout_s=config.client_read_timeout_s,
-        watch_timeout_s=config.client_watch_timeout_s,
-        conn_pool_size=config.client_conn_pool_size,
-        trace_configs=trace_configs,
-    )
-    try:
-        await client.init()
-        yield client
-    finally:
-        await client.close()
-
-
-@asynccontextmanager
 async def make_gcs_client(config: GCPProviderConfig) -> AsyncIterator[GCSClient]:
     client = GCSClient(
         project=config.key_json["project_id"],
@@ -1121,10 +1093,8 @@ async def create_app(
             logger.info("Initializing Kubernetes client")
 
             kube_client = await exit_stack.enter_async_context(
-                kube_client_from_config(config.kube)
+                KubeClient(config=config.kube)
             )
-
-            kube_api = KubeApi(kube_client=kube_client)
 
             logger.info("Initializing PermissionsService")
             permissions_service = PermissionsService(
@@ -1136,7 +1106,7 @@ async def create_app(
 
             logger.info("Initializing BucketsService")
             buckets_service = BucketsService(
-                storage=K8SBucketsStorage(kube_api),
+                storage=K8SBucketsStorage(kube_client),
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
@@ -1145,7 +1115,7 @@ async def create_app(
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
-                storage=K8SCredentialsStorage(kube_api),
+                storage=K8SCredentialsStorage(kube_client),
                 bucket_provider=bucket_provider,
                 buckets_service=buckets_service,
             )

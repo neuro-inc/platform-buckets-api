@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 
 from apolo_events_client import EventsClientConfig
-from apolo_kube_client.config import KubeClientAuthType
+
+from apolo_kube_client import KubeClientAuthType, KubeConfig
 from yarl import URL
 
 from .config import (
@@ -15,7 +16,6 @@ from .config import (
     Config,
     EMCECSProviderConfig,
     GCPProviderConfig,
-    KubeConfig,
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
@@ -73,8 +73,8 @@ class EnvironConfigFactory:
         | EMCECSProviderConfig
         | OpenStackProviderConfig
     ):
-        type = self._environ["NP_BUCKET_PROVIDER_TYPE"]
-        if type == BucketsProviderType.AWS:
+        type_ = self._environ["NP_BUCKET_PROVIDER_TYPE"]
+        if type_ == BucketsProviderType.AWS:
             return AWSProviderConfig(
                 s3_role_arn=self._environ["NP_AWS_S3_ROLE_ARN"],
                 access_key_id=self._environ.get("NP_AWS_ACCESS_KEY_ID") or None,
@@ -87,7 +87,7 @@ class EnvironConfigFactory:
                 region_name=self._environ.get("NP_AWS_REGION_NAME")
                 or AWSProviderConfig.region_name,
             )
-        elif type == BucketsProviderType.MINIO:
+        elif type_ == BucketsProviderType.MINIO:
             return MinioProviderConfig(
                 access_key_id=self._environ["NP_MINIO_ACCESS_KEY_ID"],
                 secret_access_key=self._environ["NP_MINIO_SECRET_ACCESS_KEY"],
@@ -95,18 +95,18 @@ class EnvironConfigFactory:
                 endpoint_url=URL(self._environ["NP_MINIO_ENDPOINT_URL"]),
                 endpoint_public_url=URL(self._environ["NP_MINIO_ENDPOINT_PUBLIC_URL"]),
             )
-        elif type == BucketsProviderType.AZURE:
+        elif type_ == BucketsProviderType.AZURE:
             return AzureProviderConfig(
                 endpoint_url=URL(self._environ["NP_AZURE_STORAGE_ACCOUNT_URL"]),
                 credential=self._environ["NP_AZURE_STORAGE_CREDENTIAL"],
             )
-        elif type == BucketsProviderType.GCP:
+        elif type_ == BucketsProviderType.GCP:
             key_raw = self._environ["NP_GCP_SERVICE_ACCOUNT_KEY_JSON_B64"]
             key_json = json.loads(base64.b64decode(key_raw).decode())
             return GCPProviderConfig(
                 key_json=key_json,
             )
-        elif type == BucketsProviderType.EMC_ECS:
+        elif type_ == BucketsProviderType.EMC_ECS:
             return EMCECSProviderConfig(
                 s3_role_urn=self._environ["NP_EMC_ECS_S3_ROLE_URN"],
                 access_key_id=self._environ["NP_EMC_ECS_ACCESS_KEY_ID"],
@@ -116,7 +116,7 @@ class EnvironConfigFactory:
                     self._environ["NP_EMC_ECS_MANAGEMENT_ENDPOINT_URL"]
                 ),
             )
-        elif type == BucketsProviderType.OPEN_STACK:
+        elif type_ == BucketsProviderType.OPEN_STACK:
             return OpenStackProviderConfig(
                 account_id=self._environ["NP_OS_ACCOUNT_ID"],
                 password=self._environ["NP_OS_PASSWORD"],
@@ -125,20 +125,38 @@ class EnvironConfigFactory:
                 region_name=self._environ["NP_OS_REGION_NAME"],
             )
         else:
-            raise ValueError(f"Unknown bucket provider type {type}")
+            raise ValueError(f"Unknown bucket provider type {type_}")
 
     def create_kube(self) -> KubeConfig:
         endpoint_url = self._environ["NP_BUCKETS_API_K8S_API_URL"]
         auth_type = KubeClientAuthType(
-            self._environ.get(
-                "NP_BUCKETS_API_K8S_AUTH_TYPE", KubeConfig.auth_type.value
-            )
+            self._environ.get("NP_BUCKETS_API_K8S_AUTH_TYPE", KubeClientAuthType.NONE)
         )
         ca_path = self._environ.get("NP_BUCKETS_API_K8S_CA_PATH")
         ca_data = Path(ca_path).read_text() if ca_path else None
 
         token_path = self._environ.get("NP_BUCKETS_API_K8S_TOKEN_PATH")
         token = Path(token_path).read_text() if token_path else None
+
+        kube_config_kwargs = {}
+        if namespace := self._environ.get("NP_BUCKETS_API_K8S_NS"):
+            kube_config_kwargs["namespace"] = namespace
+        if client_conn_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT"
+        ):
+            kube_config_kwargs["client_conn_timeout_s"] = int(client_conn_timeout_s)  # type: ignore
+        if client_read_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT"
+        ):
+            kube_config_kwargs["client_read_timeout_s"] = int(client_read_timeout_s)  # type: ignore
+        if client_watch_timeout_s := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT"
+        ):
+            kube_config_kwargs["client_watch_timeout_s"] = int(client_watch_timeout_s)  # type: ignore
+        if client_conn_pool_size := self._environ.get(
+            "NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE"
+        ):
+            kube_config_kwargs["client_conn_pool_size"] = int(client_conn_pool_size)  # type: ignore
 
         return KubeConfig(
             endpoint_url=endpoint_url,
@@ -150,23 +168,7 @@ class EnvironConfigFactory:
             ),
             token=token,
             token_path=token_path,
-            namespace=self._environ.get("NP_BUCKETS_API_K8S_NS", KubeConfig.namespace),
-            client_conn_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_TIMEOUT")
-                or KubeConfig.client_conn_timeout_s
-            ),
-            client_read_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_READ_TIMEOUT")
-                or KubeConfig.client_read_timeout_s
-            ),
-            client_watch_timeout_s=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_WATCH_TIMEOUT")
-                or KubeConfig.client_watch_timeout_s
-            ),
-            client_conn_pool_size=int(
-                self._environ.get("NP_BUCKETS_API_K8S_CLIENT_CONN_POOL_SIZE")
-                or KubeConfig.client_conn_pool_size
-            ),
+            **kube_config_kwargs,  # type: ignore
         )
 
     def create_events(self) -> EventsClientConfig | None:
