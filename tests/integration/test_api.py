@@ -190,7 +190,7 @@ class TestApi:
         assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
         assert payload["project_name"] == "test-project"
-        assert payload["org_name"] == "no-org"
+        assert payload["org_name"] == "test-org"
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
@@ -201,7 +201,9 @@ class TestApi:
         make_bucket: BucketFactory,
         regular_user_factory: UserFactory,
     ) -> None:
-        regular_user1 = await regular_user_factory(project_name="test-project1")
+        regular_user1 = await regular_user_factory(
+            org_name="test-org", project_name="test-project1"
+        )
         bucket1 = await make_bucket(
             "test-bucket", regular_user1, project_name="test-project1"
         )
@@ -209,7 +211,9 @@ class TestApi:
         assert bucket1["owner"] == regular_user1.name
         assert bucket1["project_name"] == "test-project1"
 
-        regular_user2 = await regular_user_factory(project_name="test-project2")
+        regular_user2 = await regular_user_factory(
+            org_name="test-org", project_name="test-project2"
+        )
         bucket2 = await make_bucket(
             "test-bucket", regular_user2, project_name="test-project2"
         )
@@ -615,7 +619,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"org_name": "no-org"},
+            params={"org_name": "test-org"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
