@@ -58,7 +58,7 @@ class ImportBucketRequest(Schema):
             validate.Length(min=3, max=40),
         ],
     )
-    org_name = fields.String(required=False, allow_none=True)
+    org_name = fields.String(required=True, allow_none=False)
     project_name = fields.String(required=False, allow_none=False)
     provider = ProviderTypeField(
         required=True,
@@ -79,7 +79,7 @@ class Bucket(Schema):
         ],
     )
     owner = fields.String(required=True)
-    org_name = fields.String(required=False, allow_none=True)
+    org_name = fields.String(required=True, allow_none=False)
     project_name = fields.String(required=True)
     provider = ProviderTypeField(
         required=True,

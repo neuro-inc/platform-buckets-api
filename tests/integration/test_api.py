@@ -99,14 +99,13 @@ class TestApi:
             name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: str | None = None,
+            org_name: str | None = "test-org",
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
                 "project_name": project_name,
+                "org_name": org_name,
             }
-            if org_name:
-                payload["org_name"] = org_name
             async with client.post(
                 buckets_api.buckets_url,
                 headers=user.headers,
@@ -125,7 +124,7 @@ class TestApi:
             name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: str | None = None,
+            org_name: str | None = "test-org",
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
@@ -133,9 +132,8 @@ class TestApi:
                 "provider_bucket_name": f"in-provider-{name}",
                 "provider": "aws",
                 "credentials": {"key": f"key-for-{name}"},
+                "org_name": org_name,
             }
-            if org_name:
-                payload["org_name"] = org_name
             async with client.post(
                 buckets_api.bucket_import_url,
                 headers=user.headers,
@@ -321,7 +319,10 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         create_resp = await make_bucket(
-            "test-bucket", regular_user, project_name=regular_user.name
+            "test-bucket",
+            regular_user,
+            org_name="test-org",
+            project_name=regular_user.name,
         )
         await grant_project_permission(regular_user2, create_resp["project_name"])
         async with client.post(
@@ -487,23 +488,6 @@ class TestApi:
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
             params={"project_name": "test-project"},
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == create_resp
-
-    async def test_get_bucket_by_name__for_legacy_bucket(
-        self,
-        buckets_api: BucketsApiEndpoints,
-        client: aiohttp.ClientSession,
-        regular_user: _User,
-        make_bucket: BucketFactory,
-    ) -> None:
-        create_resp = await make_bucket(
-            "test-bucket", regular_user, project_name=regular_user.name
-        )
-        async with client.get(
-            buckets_api.bucket_url("test-bucket"), headers=regular_user.headers
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -706,36 +690,6 @@ class TestApi:
             payload = await resp.json()
             assert payload == []
 
-    async def test_list_buckets_in_legacy_project(
-        self,
-        buckets_api: BucketsApiEndpoints,
-        client: aiohttp.ClientSession,
-        regular_user_factory: UserFactory,
-        make_bucket: BucketFactory,
-    ) -> None:
-        user = await regular_user_factory()
-        bucket = await make_bucket("bucket-1", user, project_name=user.name)
-        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
-        async with client.get(
-            buckets_api.buckets_url,
-            headers=user.headers,
-            params={"project_name": user.name},
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
-        async with client.get(
-            buckets_api.buckets_url,
-            headers=user.headers,
-            params={"project_name": "test-project"},
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == []
-
     async def test_list_buckets_ndjson(
         self,
         buckets_api: BucketsApiEndpoints,
@@ -883,7 +837,10 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         create_resp = await make_bucket(
-            "test-bucket", regular_user, project_name=regular_user.name
+            "test-bucket",
+            regular_user,
+            org_name="test-org",
+            project_name=regular_user.name,
         )
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
@@ -899,7 +856,12 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test-bucket", regular_user, project_name=regular_user.name)
+        await make_bucket(
+            "test-bucket",
+            regular_user,
+            org_name="test-org",
+            project_name=regular_user.name,
+        )
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user2.headers,
@@ -916,7 +878,10 @@ class TestApi:
         make_bucket: BucketFactory,
     ) -> None:
         create_resp = await make_bucket(
-            "test-bucket", regular_user, project_name=regular_user.name
+            "test-bucket",
+            regular_user,
+            org_name="test-org",
+            project_name=regular_user.name,
         )
         async with client.delete(
             buckets_api.bucket_url(create_resp["id"]),

@@ -32,8 +32,6 @@ BUCKET_NAME_LABEL = "platform.apolo.us/bucket_name"
 APOLO_ORG_NAME_LABEL = "platform.apolo.us/org"
 APOLO_PROJECT_NAME_LABEL = "platform.apolo.us/project"
 
-NO_ORG = "NO_ORG"
-
 
 def _k8s_name_safe(**kwargs: str) -> str:
     hasher = hashlib.new("sha256")
