@@ -76,8 +76,9 @@ class TestBucketsService:
         assert bucket.owner == "test-user"
         assert bucket.project_name == "test-project"
         assert mock_provider.created_buckets == [bucket.provider_bucket]
+        assert "no-org" in bucket.provider_bucket.name
         assert "test-project" in bucket.provider_bucket.name
-        assert "test-bucket" in bucket.provider_bucket.name
+        assert "test-" in bucket.provider_bucket.name
 
     async def test_bucket_create_duplicate(
         self, service: BucketsService, mock_provider: MockBucketProvider
@@ -129,7 +130,7 @@ class TestBucketsService:
             provider_type=BucketsProviderType.AWS,
             credentials={"key": "value"},
             name="test-bucket",
-            org_name=None,
+            org_name="test-org",
         )
         assert bucket.name == "test-bucket"
         assert bucket.owner == "test-user"
@@ -149,7 +150,7 @@ class TestBucketsService:
             provider_type=BucketsProviderType.AWS,
             credentials={"key": "value"},
             name="test-bucket",
-            org_name=None,
+            org_name="test-org",
         )
         bucket_get = await service.get_bucket(bucket.id)
         assert bucket == bucket_get
@@ -201,9 +202,13 @@ class TestBucketsService:
             name="test-bucket-2",
             org_name="test-org",
         )
-        bucket_get = await service.get_bucket_by_path(path="test-project1/test-bucket")
+        bucket_get = await service.get_bucket_by_path(
+            path="no-org/test-project1/test-bucket"
+        )
         assert bucket1 == bucket_get
-        bucket_get = await service.get_bucket_by_path(path="test-project2/test-bucket")
+        bucket_get = await service.get_bucket_by_path(
+            path="no-org/test-project2/test-bucket"
+        )
         assert bucket2 == bucket_get
         bucket_get = await service.get_bucket_by_path(
             path="test-org/test-project1/test-bucket-2"

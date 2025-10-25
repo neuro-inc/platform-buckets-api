@@ -219,9 +219,9 @@ async def regular_user_factory(
 
 @pytest.fixture
 async def regular_user(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory(project_name="test-project")
+    return await regular_user_factory(org_name="test-org", project_name="test-project")
 
 
 @pytest.fixture
 async def regular_user2(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory(project_name="test-project2")
+    return await regular_user_factory(org_name="test-org", project_name="test-project2")
