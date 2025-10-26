@@ -349,7 +349,7 @@ class TestApi:
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
             assert payload["read_only"]
-            assert "test-project" in payload["credentials"]["bucket_name"]
+            assert regular_user.name in payload["credentials"]["bucket_name"]
 
     async def test_imported_bucket_tmp_credentials(
         self,
@@ -454,6 +454,7 @@ class TestApi:
             json={
                 "name": "test-bucket",
                 "project_name": bucket["project_name"],
+                "org_name": bucket["org_name"],
             },
         ) as resp:
             assert resp.status == HTTPConflict.status_code, await resp.text()
