@@ -626,7 +626,7 @@ class TestApi:
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
     ) -> None:
-        user = await regular_user_factory()
+        user = await regular_user_factory(org_name="test-org")
         bucket = await make_bucket("bucket-1", user)
         async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -687,7 +687,7 @@ class TestApi:
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
     ) -> None:
-        user = await regular_user_factory()
+        user = await regular_user_factory(org_name="test-org")
         bucket = await make_bucket("bucket-1", user)
         async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
