@@ -18,7 +18,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.12,<4.0"
-aiohttp = "3.13.1"
+aiohttp = "3.13.2"
 neuro-auth-client = "25.8.2"
 neuro-logging = "25.10.0"
 marshmallow = "3.26.1"
