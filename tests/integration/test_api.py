@@ -644,7 +644,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"org_name": "test-org"},
+            params={"org_name": "other-org"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -1021,11 +1021,11 @@ class TestApi:
             bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
         assert bucket1_creds["bucket_id"] == bucket1["id"]
         assert bucket1_creds["provider"] == bucket1["provider"]
-        assert "test-bucket1" in bucket1_creds["credentials"]["bucket_name"]
+        assert "test-org" in bucket1_creds["credentials"]["bucket_name"]
 
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
-        assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
+        assert "test-org" in bucket2_creds["credentials"]["bucket_name"]
 
     async def test_create_credentials_when_disabled(
         self,
@@ -1069,11 +1069,11 @@ class TestApi:
             bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
         assert bucket1_creds["bucket_id"] == bucket1["id"]
         assert bucket1_creds["provider"] == bucket1["provider"]
-        assert "test-bucket1" in bucket1_creds["credentials"]["bucket_name"]
+        assert "test-org" in bucket1_creds["credentials"]["bucket_name"]
 
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
-        assert "test-bucket2" in bucket2_creds["credentials"]["bucket_name"]
+        assert "test-org" in bucket2_creds["credentials"]["bucket_name"]
 
     async def test_cannot_create_credential_for_imported_bucket(
         self,
