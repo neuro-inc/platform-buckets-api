@@ -92,9 +92,9 @@ class TestPermissionsService:
     def test_create_permissions(
         self, cluster_name: str, service: PermissionsService
     ) -> None:
-        perms = service.get_create_bucket_perms("test-project", org_name=None)
+        perms = service.get_create_bucket_perms("test-project", org_name="test-org")
         assert len(perms) == 1
-        assert perms[0].uri == f"blob://{cluster_name}/test-project"
+        assert perms[0].uri == f"blob://{cluster_name}/test-org/test-project"
         assert perms[0].action == "write"
 
     def test_create_permissions_with_org(
@@ -112,16 +112,16 @@ class TestPermissionsService:
         assert len(perms) == 2
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
-                f"{fake_bucket.id}",
+                uri=f"blob://{cluster_name}/{fake_bucket.org_name}/"
+                f"{fake_bucket.project_name}/{fake_bucket.id}",
                 action="read",
             )
             in perms
         )
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
-                f"{fake_bucket.name}",
+                uri=f"blob://{cluster_name}/{fake_bucket.org_name}/"
+                f"{fake_bucket.project_name}/{fake_bucket.name}",
                 action="read",
             )
             in perms
@@ -134,16 +134,16 @@ class TestPermissionsService:
         assert len(perms) == 2
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
-                f"{fake_bucket.id}",
+                uri=f"blob://{cluster_name}/{fake_bucket.org_name}/"
+                f"{fake_bucket.project_name}/{fake_bucket.id}",
                 action="write",
             )
             in perms
         )
         assert (
             Permission(
-                uri=f"blob://{cluster_name}/{fake_bucket.project_name}/"
-                f"{fake_bucket.name}",
+                uri=f"blob://{cluster_name}/{fake_bucket.org_name}/"
+                f"{fake_bucket.project_name}/{fake_bucket.name}",
                 action="write",
             )
             in perms
@@ -206,6 +206,7 @@ class TestPermissionsService:
         service: PermissionsService,
         fake_bucket: UserBucket,
     ) -> None:
+        org_name = fake_bucket.org_name
         project_name = fake_bucket.project_name
         mock_auth_client.perm_tree_to_return = ClientSubTreeViewRoot(
             scheme="blob",
@@ -213,20 +214,25 @@ class TestPermissionsService:
             sub_tree=ClientAccessSubTreeView(
                 action="list",
                 children={
-                    project_name: ClientAccessSubTreeView(
-                        action="write",
-                        children={},
-                    ),
-                    "another-project": ClientAccessSubTreeView(
+                    org_name: ClientAccessSubTreeView(
                         action="list",
                         children={
-                            "fully-shared": ClientAccessSubTreeView(
+                            project_name: ClientAccessSubTreeView(
                                 action="write",
                                 children={},
                             ),
-                            "read-shared": ClientAccessSubTreeView(
-                                action="read",
-                                children={},
+                            "another-project": ClientAccessSubTreeView(
+                                action="list",
+                                children={
+                                    "fully-shared": ClientAccessSubTreeView(
+                                        action="write",
+                                        children={},
+                                    ),
+                                    "read-shared": ClientAccessSubTreeView(
+                                        action="read",
+                                        children={},
+                                    ),
+                                },
                             ),
                         },
                     ),

@@ -36,7 +36,6 @@ from aiohttp_apispec import (
 )
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
-from apolo_kube_client.apolo import NO_ORG, normalize_name
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
@@ -276,7 +275,7 @@ class BucketsApiHandler:
         data = await request.json()
         data["project_name"] = data.get("project_name", user.name)
         data = schema.load(data)
-        org_name = data.get("org_name")
+        org_name = data["org_name"]
         project_name = data["project_name"]
 
         await check_any_permissions(
@@ -284,7 +283,6 @@ class BucketsApiHandler:
             self.permissions_service.get_create_bucket_perms(project_name, org_name),
         )
 
-        org_name = org_name or normalize_name(NO_ORG)
         try:
             bucket = await self.service.create_bucket(
                 owner=user.name,
@@ -330,7 +328,7 @@ class BucketsApiHandler:
         data = await request.json()
         data["project_name"] = data.get("project_name", user.name)
         data = schema.load(data)
-        org_name = data.get("org_name")
+        org_name = data["org_name"]
         project_name = data["project_name"]
         await check_any_permissions(
             request,
