@@ -63,7 +63,7 @@ from .config import (
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
 
-from apolo_kube_client import KubeClient
+from apolo_kube_client import KubeClientSelector
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import (
@@ -1090,8 +1090,8 @@ async def create_app(
 
             logger.info("Initializing Kubernetes client")
 
-            kube_client = await exit_stack.enter_async_context(
-                KubeClient(config=config.kube)
+            kube_client_selector = await exit_stack.enter_async_context(
+                KubeClientSelector(config=config.kube)
             )
 
             logger.info("Initializing PermissionsService")
@@ -1104,7 +1104,7 @@ async def create_app(
 
             logger.info("Initializing BucketsService")
             buckets_service = BucketsService(
-                storage=K8SBucketsStorage(kube_client),
+                storage=K8SBucketsStorage(kube_client_selector),
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
@@ -1113,7 +1113,7 @@ async def create_app(
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
-                storage=K8SCredentialsStorage(kube_client),
+                storage=K8SCredentialsStorage(kube_client_selector.host_client),
                 bucket_provider=bucket_provider,
                 buckets_service=buckets_service,
             )

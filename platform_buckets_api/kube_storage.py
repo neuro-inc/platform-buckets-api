@@ -1,10 +1,10 @@
 from collections.abc import AsyncIterator
 
-from apolo_kube_client.apolo import create_namespace, generate_namespace_name
 from apolo_kube_client import (
     KubeClient,
     ResourceExists,
     ResourceNotFound,
+    KubeClientSelector,
 )
 
 from platform_buckets_api.kube_utils import (
@@ -21,38 +21,34 @@ from platform_buckets_api.storage import (
     StorageError,
 )
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
+
 from .kube_utils import (
     ID_LABEL,
     BUCKET_NAME_LABEL,
-    APOLO_ORG_NAME_LABEL,
-    APOLO_PROJECT_NAME_LABEL,
     OWNER_LABEL,
     CREDENTIALS_NAME_LABEL,
 )
 
 
 class K8SBucketsStorage(BucketsStorage):
-    def __init__(self, kube_client: KubeClient) -> None:
-        self._kube_client = kube_client
+    def __init__(self, kube_client_selector: KubeClientSelector) -> None:
+        self._kube_client_selector = kube_client_selector
 
     async def create_bucket(self, bucket: BucketType) -> None:
-        namespace = await create_namespace(
-            kube_client=self._kube_client,
-            org_name=bucket.org_name,
-            project_name=bucket.project_name,
-        )
-        try:
-            await self._kube_client.neuromation_io_v1.user_bucket.create(
-                model=BucketCRDMapper.to_model(bucket),
-                namespace=namespace.metadata.name,
-            )
-        except ResourceExists:
-            raise ExistsError(
-                f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
-            )
+        async with self._kube_client_selector.get_client(
+            org_name=bucket.org_name, project_name=bucket.project_name
+        ) as k8s:
+            try:
+                await k8s.neuromation_io_v1.user_bucket.create(
+                    model=BucketCRDMapper.to_model(bucket)
+                )
+            except ResourceExists:
+                raise ExistsError(
+                    f"UserBucket for {bucket.owner} with name {bucket.name} already exists"
+                )
 
     async def get_bucket(self, id_: str) -> BucketType:
-        bucket_list = await self._kube_client.neuromation_io_v1.user_bucket.get_list(
+        bucket_list = await self._kube_client_selector.host_client.neuromation_io_v1.user_bucket.get_list(
             label_selector=f"{ID_LABEL}={id_}", all_namespaces=True
         )
 
@@ -62,44 +58,39 @@ class K8SBucketsStorage(BucketsStorage):
         return BucketCRDMapper.from_model(bucket_list.items[0])
 
     async def get_bucket_by_name(
-        self, name: str, org_name: str | None, project_name: str
+        self,
+        name: str,
+        org_name: str,  # type: ignore
+        project_name: str,
     ) -> BucketType:
         label_selectors = [f"{BUCKET_NAME_LABEL}={name}"]
-        if project_name:
-            label_selectors.append(f"{APOLO_PROJECT_NAME_LABEL}={project_name}")
-        if org_name:
-            label_selectors.append(f"{APOLO_ORG_NAME_LABEL}={org_name}")
 
-        bucket_list = await self._kube_client.neuromation_io_v1.user_bucket.get_list(
-            all_namespaces=True, label_selector=",".join(label_selectors)
-        )
-
-        if len(bucket_list.items) == 0:
-            raise NotExistsError(
-                f"UserBucket with org {org_name} project {project_name}, "
-                f"name {name} doesn't exist"
+        async with self._kube_client_selector.get_client(
+            org_name=org_name, project_name=project_name
+        ) as k8s:
+            bucket_list = await k8s.neuromation_io_v1.user_bucket.get_list(
+                label_selector=",".join(label_selectors)
             )
 
-        return BucketCRDMapper.from_model(bucket_list.items[0])
+            if len(bucket_list.items) == 0:
+                raise NotExistsError(
+                    f"UserBucket with org {org_name} project {project_name}, "
+                    f"name {name} doesn't exist"
+                )
+
+            return BucketCRDMapper.from_model(bucket_list.items[0])
 
     @asyncgeneratorcontextmanager
     async def list_buckets(
-        self, org_name: str | None = None, project_name: str | None = None
+        self, org_name: str, project_name: str
     ) -> AsyncIterator[BucketType]:
-        label_selectors = []
-        if project_name:
-            label_selectors.append(f"{APOLO_PROJECT_NAME_LABEL}={project_name}")
-        if org_name:
-            label_selectors.append(f"{APOLO_ORG_NAME_LABEL}={org_name}")
+        async with self._kube_client_selector.get_client(
+            org_name=org_name, project_name=project_name
+        ) as k8s:
+            user_bucket_list = await k8s.neuromation_io_v1.user_bucket.get_list()
 
-        user_bucket_list = (
-            await self._kube_client.neuromation_io_v1.user_bucket.get_list(
-                all_namespaces=True, label_selector=",".join(label_selectors)
-            )
-        )
-
-        for user_bucket in user_bucket_list.items:
-            yield BucketCRDMapper.from_model(user_bucket)
+            for user_bucket in user_bucket_list.items:
+                yield BucketCRDMapper.from_model(user_bucket)
 
     async def delete_bucket(self, id: str) -> None:
         try:
@@ -107,37 +98,34 @@ class K8SBucketsStorage(BucketsStorage):
         except NotExistsError:
             return
 
-        namespace = generate_namespace_name(
+        async with self._kube_client_selector.get_client(
             org_name=bucket.org_name, project_name=bucket.project_name
-        )
-        credentials_list = await self._kube_client.neuromation_io_v1.persistent_bucket_credential.get_list(
-            namespace=namespace,
-        )
-        for credential in credentials_list.items:
-            if id in credential.spec.bucket_ids:
-                raise StorageError(
-                    "Cannot remove UserBucket that is mentioned "
-                    f"in PersistentCredentials with id {credential.metadata.name}"
-                )
-        name = BucketCRDMapper.to_model(bucket).metadata.name
-        await self._kube_client.neuromation_io_v1.user_bucket.delete(
-            name=name, namespace=bucket.namespace
-        )
+        ) as k8s:
+            credentials_list = (
+                await k8s.neuromation_io_v1.persistent_bucket_credential.get_list()
+            )
+            for credential in credentials_list.items:
+                if id in credential.spec.bucket_ids:
+                    raise StorageError(
+                        "Cannot remove UserBucket that is mentioned "
+                        f"in PersistentCredentials with id {credential.metadata.name}"
+                    )
+            name = BucketCRDMapper.to_model(bucket).metadata.name
+            await k8s.neuromation_io_v1.user_bucket.delete(name=name)
 
     async def update_bucket(self, bucket: BucketType) -> None:
-        name = BucketCRDMapper.to_model(bucket).metadata.name
-        k8s_bucket = await self._kube_client.neuromation_io_v1.user_bucket.get(
-            name=name, namespace=bucket.namespace
-        )
-        update_model = BucketCRDMapper.to_model(bucket)
-        update_model.metadata.resourceVersion = k8s_bucket.metadata.resourceVersion
+        async with self._kube_client_selector.get_client(
+            org_name=bucket.org_name, project_name=bucket.project_name
+        ) as k8s:
+            name = BucketCRDMapper.to_model(bucket).metadata.name
+            k8s_bucket = await k8s.neuromation_io_v1.user_bucket.get(name=name)
+            update_model = BucketCRDMapper.to_model(bucket)
+            update_model.metadata.resourceVersion = k8s_bucket.metadata.resourceVersion
 
-        try:
-            await self._kube_client.neuromation_io_v1.user_bucket.update(
-                model=update_model, namespace=bucket.namespace
-            )
-        except ResourceNotFound:
-            raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exist")
+            try:
+                await k8s.neuromation_io_v1.user_bucket.update(model=update_model)  # type: ignore
+            except ResourceNotFound:
+                raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exist")
 
 
 class K8SCredentialsStorage(CredentialsStorage):
