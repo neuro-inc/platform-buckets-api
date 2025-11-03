@@ -123,7 +123,7 @@ class K8SBucketsStorage(BucketsStorage):
             update_model.metadata.resourceVersion = k8s_bucket.metadata.resourceVersion
 
             try:
-                await k8s.neuromation_io_v1.user_bucket.update(model=update_model)  # type: ignore
+                await k8s.neuromation_io_v1.user_bucket.update(model=update_model)
             except ResourceNotFound:
                 raise NotExistsError(f"UserBucket with id {bucket.id} doesn't exist")
 
