@@ -169,7 +169,7 @@ class UserFactory(Protocol):
     async def __call__(
         self,
         name: str | None = None,
-        org_name: str | None = None,
+        org_name: str = "test-org",
         org_level: bool = False,
         project_name: str = "test-project",
     ) -> _User:
@@ -182,12 +182,14 @@ async def regular_user_factory(
     token_factory: Callable[[str], str],
     admin_token: str,
     cluster_name: str,
+    org_name: str,
+    project_name: str,
 ) -> AsyncIterator[UserFactory]:
     async def _factory(
         name: str | None = None,
-        org_name: str | None = None,
+        org_name: str = org_name,
         org_level: bool = False,
-        project_name: str = "test-project",
+        project_name: str = project_name,
     ) -> _User:
         if not name:
             name = f"user-{random_name()}"
@@ -218,10 +220,16 @@ async def regular_user_factory(
 
 
 @pytest.fixture
-async def regular_user(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory(org_name="test-org", project_name="test-project")
+async def regular_user(
+    regular_user_factory: UserFactory, org_name: str, project_name: str
+) -> _User:
+    return await regular_user_factory(org_name=org_name, project_name=project_name)
 
 
 @pytest.fixture
-async def regular_user2(regular_user_factory: UserFactory) -> _User:
-    return await regular_user_factory(org_name="test-org", project_name="test-project2")
+async def regular_user2(
+    regular_user_factory: UserFactory, org_name: str, project_name: str
+) -> _User:
+    return await regular_user_factory(
+        org_name=org_name, project_name=f"{project_name}2"
+    )

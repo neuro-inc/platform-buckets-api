@@ -31,17 +31,15 @@ async def grant_project_permission(
     token_factory: Callable[[str], str],
     admin_token: str,
     cluster_name: str,
-) -> AsyncIterator[Callable[[_User, str, str, str | None], Awaitable[None]]]:
+    org_name: str,
+) -> AsyncIterator[Callable[[_User, str, str, str], Awaitable[None]]]:
     async def _grant(
         user: _User,
         project_name: str,
         action: str = "read",
-        org_name: str | None = None,
+        org_name: str = org_name,
     ) -> None:
-        if org_name:
-            uri = f"blob://{cluster_name}/{org_name}/{project_name}"
-        else:
-            uri = f"blob://{cluster_name}/{project_name}"
+        uri = f"blob://{cluster_name}/{org_name}/{project_name}"
         permission = Permission(uri=uri, action=action)
         await auth_client.grant_user_permissions(user.name, [permission], admin_token)
 
@@ -94,19 +92,23 @@ class TestApi:
             name: str | None,
             user: _User,
             project_name: str = "test-project",
-            org_name: str | None = None,
+            org_name: str = "test-org",
         ) -> dict[str, Any]:
             pass
 
     @pytest.fixture()
     async def make_bucket(
-        self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        org_name: str,
+        project_name: str,
     ) -> BucketFactory:
         async def _factory(
             name: str | None,
             user: _User,
-            project_name: str = "test-project",
-            org_name: str | None = "test-org",
+            project_name: str = project_name,
+            org_name: str = org_name,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
@@ -125,13 +127,17 @@ class TestApi:
 
     @pytest.fixture()
     async def import_bucket(
-        self, buckets_api: BucketsApiEndpoints, client: aiohttp.ClientSession
+        self,
+        buckets_api: BucketsApiEndpoints,
+        client: aiohttp.ClientSession,
+        org_name: str,
+        project_name: str,
     ) -> BucketFactory:
         async def _factory(
             name: str | None,
             user: _User,
-            project_name: str = "test-project",
-            org_name: str | None = "test-org",
+            project_name: str = project_name,
+            org_name: str = org_name,
         ) -> dict[str, Any]:
             payload = {
                 "name": name,
@@ -188,6 +194,8 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
         before = utc_now()
         payload = await make_bucket("test-bucket", regular_user)
@@ -196,8 +204,8 @@ class TestApi:
         assert payload["name"] == "test-bucket"
         assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
-        assert payload["project_name"] == "test-project"
-        assert payload["org_name"] == "test-org"
+        assert payload["project_name"] == project_name
+        assert payload["org_name"] == org_name
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
@@ -207,9 +215,10 @@ class TestApi:
         client: aiohttp.ClientSession,
         make_bucket: BucketFactory,
         regular_user_factory: UserFactory,
+        org_name: str,
     ) -> None:
         regular_user1 = await regular_user_factory(
-            org_name="test-org", project_name="test-project1"
+            org_name=org_name, project_name="test-project1"
         )
         bucket1 = await make_bucket(
             "test-bucket", regular_user1, project_name="test-project1"
@@ -219,7 +228,7 @@ class TestApi:
         assert bucket1["project_name"] == "test-project1"
 
         regular_user2 = await regular_user_factory(
-            org_name="test-org", project_name="test-project2"
+            org_name=org_name, project_name="test-project2"
         )
         bucket2 = await make_bucket(
             "test-bucket", regular_user2, project_name="test-project2"
@@ -235,16 +244,17 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
-        regular_user = await regular_user_factory(org_name="test-org")
+        regular_user = await regular_user_factory(org_name=org_name)
         before = utc_now()
-        payload = await make_bucket("test-bucket", regular_user, org_name="test-org")
+        payload = await make_bucket("test-bucket", regular_user, org_name=org_name)
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test-bucket"
         assert payload["provider"] in ("aws", "minio")
         assert payload["owner"] == regular_user.name
-        assert payload["org_name"] == "test-org"
+        assert payload["org_name"] == org_name
         assert not payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
@@ -288,16 +298,17 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         import_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
-        regular_user = await regular_user_factory(org_name="test-org")
+        regular_user = await regular_user_factory(org_name=org_name)
         before = utc_now()
-        payload = await import_bucket("test-bucket", regular_user, org_name="test-org")
+        payload = await import_bucket("test-bucket", regular_user, org_name=org_name)
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test-bucket"
         assert payload["provider"] == "aws"
         assert payload["owner"] == regular_user.name
-        assert payload["org_name"] == "test-org"
+        assert payload["org_name"] == org_name
         assert payload["imported"]
         assert before <= datetime.fromisoformat(payload["created_at"]) <= after
 
@@ -307,18 +318,23 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         make_bucket: BucketFactory,
+        project_name: str,
     ) -> None:
         create_resp = await make_bucket("test-bucket", regular_user)
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
             assert payload["bucket_id"] == create_resp["id"]
             assert payload["provider"] == create_resp["provider"]
             assert not payload["read_only"]
-            assert "test-project" in payload["credentials"]["bucket_name"]
+            assert project_name in payload["credentials"]["bucket_name"]
 
     async def test_make_bucket_tmp_credentials_readonly(
         self,
@@ -326,15 +342,14 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_project_permission: Callable[
-            [_User, str, str, str | None], Awaitable[None]
-        ],
+        grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
         create_resp = await make_bucket(
             "test-bucket",
             regular_user,
-            org_name="test-org",
+            org_name=org_name,
             project_name=regular_user.name,
         )
         await grant_project_permission(
@@ -343,6 +358,10 @@ class TestApi:
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -362,6 +381,10 @@ class TestApi:
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -377,9 +400,7 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_project_permission: Callable[
-            [_User, str, str, str | None], Awaitable[None]
-        ],
+        grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         import_bucket: BucketFactory,
     ) -> None:
         create_resp = await import_bucket("test-bucket", regular_user)
@@ -389,6 +410,10 @@ class TestApi:
         async with client.post(
             buckets_api.bucket_make_tmp_credentials_url(create_resp["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -409,6 +434,10 @@ class TestApi:
         async with client.post(
             buckets_api.bucket_sign_blob_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
             json={"key": "some/file"},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -426,6 +455,10 @@ class TestApi:
         async with client.patch(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
             json={"public": True},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -434,6 +467,10 @@ class TestApi:
         async with client.patch(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
             json={"public": False},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -472,6 +509,10 @@ class TestApi:
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -483,14 +524,17 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
-        regular_user = await regular_user_factory(org_name="test-org")
-        create_resp = await make_bucket(
-            "test-bucket", regular_user, org_name="test-org"
-        )
+        regular_user = await regular_user_factory(org_name=org_name)
+        create_resp = await make_bucket("test-bucket", regular_user, org_name=org_name)
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -507,7 +551,10 @@ class TestApi:
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
-            params={"project_name": "test-project"},
+            params={
+                "project_name": create_resp["project_name"],
+                "org_name": create_resp["org_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -518,25 +565,32 @@ class TestApi:
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
+        org_name: str,
+        project_name: str,
     ) -> None:
+        # no org name
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
-            params={"owner": regular_user.name, "project_name": "test-project"},
+            params={"owner": regular_user.name},
         ) as resp:
+            response = await resp.json()
             assert resp.status == HTTPBadRequest.status_code, await resp.text()
+            assert response["error"] == "org_name must be provided"
+
+        # both project name and owner passed
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
-            params={"owner": regular_user.name, "org_name": "test-org"},
+            params={
+                "owner": regular_user.name,
+                "project_name": project_name,
+                "org_name": org_name,
+            },
         ) as resp:
+            response = await resp.json()
             assert resp.status == HTTPBadRequest.status_code, await resp.text()
-        async with client.get(
-            buckets_api.bucket_url("test-bucket"),
-            headers=regular_user.headers,
-            params={"org_name": "test-org"},
-        ) as resp:
-            assert resp.status == HTTPBadRequest.status_code, await resp.text()
+            assert response["error"] == "owner cannot be specified with project_name"
 
     async def test_get_bucket_by_path(
         self,
@@ -544,15 +598,14 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
-        regular_user = await regular_user_factory(org_name="test-org")
-        create_resp = await make_bucket(
-            "test-bucket", regular_user, org_name="test-org"
-        )
+        regular_user = await regular_user_factory(org_name=org_name)
+        create_resp = await make_bucket("test-bucket", regular_user, org_name=org_name)
         project_name = create_resp["project_name"]
         async with client.get(
             buckets_api.bucket_by_path,
-            params={"path": f"test-org/{project_name}/test-bucket"},
+            params={"path": f"{org_name}/{project_name}/test-bucket"},
             headers=regular_user.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -565,10 +618,13 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
         async with client.get(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
 
@@ -578,6 +634,8 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
         buckets_data = []
         for index in range(5):
@@ -589,6 +647,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user.headers,
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -602,16 +661,19 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
-        user1 = await regular_user_factory(org_name="test-org")
-        user2 = await regular_user_factory(org_name="test-org")
-        user3 = await regular_user_factory(org_name="test-org", org_level=True)
-        bucket1 = await make_bucket("bucket-1", user1, org_name="test-org")
-        bucket2 = await make_bucket("bucket-2", user2, org_name="test-org")
+        user1 = await regular_user_factory(org_name=org_name)
+        user2 = await regular_user_factory(org_name=org_name)
+        user3 = await regular_user_factory(org_name=org_name, org_level=True)
+        bucket1 = await make_bucket("bucket-1", user1, org_name=org_name)
+        bucket2 = await make_bucket("bucket-2", user2, org_name=org_name)
         buckets_data = [bucket1, bucket2]
         async with client.get(
             buckets_api.buckets_url,
             headers=user3.headers,
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -619,54 +681,21 @@ class TestApi:
             for bucket_data in buckets_data:
                 assert bucket_data in payload
 
-    async def test_list_buckets_no_org(
-        self,
-        buckets_api: BucketsApiEndpoints,
-        client: aiohttp.ClientSession,
-        regular_user_factory: UserFactory,
-        make_bucket: BucketFactory,
-    ) -> None:
-        user = await regular_user_factory(org_name="test-org")
-        bucket = await make_bucket("bucket-1", user)
-        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
-        async with client.get(
-            buckets_api.buckets_url,
-            headers=user.headers,
-            params={"org_name": "test-org"},
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
-            assert payload == [bucket]
-        async with client.get(
-            buckets_api.buckets_url,
-            headers=user.headers,
-            params={"org_name": "other-org"},
-        ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == []
-
     async def test_list_buckets_in_org(
         self,
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
-        user = await regular_user_factory(org_name="test-org")
-        bucket = await make_bucket("bucket-1", user, org_name="test-org")
-        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
+        user = await regular_user_factory(org_name=org_name)
+        bucket = await make_bucket("bucket-1", user, org_name=org_name)
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"org_name": "test-org"},
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -674,7 +703,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"org_name": "other-test-org"},
+            params={"org_name": "other-test-org", "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -686,17 +715,15 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user_factory: UserFactory,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
-        user = await regular_user_factory(org_name="test-org")
+        user = await regular_user_factory(org_name=org_name)
         bucket = await make_bucket("bucket-1", user)
-        async with client.get(buckets_api.buckets_url, headers=user.headers) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload == [bucket]
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"project_name": "test-project"},
+            params={"project_name": project_name, "org_name": org_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -704,7 +731,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers=user.headers,
-            params={"project_name": "other-test-project"},
+            params={"project_name": "other-test-project", "org_name": org_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -716,11 +743,14 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         make_bucket: BucketFactory,
+        org_name: str,
+        project_name: str,
     ) -> None:
         headers = {"Accept": "application/x-ndjson"}
         async with client.get(
             buckets_api.buckets_url,
             headers={**regular_user.headers, **headers},
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = []
@@ -736,6 +766,7 @@ class TestApi:
         async with client.get(
             buckets_api.buckets_url,
             headers={**regular_user.headers, **headers},
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = []
@@ -756,11 +787,16 @@ class TestApi:
         async with client.delete(
             buckets_api.bucket_url(data["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": data["org_name"],
+                "project_name": data["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user.headers,
+            params={"org_name": data["org_name"], "project_name": data["project_name"]},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -785,6 +821,10 @@ class TestApi:
         async with client.delete(
             buckets_api.bucket_url(bucket1["id"]),
             headers=regular_user.headers,
+            params={
+                "org_name": bucket1["org_name"],
+                "project_name": bucket1["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
 
@@ -821,16 +861,23 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
     ) -> None:
-        await make_bucket("test-bucket", regular_user)
+        created = await make_bucket("test-bucket", regular_user)
         async with client.delete(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
-            params={"project_name": "test-project"},
+            params={
+                "project_name": created["project_name"],
+                "org_name": created["org_name"],
+            },
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user.headers,
+            params={
+                "org_name": created["org_name"],
+                "project_name": created["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             payload = await resp.json()
@@ -841,10 +888,13 @@ class TestApi:
         buckets_api: BucketsApiEndpoints,
         client: aiohttp.ClientSession,
         regular_user: _User,
+        org_name: str,
+        project_name: str,
     ) -> None:
         async with client.delete(
             buckets_api.bucket_url("test-bucket"),
             headers=regular_user.headers,
+            params={"org_name": org_name, "project_name": project_name},
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
 
@@ -855,16 +905,21 @@ class TestApi:
         regular_user: _User,
         regular_user2: _User,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
         create_resp = await make_bucket(
             "test-bucket",
             regular_user,
-            org_name="test-org",
+            org_name=org_name,
             project_name=regular_user.name,
         )
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPForbidden.status_code, await resp.text()
 
@@ -875,16 +930,18 @@ class TestApi:
         regular_user: _User,
         regular_user2: _User,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
         await make_bucket(
             "test-bucket",
             regular_user,
-            org_name="test-org",
+            org_name=org_name,
             project_name=regular_user.name,
         )
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user2.headers,
+            params={"org_name": org_name, "project_name": regular_user.name},
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert await resp.json() == []
@@ -896,16 +953,21 @@ class TestApi:
         regular_user: _User,
         regular_user2: _User,
         make_bucket: BucketFactory,
+        org_name: str,
     ) -> None:
         create_resp = await make_bucket(
             "test-bucket",
             regular_user,
-            org_name="test-org",
+            org_name=org_name,
             project_name=regular_user.name,
         )
         async with client.delete(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPForbidden.status_code, await resp.text()
 
@@ -915,9 +977,7 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_project_permission: Callable[
-            [_User, str, str, str | None], Awaitable[None]
-        ],
+        grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
         create_resp = await make_bucket("test-bucket1", regular_user)
@@ -927,12 +987,20 @@ class TestApi:
         async with client.get(
             buckets_api.bucket_url(create_resp["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
 
         async with client.get(
             buckets_api.buckets_url,
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp["org_name"],
+                "project_name": create_resp["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
             assert len(await resp.json()) == 1
@@ -943,9 +1011,7 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_project_permission: Callable[
-            [_User, str, str, str | None], Awaitable[None]
-        ],
+        grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
         create_resp1 = await make_bucket("test-bucket1", regular_user)
@@ -957,7 +1023,10 @@ class TestApi:
         )
         async with client.get(
             buckets_api.bucket_url(create_resp1["name"]),
-            params={"project_name": create_resp1["project_name"]},
+            params={
+                "project_name": create_resp1["project_name"],
+                "org_name": create_resp1["org_name"],
+            },
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPOk.status_code, await resp.text()
@@ -968,9 +1037,7 @@ class TestApi:
         client: aiohttp.ClientSession,
         regular_user: _User,
         regular_user2: _User,
-        grant_project_permission: Callable[
-            [_User, str, str, str | None], Awaitable[None]
-        ],
+        grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
     ) -> None:
         create_resp1 = await make_bucket("test-bucket1", regular_user)
@@ -984,6 +1051,10 @@ class TestApi:
         async with client.delete(
             buckets_api.bucket_url(create_resp1["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp1["org_name"],
+                "project_name": create_resp1["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPForbidden.status_code, await resp.text()
         await grant_project_permission(
@@ -995,6 +1066,10 @@ class TestApi:
         async with client.delete(
             buckets_api.bucket_url(create_resp2["id"]),
             headers=regular_user2.headers,
+            params={
+                "org_name": create_resp2["org_name"],
+                "project_name": create_resp2["project_name"],
+            },
         ) as resp:
             assert resp.status == HTTPNoContent.status_code, await resp.text()
 
@@ -1021,11 +1096,11 @@ class TestApi:
             bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
         assert bucket1_creds["bucket_id"] == bucket1["id"]
         assert bucket1_creds["provider"] == bucket1["provider"]
-        assert "test-org" in bucket1_creds["credentials"]["bucket_name"]
+        assert bucket1["org_name"] in bucket1_creds["credentials"]["bucket_name"]
 
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
-        assert "test-org" in bucket2_creds["credentials"]["bucket_name"]
+        assert bucket2["org_name"] in bucket2_creds["credentials"]["bucket_name"]
 
     async def test_create_credentials_when_disabled(
         self,
@@ -1069,11 +1144,11 @@ class TestApi:
             bucket1_creds, bucket2_creds = bucket2_creds, bucket1_creds
         assert bucket1_creds["bucket_id"] == bucket1["id"]
         assert bucket1_creds["provider"] == bucket1["provider"]
-        assert "test-org" in bucket1_creds["credentials"]["bucket_name"]
+        assert bucket1["org_name"] in bucket1_creds["credentials"]["bucket_name"]
 
         assert bucket2_creds["bucket_id"] == bucket2["id"]
         assert bucket2_creds["provider"] == bucket2["provider"]
-        assert "test-org" in bucket2_creds["credentials"]["bucket_name"]
+        assert bucket2["org_name"] in bucket2_creds["credentials"]["bucket_name"]
 
     async def test_cannot_create_credential_for_imported_bucket(
         self,

@@ -71,12 +71,12 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         assert bucket.owner == "test-user"
         assert bucket.project_name == "test-project"
         assert mock_provider.created_buckets == [bucket.provider_bucket]
-        assert "no-org" in bucket.provider_bucket.name
+        assert "test-org" in bucket.provider_bucket.name
         assert "test-project" in bucket.provider_bucket.name
         assert "test-" in bucket.provider_bucket.name
 
@@ -87,14 +87,14 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         with pytest.raises(ExistsError):
             await service.create_bucket(
                 owner="test-user",
                 project_name="test-project",
                 name="test-bucket",
-                org_name="no-org",
+                org_name="test-org",
             )
         if len(mock_provider.created_buckets) == 2:
             second_bucket = mock_provider.created_buckets[1]
@@ -107,13 +107,13 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket-1",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user",
             project_name="test-project",
             name="test-bucket-2",
-            org_name="no-org",
+            org_name="test-org",
         )
         assert mock_provider.created_buckets == [
             bucket1.provider_bucket,
@@ -162,7 +162,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket_get = await service.get_bucket(bucket.id)
         assert bucket == bucket_get
@@ -174,10 +174,10 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket_get = await service.get_bucket_by_name(
-            "test-bucket", None, "test-project"
+            "test-bucket", "test-org", "test-project"
         )
         assert bucket == bucket_get
 
@@ -188,13 +188,13 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project1",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user/sub",
             project_name="test-project2",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket3 = await service.create_bucket(
             owner="test-user",
@@ -203,19 +203,17 @@ class TestBucketsService:
             org_name="test-org",
         )
         bucket_get = await service.get_bucket_by_path(
-            path="no-org/test-project1/test-bucket"
+            path="test-org/test-project1/test-bucket"
         )
         assert bucket1 == bucket_get
         bucket_get = await service.get_bucket_by_path(
-            path="no-org/test-project2/test-bucket"
+            path="test-org/test-project2/test-bucket"
         )
         assert bucket2 == bucket_get
         bucket_get = await service.get_bucket_by_path(
             path="test-org/test-project1/test-bucket-2"
         )
         assert bucket3 == bucket_get
-        with pytest.raises(NotExistsError):
-            await service.get_bucket_by_path(path="test-org/test-project1/test-bucket")
         with pytest.raises(NotExistsError):
             await service.get_bucket_by_path(
                 path="test-org/test-project1/test-bucket-2-2"
@@ -228,7 +226,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project1",
             name="test-bucket1",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket2 = await service.create_bucket(
             owner="test-user",
@@ -236,32 +234,30 @@ class TestBucketsService:
             name="test-bucket2",
             org_name="test-org",
         )
-        bucket3 = await service.create_bucket(
+        await service.create_bucket(
             owner="another-user",
             project_name="test-project3",
             name="test-bucket3",
-            org_name="no-org",
+            org_name="test-org",
         )
-        async with service.get_buckets("test-user") as it:
-            buckets = [bucket async for bucket in it]
-        assert len(buckets) == 2
-        assert bucket1 in buckets
-        assert bucket2 in buckets
-        assert bucket3 not in buckets
 
-        async with service.get_buckets("test-user", project_name="test-project1") as it:
+        async with service.get_buckets(
+            "test-user", org_name="test-org", project_name="test-project1"
+        ) as it:
             buckets = [bucket async for bucket in it]
-        assert len(buckets) == 1
-        assert bucket1 in buckets
-        assert bucket2 not in buckets
-        assert bucket3 not in buckets
+        assert buckets == [bucket1]
 
-        async with service.get_buckets("test-user", org_name="test-org") as it:
+        async with service.get_buckets(
+            "test-user", org_name="test-org", project_name="test-project2"
+        ) as it:
             buckets = [bucket async for bucket in it]
-        assert len(buckets) == 1
-        assert bucket1 not in buckets
-        assert bucket2 in buckets
-        assert bucket3 not in buckets
+        assert buckets == [bucket2]
+
+        async with service.get_buckets(
+            "test-user", org_name="test-org", project_name="test-project3"
+        ) as it:
+            buckets = [bucket async for bucket in it]
+        assert buckets == []
 
     async def test_delete_bucket(
         self, service: BucketsService, mock_provider: MockBucketProvider
@@ -270,7 +266,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         await service.delete_bucket(bucket.id)
         with pytest.raises(NotExistsError):
@@ -283,7 +279,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         await service.set_public_access(bucket, True)
         assert mock_provider.public_state[bucket.provider_bucket.name]
@@ -295,7 +291,7 @@ class TestBucketsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket",
-            org_name="no-org",
+            org_name="test-org",
         )
         await service.set_public_access(bucket, True)
         assert (await service.get_bucket(bucket.id)).public
@@ -335,7 +331,7 @@ class TestPersistentCredentialsService:
                 await buckets_service.create_bucket(
                     "test-user",
                     "test-project",
-                    org_name="no-org",
+                    org_name="test-org",
                 )
             ).id
             for _ in range(3)
@@ -509,31 +505,31 @@ class TestPersistentCredentialsService:
             owner="test-user",
             project_name="test-project",
             name="test-bucket-1",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket2_1 = await buckets_service.create_bucket(
             owner="test-user2",
             project_name="test-project",
             name="test-bucket-2-1",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket2_2 = await buckets_service.create_bucket(
             owner="test-user2",
             project_name="test-project",
             name="test-bucket-2-2",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket3_1 = await buckets_service.create_bucket(
             owner="test-user3",
             project_name="test-project",
             name="test-bucket-3-1",
-            org_name="no-org",
+            org_name="test-org",
         )
         bucket3_2 = await buckets_service.create_bucket(
             owner="test-user3",
             project_name="test-project",
             name="test-bucket-3-2",
-            org_name="no-org",
+            org_name="test-org",
         )
         all_buckets = [bucket1, bucket2_1, bucket2_2, bucket3_1, bucket3_2]
         all_buckets_ids = [bucket.id for bucket in all_buckets]

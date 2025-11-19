@@ -229,7 +229,7 @@ class TestProviderBase:
                 assert data == b"blob data 2"
 
     async def test_bucket_make_public_for_imported_bucket(
-        self, provider_option: ProviderTestOption
+        self, provider_option: ProviderTestOption, org_name: str
     ) -> None:
         if provider_option.type == "aws":
             pytest.skip("Moto fails with 500")
@@ -246,7 +246,7 @@ class TestProviderBase:
                 created_at=datetime.now(UTC),
                 owner="user",
                 name="not-important",
-                org_name="no-org",
+                org_name=org_name,
                 project_name="not-important",
                 public=False,
                 provider_bucket=bucket,

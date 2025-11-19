@@ -68,7 +68,7 @@ class TestPermissionsService:
             name="test-bucket",
             owner="test-user",
             project_name="test-project",
-            org_name="no-org",
+            org_name="test-org",
             created_at=utc_now(),
             provider_bucket=None,  # type: ignore
             public=False,

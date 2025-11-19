@@ -24,15 +24,17 @@ class TestProjectDeleterIntegration:
         regular_user_factory: UserFactory,
         buckets_api: BucketsApiEndpoints,
         events_queues: EventsQueues,
+        org_name: str,
+        project_name: str,
     ) -> None:
         """Test that project-remove event deletes buckets and their credentials."""
-        user = await regular_user_factory(org_name="test-org")
+        user = await regular_user_factory(org_name=org_name)
 
         # Create bucket
         bucket_data = {
             "name": "test-bucket",
-            "project_name": "test-project",
-            "org_name": "test-org",
+            "project_name": project_name,
+            "org_name": org_name,
         }
 
         async with client.post(
@@ -71,8 +73,8 @@ class TestProjectDeleterIntegration:
                         stream=StreamType("platform-admin"),
                         event_type=EventType("project-remove"),
                         cluster="test-cluster",
-                        org="test-org",
-                        project="test-project",
+                        org=org_name,
+                        project=project_name,
                         user="test-user",
                     ),
                 ],
@@ -88,6 +90,10 @@ class TestProjectDeleterIntegration:
         async with client.get(
             buckets_api.bucket_url(created_bucket["id"]),
             headers=user.headers,
+            params={
+                "org_name": created_bucket["org_name"],
+                "project_name": created_bucket["project_name"],
+            },
         ) as resp:
             assert resp.status == 404
 
@@ -104,15 +110,17 @@ class TestProjectDeleterIntegration:
         regular_user_factory: UserFactory,
         buckets_api: BucketsApiEndpoints,
         events_queues: EventsQueues,
+        org_name: str,
+        project_name: str,
     ) -> None:
         """Test that non-project-remove events are ignored but acknowledged."""
-        user = await regular_user_factory(org_name="test-org")
+        user = await regular_user_factory(org_name=org_name)
 
         # Create bucket
         bucket_data = {
             "name": "ignore-test-bucket",
-            "project_name": "test-project",
-            "org_name": "test-org",
+            "project_name": project_name,
+            "org_name": org_name,
         }
 
         async with client.post(
@@ -136,8 +144,8 @@ class TestProjectDeleterIntegration:
                         stream=StreamType("platform-admin"),
                         event_type=EventType("project-create"),
                         cluster="test-cluster",
-                        org="test-org",
-                        project="test-project",
+                        org=org_name,
+                        project=project_name,
                         user="test-user",
                     ),
                 ],
@@ -162,6 +170,7 @@ class TestProjectDeleterIntegration:
         regular_user_factory: UserFactory,
         buckets_api: BucketsApiEndpoints,
         events_queues: EventsQueues,
+        project_name: str,
     ) -> None:
         """Test that only buckets from specified project are deleted."""
         # Use two different orgs to simulate project isolation
@@ -171,7 +180,7 @@ class TestProjectDeleterIntegration:
         # Create bucket in first org (will be "deleted")
         bucket_to_delete_data = {
             "name": "bucket-to-delete",
-            "project_name": "test-project",
+            "project_name": project_name,
             "org_name": "test-org1",
         }
 
@@ -186,7 +195,7 @@ class TestProjectDeleterIntegration:
         # Create bucket in second org (should be kept)
         bucket_to_keep_data = {
             "name": "bucket-to-keep",
-            "project_name": "test-project",
+            "project_name": project_name,
             "org_name": "test-org2",
         }
 
@@ -212,7 +221,7 @@ class TestProjectDeleterIntegration:
                         event_type=EventType("project-remove"),
                         cluster="test-cluster",
                         org="test-org1",
-                        project="test-project",
+                        project=project_name,
                         user="test-user",
                     ),
                 ],
@@ -228,6 +237,10 @@ class TestProjectDeleterIntegration:
         async with client.get(
             buckets_api.bucket_url(bucket_to_delete["id"]),
             headers=user_org1.headers,
+            params={
+                "org_name": bucket_to_delete["org_name"],
+                "project_name": bucket_to_delete["project_name"],
+            },
         ) as resp:
             assert resp.status == 404
 
@@ -235,5 +248,9 @@ class TestProjectDeleterIntegration:
         async with client.get(
             buckets_api.bucket_url(bucket_to_keep["id"]),
             headers=user_org2.headers,
+            params={
+                "org_name": bucket_to_keep["org_name"],
+                "project_name": bucket_to_keep["project_name"],
+            },
         ) as resp:
             assert resp.status == 200

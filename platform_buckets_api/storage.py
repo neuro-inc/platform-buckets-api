@@ -90,7 +90,7 @@ BucketType = Union[UserBucket, ImportedBucket]
 class BucketsStorage(abc.ABC):
     @abc.abstractmethod
     def list_buckets(
-        self, org_name: str | None = None, project_name: str | None = None
+        self, org_name: str, project_name: str
     ) -> AbstractAsyncContextManager[AsyncIterator[BucketType]]:
         pass
 
@@ -100,7 +100,7 @@ class BucketsStorage(abc.ABC):
 
     @abc.abstractmethod
     async def get_bucket_by_name(
-        self, name: str, org_name: str | None, project_name: str
+        self, name: str, org_name: str, project_name: str
     ) -> BucketType:
         pass
 
@@ -153,12 +153,12 @@ class InMemoryBucketsStorage(BucketsStorage):
 
     @asyncgeneratorcontextmanager
     async def list_buckets(
-        self, org_name: str | None = None, project_name: str | None = None
+        self, org_name: str, project_name: str
     ) -> AsyncIterator[BucketType]:
         for bucket in self._buckets:
-            if org_name and org_name != bucket.org_name:
+            if org_name != bucket.org_name:
                 continue
-            if project_name and project_name != bucket.project_name:
+            if project_name != bucket.project_name:
                 continue
             yield bucket
 
@@ -186,13 +186,13 @@ class InMemoryBucketsStorage(BucketsStorage):
         raise NotExistsError(f"UserBucket with id {id} doesn't exist")
 
     async def get_bucket_by_name(
-        self, name: str, org_name: str | None, project_name: str
+        self, name: str, org_name: str, project_name: str
     ) -> BucketType:
         for bucket in self._buckets:
             if (
                 bucket.name == name
-                and (not org_name or bucket.org_name == org_name)
-                and (not project_name or bucket.project_name == project_name)
+                and bucket.org_name == org_name
+                and bucket.project_name == project_name
             ):
                 return bucket
         raise NotExistsError(

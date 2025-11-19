@@ -123,19 +123,29 @@ class TestBucketsStorage:
     ) -> BucketsStorage:
         return in_memory_buckets_storage
 
+    @pytest.fixture()
+    def org(self) -> str:
+        return str(uuid4())
+
+    @pytest.fixture()
+    def project(self) -> str:
+        return str(uuid4())
+
     def _make_bucket(
         self,
         username: str,
         name: str | None,
         public: bool = False,
         with_meta: bool = True,
+        project_name: str = "project",
+        org_name: str = "org",
     ) -> UserBucket:
         return UserBucket(
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
-            org_name="no-org",
-            project_name="project",
+            org_name=org_name,
+            project_name=project_name,
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
@@ -151,13 +161,15 @@ class TestBucketsStorage:
         name: str | None,
         public: bool = False,
         with_meta: bool = True,
+        project_name: str = "project",
+        org_name: str = "org",
     ) -> UserBucket:
         return UserBucket(
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
-            org_name="test-org",
-            project_name="project",
+            org_name=org_name,
+            project_name=project_name,
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
@@ -172,13 +184,15 @@ class TestBucketsStorage:
         username: str,
         name: str | None,
         public: bool = False,
+        project_name: str = "project",
+        org_name: str = "org",
     ) -> ImportedBucket:
         return ImportedBucket(
             id=f"bucket-{uuid4()}",
             owner=username,
             name=name,
-            org_name="no-org",
-            project_name="project",
+            org_name=org_name,
+            project_name=project_name,
             created_at=utc_now(),
             provider_bucket=ProviderBucket(
                 provider_type=BucketsProviderType.AWS,
@@ -191,36 +205,52 @@ class TestBucketsStorage:
     async def test_buckets_create_list(
         self,
         storage: BucketsStorage,
+        org: str,
+        project: str,
     ) -> None:
-        bucket1 = self._make_bucket("user1", "test", with_meta=False)
-        bucket2 = self._make_bucket("user2", None)
-        bucket3 = self._make_bucket("user2", None, True)
-        bucket4 = self._make_imported_bucket("user2", None)
+        bucket1 = self._make_bucket(
+            "user1", "test", with_meta=False, project_name=project, org_name=org
+        )
+        bucket2 = self._make_bucket("user2", None, project_name=project, org_name=org)
+        bucket3 = self._make_bucket(
+            "user2", None, True, project_name=project, org_name=org
+        )
+        bucket4 = self._make_imported_bucket(
+            "user2", None, project_name=project, org_name=org
+        )
 
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         await storage.create_bucket(bucket3)
         await storage.create_bucket(bucket4)
-        async with storage.list_buckets() as it:
+        async with storage.list_buckets(project_name=project, org_name=org) as it:
             buckets = [bucket async for bucket in it]
         assert len(buckets) == 4
         assert all(bucket in buckets for bucket in [bucket1, bucket2, bucket3, bucket4])
 
-    async def test_bucket_duplicate_not_allowed(self, storage: BucketsStorage) -> None:
-        bucket1 = self._make_bucket("user", "test")
-        bucket2 = self._make_bucket("user", "test")
+    async def test_bucket_duplicate_not_allowed(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket1 = self._make_bucket("user", "test", project_name=project, org_name=org)
+        bucket2 = self._make_bucket("user", "test", project_name=project, org_name=org)
         await storage.create_bucket(bucket1)
         with pytest.raises(ExistsError):
             await storage.create_bucket(bucket2)
 
-    async def test_buckets_create_get(self, storage: BucketsStorage) -> None:
-        bucket = self._make_bucket("user1", "test")
+    async def test_buckets_create_get(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket = self._make_bucket("user1", "test", project_name=project, org_name=org)
         await storage.create_bucket(bucket)
         bucket_get = await storage.get_bucket(bucket.id)
         assert bucket == bucket_get
 
-    async def test_buckets_create_get_with_org(self, storage: BucketsStorage) -> None:
-        bucket = self._make_bucket_with_org("user1", "test")
+    async def test_buckets_create_get_with_org(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket = self._make_bucket_with_org(
+            "user1", "test", project_name=project, org_name=org
+        )
         await storage.create_bucket(bucket)
         bucket_get = await storage.get_bucket(bucket.id)
         assert bucket == bucket_get
@@ -229,40 +259,54 @@ class TestBucketsStorage:
         with pytest.raises(NotExistsError):
             await storage.get_bucket("anything")
 
-    async def test_buckets_create_get_by_name(self, storage: BucketsStorage) -> None:
-        bucket1 = self._make_bucket("user1", "test-1")
-        bucket2 = self._make_imported_bucket("user1", "test-2")
+    async def test_buckets_create_get_by_name(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket1 = self._make_bucket(
+            "user1", "test-1", project_name=project, org_name=org
+        )
+        bucket2 = self._make_imported_bucket(
+            "user1", "test-2", project_name=project, org_name=org
+        )
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         assert bucket1.name
         bucket_get = await storage.get_bucket_by_name(
-            bucket1.name, None, bucket1.project_name
+            bucket1.name, org, bucket1.project_name
         )
         assert bucket1 == bucket_get
 
         assert bucket2.name
         bucket_get = await storage.get_bucket_by_name(
-            bucket2.name, None, bucket2.project_name
+            bucket2.name, org, bucket2.project_name
         )
         assert bucket2 == bucket_get
 
     async def test_buckets_get_by_name_not_found(self, storage: BucketsStorage) -> None:
         with pytest.raises(NotExistsError):
-            await storage.get_bucket_by_name("any", None, "any")
+            await storage.get_bucket_by_name("any", "any", "any")
 
-    async def test_bucket_delete(self, storage: BucketsStorage) -> None:
-        bucket = self._make_bucket("user1", "test")
+    async def test_bucket_delete(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket = self._make_bucket("user1", "test", org_name=org, project_name=project)
         await storage.create_bucket(bucket)
         await storage.delete_bucket(bucket.id)
         with pytest.raises(NotExistsError):
             await storage.get_bucket(bucket.id)
-        async with storage.list_buckets() as it:
+        async with storage.list_buckets(org_name=org, project_name=project) as it:
             buckets = {bucket async for bucket in it}
         assert buckets == set()
 
-    async def test_bucket_update(self, storage: BucketsStorage) -> None:
-        bucket1 = self._make_bucket("user1", "test1", public=False)
-        bucket2 = self._make_bucket("user1", "test2", public=False)
+    async def test_bucket_update(
+        self, storage: BucketsStorage, org: str, project: str
+    ) -> None:
+        bucket1 = self._make_bucket(
+            "user1", "test1", public=False, org_name=org, project_name=project
+        )
+        bucket2 = self._make_bucket(
+            "user1", "test2", public=False, org_name=org, project_name=project
+        )
         await storage.create_bucket(bucket1)
         await storage.create_bucket(bucket2)
         bucket1 = replace(bucket1, public=True)
