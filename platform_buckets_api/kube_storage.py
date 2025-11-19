@@ -60,7 +60,7 @@ class K8SBucketsStorage(BucketsStorage):
     async def get_bucket_by_name(
         self,
         name: str,
-        org_name: str,  # type: ignore
+        org_name: str,
         project_name: str,
     ) -> BucketType:
         label_selectors = [f"{BUCKET_NAME_LABEL}={name}"]

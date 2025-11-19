@@ -130,24 +130,20 @@ class BucketsService:
         return await self._storage.get_bucket(id)
 
     async def get_bucket_by_name(
-        self, name: str, org_name: str | None, project_name: str
+        self, name: str, org_name: str, project_name: str
     ) -> BaseBucket:
         return await self._storage.get_bucket_by_name(name, org_name, project_name)
 
     async def get_bucket_by_path(self, path: str) -> BaseBucket:
-        async with self._storage.list_buckets() as it:
-            async for bucket in it:
-                bucket_paths = [f"{bucket.project_name}/{bucket.id}"]
-                if bucket.name:
-                    bucket_paths.append(f"{bucket.project_name}/{bucket.name}")
-                bucket_paths = [
-                    f"{bucket.org_name}/{bucket_path}" for bucket_path in bucket_paths
-                ]
-                for bucket_path in bucket_paths:
-                    if path.startswith(bucket_path) and (
-                        path == bucket_path or path[len(bucket_path)] == "/"
-                    ):
-                        return bucket
+        parts = path.split("/", 3)
+        if len(parts) < 3:
+            raise NotExistsError(f"Bucket for path {path} not found")
+        org_name, project_name, bucket_name = parts[0], parts[1], parts[2]
+        try:
+            return await self.get_bucket_by_name(
+                bucket_name, org_name=org_name, project_name=project_name
+            )
+        except NotExistsError:
             raise NotExistsError(f"Bucket for path {path} not found")
 
     async def make_tmp_credentials(
@@ -194,8 +190,8 @@ class BucketsService:
     async def get_buckets(
         self,
         owner: str,
-        org_name: str | None = None,
-        project_name: str | None = None,
+        org_name: str,
+        project_name: str,
     ) -> AsyncIterator[BaseBucket]:
         checker = await self._permissions_service.get_perms_checker(owner)
         async with self._storage.list_buckets(
