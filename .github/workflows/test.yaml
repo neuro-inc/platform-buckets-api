@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout commit
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     - name: Install python
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout commit
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     - name: Install python
@@ -71,7 +71,7 @@ jobs:
       MINIKUBE_DRIVER: none
     steps:
     - name: Checkout commit
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     - name: Install python
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout commit
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
     - name: Install python
