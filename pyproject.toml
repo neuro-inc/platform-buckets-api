@@ -39,7 +39,7 @@ platform-buckets-api = "platform_buckets_api.api:main"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "1.18.2"
-pre-commit = "4.4.0"
+pre-commit = "4.5.0"
 codecov = "2.1.13"
 docker = "7.1.0"
 pytest = "9.0.1"
