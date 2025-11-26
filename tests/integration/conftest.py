@@ -258,3 +258,13 @@ def events_client_name() -> str:
 @pytest.fixture
 def cluster_name() -> str:
     return "test-cluster"
+
+
+@pytest.fixture
+def org_name() -> str:
+    return "test-org"
+
+
+@pytest.fixture
+def project_name() -> str:
+    return "test-project"

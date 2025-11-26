@@ -63,7 +63,7 @@ from .config import (
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
 
-from apolo_kube_client import KubeClient
+from apolo_kube_client import KubeClientSelector
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
 from .providers import (
@@ -86,6 +86,7 @@ from .schema import (
     PersistentBucketsCredentialsRequest,
     SignedUrl,
     SignedUrlRequest,
+    query_schema,
 )
 from .service import BucketsService, PersistentCredentialsService
 from .storage import (
@@ -212,18 +213,17 @@ class BucketsApiHandler:
             bucket = await self.service.get_bucket(id_or_name)
         except NotExistsError:
             org_name = request.query.get("org_name")
+            if not org_name:
+                raise ValueError("org_name must be provided")
             project_name = request.query.get("project_name")
             owner = request.query.get("owner")
             if project_name:
                 if owner:
                     raise ValueError("owner cannot be specified with project_name")
             else:
-                if org_name:
-                    raise ValueError("org_name can be specified only with project_name")
                 if owner is None:
                     user = await _get_untrusted_user(request)
                     owner = user.name
-                org_name = None
                 project_name = owner
             try:
                 bucket = await self.service.get_bucket_by_name(
@@ -431,13 +431,17 @@ class BucketsApiHandler:
         summary="List all buckets available to current user",
     )
     @response_schema(Bucket(many=True), 200)
+    @query_schema(
+        org_name=fields.String(required=True),
+        project_name=fields.String(required=True),
+    )
     async def list_buckets(
         self,
         request: aiohttp.web.Request,
+        org_name: str,
+        project_name: str,
     ) -> aiohttp.web.StreamResponse:
         username = await check_authorized(request)
-        org_name = request.query.get("org_name")
-        project_name = request.query.get("project_name")
         async with self.service.get_buckets(
             owner=username, org_name=org_name, project_name=project_name
         ) as buckets_it:
@@ -1090,8 +1094,8 @@ async def create_app(
 
             logger.info("Initializing Kubernetes client")
 
-            kube_client = await exit_stack.enter_async_context(
-                KubeClient(config=config.kube)
+            kube_client_selector = await exit_stack.enter_async_context(
+                KubeClientSelector(config=config.kube)
             )
 
             logger.info("Initializing PermissionsService")
@@ -1104,7 +1108,7 @@ async def create_app(
 
             logger.info("Initializing BucketsService")
             buckets_service = BucketsService(
-                storage=K8SBucketsStorage(kube_client),
+                storage=K8SBucketsStorage(kube_client_selector),
                 bucket_provider=bucket_provider,
                 permissions_service=permissions_service,
             )
@@ -1113,7 +1117,7 @@ async def create_app(
 
             logger.info("Initializing PersistentCredentialsService")
             credentials_service = PersistentCredentialsService(
-                storage=K8SCredentialsStorage(kube_client),
+                storage=K8SCredentialsStorage(kube_client_selector.host_client),
                 bucket_provider=bucket_provider,
                 buckets_service=buckets_service,
             )
