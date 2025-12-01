@@ -111,6 +111,7 @@ class K8SBucketsStorage(BucketsStorage):
                         f"in PersistentCredentials with id {credential.metadata.name}"
                     )
             name = BucketCRDMapper.to_model(bucket).metadata.name
+            assert name is not None
             await k8s.neuromation_io_v1.user_bucket.delete(name=name)
 
     async def update_bucket(self, bucket: BucketType) -> None:
@@ -118,9 +119,12 @@ class K8SBucketsStorage(BucketsStorage):
             org_name=bucket.org_name, project_name=bucket.project_name
         ) as k8s:
             name = BucketCRDMapper.to_model(bucket).metadata.name
+            assert name is not None
             k8s_bucket = await k8s.neuromation_io_v1.user_bucket.get(name=name)
             update_model = BucketCRDMapper.to_model(bucket)
-            update_model.metadata.resourceVersion = k8s_bucket.metadata.resourceVersion
+            update_model.metadata.resource_version = (
+                k8s_bucket.metadata.resource_version
+            )
 
             try:
                 await k8s.neuromation_io_v1.user_bucket.update(model=update_model)
@@ -196,19 +200,21 @@ class K8SCredentialsStorage(CredentialsStorage):
             return
 
         name = PersistentCredentialsCRDMapper.to_model(credentials).metadata.name
+        assert name is not None
         await self._kube_client.neuromation_io_v1.persistent_bucket_credential.delete(
             name=name, namespace=credentials.namespace
         )
 
     async def update_credentials(self, credentials: PersistentCredentials) -> None:
         name = PersistentCredentialsCRDMapper.to_model(credentials).metadata.name
+        assert name is not None
         k8s_pc = (
             await self._kube_client.neuromation_io_v1.persistent_bucket_credential.get(
                 name=name, namespace=credentials.namespace
             )
         )
         update_model = PersistentCredentialsCRDMapper.to_model(credentials)
-        update_model.metadata.resourceVersion = k8s_pc.metadata.resourceVersion
+        update_model.metadata.resource_version = k8s_pc.metadata.resource_version
 
         try:
             await (

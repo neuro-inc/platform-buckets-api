@@ -15,9 +15,8 @@ from .storage import (
 from apolo_kube_client import (
     V1UserBucketCRD,
     V1PersistentBucketCredentialCRD,
-    V1PersistentBucketCredentialCRDMetadata,
     V1PersistentBucketCredentialCRDSpec,
-    V1UserBucketCRDMetadata,
+    V1ObjectMeta,
     V1UserBucketCRDSpec,
 )
 from .utils import datetime_dump, datetime_load
@@ -74,7 +73,7 @@ class PersistentCredentialsCRDMapper:
             labels[CREDENTIALS_NAME_LABEL] = entry.name
 
         return V1PersistentBucketCredentialCRD(
-            metadata=V1PersistentBucketCredentialCRDMetadata(
+            metadata=V1ObjectMeta(
                 name=name,
                 labels=labels,
             ),
@@ -153,7 +152,7 @@ class BucketCRDMapper:
             spec["credentials"] = entry.credentials
 
         return V1UserBucketCRD(
-            metadata=V1UserBucketCRDMetadata(
+            metadata=V1ObjectMeta(
                 name=name,
                 labels=labels,
             ),

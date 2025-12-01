@@ -63,7 +63,6 @@ async def kube_config(
         auth_type=KubeClientAuthType.CERTIFICATE,
         auth_cert_path=user["client-certificate"],
         auth_cert_key_path=user["client-key"],
-        namespace="default",
     )
     return kube_config
 
@@ -88,6 +87,7 @@ async def kube_client(
             all_namespaces=True
         )
         for bucket in bucket_list.items:
+            assert bucket.metadata.name is not None
             try:
                 await kube_client.neuromation_io_v1.user_bucket.delete(
                     name=bucket.metadata.name,
@@ -102,6 +102,7 @@ async def kube_client(
             )
         )
         for creds in creds_list.items:
+            assert creds.metadata.name is not None
             try:
                 await kube_client.neuromation_io_v1.persistent_bucket_credential.delete(
                     name=creds.metadata.name,
