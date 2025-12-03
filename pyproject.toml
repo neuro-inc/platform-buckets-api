@@ -31,7 +31,7 @@ azure-storage-blob = "12.27.1"
 google-cloud-storage = "3.6.0"
 google-cloud-iam = "2.20.0"
 google-api-python-client = "2.187.0"
-apolo-kube-client="25.12.0"
+apolo-kube-client="25.12.1"
 apolo-events-client = "25.10.0"
 
 [tool.poetry.scripts]
