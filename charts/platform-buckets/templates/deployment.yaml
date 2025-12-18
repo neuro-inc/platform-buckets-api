@@ -116,7 +116,7 @@ spec:
         - name: NP_MINIO_SECRET_ACCESS_KEY
           {{- toYaml .Values.bucketProvider.minio.secretAccessKey | nindent 10 }}
         - name: NP_MINIO_REGION_NAME
-          value: {{ .Values.bucketProvider.minio.regionName | default "default" }}
+          value: {{ .Values.bucketProvider.minio.regionName | default "minio" }}
         {{- end }}
         # Azure provider
         {{- if eq .Values.bucketProvider.type "azure" }}
