@@ -21,7 +21,7 @@ python = ">=3.13,<4.0"
 aiohttp = "3.13.2"
 neuro-auth-client = "25.8.2"
 neuro-logging = "25.11.0"
-marshmallow = "4.1.1"
+marshmallow = "3.26.1"
 apispec = "6.9.0"
 aiohttp-apispec = "3.0.0b2"
 markupsafe = "3.0.3"
@@ -31,7 +31,7 @@ azure-storage-blob = "12.27.1"
 google-cloud-storage = "3.7.0"
 google-cloud-iam = "2.20.0"
 google-api-python-client = "2.187.0"
-apolo-kube-client="25.12.1"
+apolo-kube-client = "25.12.1"
 apolo-events-client = "25.10.0"
 
 [tool.poetry.scripts]
@@ -45,7 +45,7 @@ docker = "7.1.0"
 pytest = "9.0.2"
 pytest-asyncio = "1.3.0"
 pytest-cov = "7.0.0"
-apolo-events-client = {extras = ["pytest"], version = "25.10.0"}
+apolo-events-client = { extras = ["pytest"], version = "25.10.0" }
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
@@ -62,10 +62,7 @@ combine_as_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-filterwarnings = [
-    "ignore::DeprecationWarning:jose",
-    "ignore::ResourceWarning",
-]
+filterwarnings = ["ignore::DeprecationWarning:jose", "ignore::ResourceWarning"]
 
 [tool.coverage.run]
 branch = true
