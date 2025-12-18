@@ -112,11 +112,11 @@ spec:
         - name: NP_MINIO_ENDPOINT_PUBLIC_URL
           value: {{ .Values.bucketProvider.minio.publicUrl }}
         - name: NP_MINIO_ACCESS_KEY_ID
-          value: {{ .Values.bucketProvider.minio.accessKeyId }}
+          {{- toYaml .Values.bucketProvider.minio.accessKeyId | nindent 10 }}
         - name: NP_MINIO_SECRET_ACCESS_KEY
-          value: {{ .Values.bucketProvider.minio.secretAccessKey }}
+          {{- toYaml .Values.bucketProvider.minio.secretAccessKey | nindent 10 }}
         - name: NP_MINIO_REGION_NAME
-          value: {{ .Values.bucketProvider.minio.regionName }}
+          value: {{ .Values.bucketProvider.minio.regionName | default "default" }}
         {{- end }}
         # Azure provider
         {{- if eq .Values.bucketProvider.type "azure" }}
