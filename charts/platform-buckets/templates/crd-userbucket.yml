@@ -46,4 +46,3 @@ spec:
     listKind: UserBucketsList
     plural: userbuckets
     singular: userbucket
-    shortNames: []
