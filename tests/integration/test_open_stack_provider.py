@@ -112,8 +112,8 @@ class TestOpenStackProvider(TestProviderBase):
                 lambda bucket: AwsBasicBucketClient(open_stack_s3, bucket.name)
             ),
             role_exists=partial(open_stack_role_exists, open_stack_api),
-            get_public_url=lambda bucket_name, key: open_stack_config["public_url"]
-            / bucket_name
-            / key,
+            get_public_url=lambda bucket_name, key: (
+                open_stack_config["public_url"] / bucket_name / key
+            ),
             credentials_for_imported={},
         )
