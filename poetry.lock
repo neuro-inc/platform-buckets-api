@@ -1950,22 +1950,19 @@ files = [
 
 [[package]]
 name = "marshmallow"
-version = "3.26.2"
+version = "4.2.3"
 description = "A lightweight library for converting complex datatypes to and from native Python datatypes."
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73"},
-    {file = "marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57"},
+    {file = "marshmallow-4.2.3-py3-none-any.whl", hash = "sha256:c84fd89817ecea690bde1eb925036070e5e9883148217585adc56d5cfbc082b8"},
+    {file = "marshmallow-4.2.3.tar.gz", hash = "sha256:3e3fef6b3603721a25a723b8caedfa488369bddaf9bc03b40b9442c90aebd22b"},
 ]
-
-[package.dependencies]
-packaging = ">=17.0"
 
 [package.extras]
 dev = ["marshmallow[tests]", "pre-commit (>=3.5,<5.0)", "tox"]
-docs = ["autodocsumm (==0.2.14)", "furo (==2024.8.6)", "sphinx (==8.1.3)", "sphinx-copybutton (==0.5.2)", "sphinx-issues (==5.0.0)", "sphinxext-opengraph (==0.9.1)"]
+docs = ["autodocsumm (==0.2.14)", "furo (==2025.12.19)", "sphinx (==8.2.3)", "sphinx-copybutton (==0.5.2)", "sphinx-issues (==6.0.0)", "sphinxext-opengraph (==0.13.0)"]
 tests = ["pytest", "simplejson"]
 
 [[package]]
@@ -3528,4 +3525,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "b337c804ee3feab32f89ca24ddeedca75a012b766e85d0af69532f2da365a3fe"
+content-hash = "02b73303ff5f2b966860252ae2469bb208a506f3bb2fbceb1b113c3abef4dd4c"
