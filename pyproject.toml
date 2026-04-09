@@ -30,7 +30,7 @@ bmc = "0.0.4"
 azure-storage-blob = "12.28.0"
 google-cloud-storage = "3.10.1"
 google-cloud-iam = "2.22.0"
-google-api-python-client = "2.193.0"
+google-api-python-client = "2.194.0"
 apolo-kube-client = "25.12.1"
 apolo-events-client = "25.10.0"
 
