@@ -19,6 +19,7 @@ from .config import (
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
+    SeaweedFSProviderConfig,
     ServerConfig,
 )
 
@@ -72,6 +73,7 @@ class EnvironConfigFactory:
         | GCPProviderConfig
         | EMCECSProviderConfig
         | OpenStackProviderConfig
+        | SeaweedFSProviderConfig
     ):
         type_ = self._environ["NP_BUCKET_PROVIDER_TYPE"]
         if type_ == BucketsProviderType.AWS:
@@ -123,6 +125,16 @@ class EnvironConfigFactory:
                 endpoint_url=URL(self._environ["NP_OS_ENDPOINT_URL"]),
                 s3_endpoint_url=URL(self._environ["NP_OS_S3_ENDPOINT_URL"]),
                 region_name=self._environ["NP_OS_REGION_NAME"],
+            )
+        elif type_ == BucketsProviderType.SEAWEEDFS:
+            return SeaweedFSProviderConfig(
+                access_key_id=self._environ["NP_SEAWEEDFS_ACCESS_KEY_ID"],
+                secret_access_key=self._environ["NP_SEAWEEDFS_SECRET_ACCESS_KEY"],
+                region_name=self._environ.get("NP_SEAWEEDFS_REGION_NAME", "us-east-1"),
+                endpoint_url=URL(self._environ["NP_SEAWEEDFS_ENDPOINT_URL"]),
+                endpoint_public_url=URL(
+                    self._environ["NP_SEAWEEDFS_ENDPOINT_PUBLIC_URL"]
+                ),
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type_}")

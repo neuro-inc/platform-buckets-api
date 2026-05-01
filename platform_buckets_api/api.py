@@ -59,6 +59,7 @@ from .config import (
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
+    SeaweedFSProviderConfig,
 )
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
@@ -75,6 +76,7 @@ from .providers import (
     MinioBucketProvider,
     OpenStackBucketProvider,
     OpenStackStorageApi,
+    SeaweedFSBucketProvider,
 )
 from .schema import (
     Bucket,
@@ -1086,6 +1088,26 @@ async def create_app(
                         api=os_api,
                         region_name=config.bucket_provider.region_name,
                         s3_url=config.bucket_provider.s3_endpoint_url,
+                    )
+                elif isinstance(config.bucket_provider, SeaweedFSProviderConfig):
+                    session = aiobotocore.session.get_session()
+                    client_kwargs = {
+                        "region_name": config.bucket_provider.region_name,
+                        "aws_access_key_id": config.bucket_provider.access_key_id,
+                        "aws_secret_access_key": config.bucket_provider.secret_access_key,
+                        "endpoint_url": str(config.bucket_provider.endpoint_url),
+                    }
+                    s3_client = await exit_stack.enter_async_context(
+                        session.create_client("s3", **client_kwargs)
+                    )
+                    iam_client = await exit_stack.enter_async_context(
+                        session.create_client("iam", **client_kwargs)
+                    )
+                    bucket_provider = SeaweedFSBucketProvider(
+                        s3_client=s3_client,
+                        iam_client=iam_client,
+                        region_name=config.bucket_provider.region_name,
+                        public_url=config.bucket_provider.endpoint_public_url,
                     )
                 else:
                     raise Exception(

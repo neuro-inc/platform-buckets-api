@@ -1,4 +1,4 @@
-ARG PY_VERSION=3.13.3
+ARG PY_VERSION=3.13
 
 FROM python:${PY_VERSION}-slim-bookworm AS builder
 
@@ -10,11 +10,8 @@ COPY requirements.txt /tmp/
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 COPY dist /tmp/dist/
-RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-buckets-api \
-    && rm -rf /tmp/dist
-
-RUN apt-get -q update && apt-get -q install -y wget \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-buckets-api
+RUN apt-get -q install -y wget
 RUN wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
 RUN chmod +x mc
 

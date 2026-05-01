@@ -23,6 +23,7 @@ from platform_buckets_api.config import (
     KubeConfig,
     MinioProviderConfig,
     PlatformAuthConfig,
+    SeaweedFSProviderConfig,
     ServerConfig,
 )
 
@@ -34,6 +35,7 @@ pytest_plugins = [
     "tests.integration.auth",
     "tests.integration.moto_server",
     "tests.integration.minio",
+    "tests.integration.seaweedfs",
     "tests.integration.kube",
 ]
 
@@ -111,12 +113,32 @@ def config_factory(
     return _f
 
 
-@pytest.fixture(params=["aws-moto", "minio"])
+@pytest.fixture(scope="session")
+def seaweedfs_server(docker_ip: str, docker_services: Any) -> URL:
+    # SeaweedFS S3 endpoint (from docker-compose, mirrors MinIO test logic)
+    port = docker_services.port_for("seaweedfs-s3", 9000)
+    return URL(f"http://{docker_ip}:{port}")
+
+
+@pytest.fixture
+def seaweedfs_provider_config(seaweedfs_server: URL) -> SeaweedFSProviderConfig:
+    # Credentials and bucket name match test docker-compose
+    return SeaweedFSProviderConfig(
+        endpoint_url=seaweedfs_server,
+        endpoint_public_url=seaweedfs_server,
+        access_key_id="admin",
+        secret_access_key="devsecret",
+        region_name="us-east-1",
+    )
+
+
+@pytest.fixture(params=["aws-moto", "minio", "seaweedfs"])
 def config(
     request: Any,
     config_factory: Callable[..., Config],
     moto_server: MotoConfig,
     minio_server: URL,
+    seaweedfs_provider_config: SeaweedFSProviderConfig,
 ) -> Config:
     if request.param == "aws-moto":
         return config_factory()  # Moto is by default
@@ -130,6 +152,8 @@ def config(
                 region_name="region-1",
             )
         )
+    elif request.param == "seaweedfs":
+        return config_factory(bucket_provider=seaweedfs_provider_config)
     raise Exception(f"Unknown bucket provider {request.param}.")
 
 

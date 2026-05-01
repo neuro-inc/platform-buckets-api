@@ -156,6 +156,19 @@ spec:
         - name: NP_OS_REGION_NAME
           value: {{ .Values.bucketProvider.open_stack.regionName }}
         {{- end }}
+        # SeaweedFS provider
+        {{- if eq .Values.bucketProvider.type "seaweedfs" }}
+        - name: NP_SEAWEEDFS_ENDPOINT_URL
+          value: {{ .Values.bucketProvider.seaweedfs.url }}
+        - name: NP_SEAWEEDFS_ENDPOINT_PUBLIC_URL
+          value: {{ .Values.bucketProvider.seaweedfs.publicUrl }}
+        - name: NP_SEAWEEDFS_ACCESS_KEY_ID
+          {{- toYaml .Values.bucketProvider.seaweedfs.accessKeyId | nindent 10 }}
+        - name: NP_SEAWEEDFS_SECRET_ACCESS_KEY
+          {{- toYaml .Values.bucketProvider.seaweedfs.secretAccessKey | nindent 10 }}
+        - name: NP_SEAWEEDFS_REGION_NAME
+          value: {{ .Values.bucketProvider.seaweedfs.regionName | default "us-east-1" }}
+        {{- end }}
         # End of providers
         {{- if .Values.sentry }}
         - name: SENTRY_DSN
