@@ -255,7 +255,8 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
     def __init__(
         self,
         s3_client: AioBaseClient,
-        sts_client: AioBaseClient | None,  # Accept None for providers that do not use STS
+        sts_client: AioBaseClient
+        | None,  # Accept None for providers that do not use STS
         s3_role_arn: str,
         session_duration_s: int = 3600,
         public_url: URL | None = None,
@@ -314,6 +315,11 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
                 )
             ]
         )
+        if self._sts_client is None:
+            raise RuntimeError(
+                "STS client is not configured for this provider; "
+                "cannot assume role for bucket credentials."
+            )
         res = await self._sts_client.assume_role(
             RoleArn=self._s3_role_arn,
             RoleSessionName=f"{bucket.name}-{requester}"[:58] + secrets.token_hex(3),
@@ -406,7 +412,10 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         return bucket
 
     async def create_role(
-        self, username: str, initial_permissions: Iterable[BucketPermission], permissions_boundary: str | None = None
+        self,
+        username: str,
+        initial_permissions: Iterable[BucketPermission],
+        permissions_boundary: str | None = None,
     ) -> ProviderRole:
         create_user_kwargs = {"UserName": username}
         if permissions_boundary is not None:
@@ -415,7 +424,9 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
             await self._iam_client.create_user(**create_user_kwargs)
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)
-        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
+        keys = (await self._iam_client.create_access_key(UserName=username))[
+            "AccessKey"
+        ]
         role = ProviderRole(
             name=username,
             provider_type=self.provider_type,
@@ -643,7 +654,9 @@ class SeaweedFSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations
     ) -> Mapping[str, str]:
         username = f"tmp-{bucket.name[:20]}-{secrets.token_hex(4)}"
         await self._iam_client.create_user(UserName=username)
-        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
+        keys = (await self._iam_client.create_access_key(UserName=username))[
+            "AccessKey"
+        ]
         policy_doc = self._permissions_to_policy_doc(
             [BucketPermission(bucket_name=bucket.name, write=write)]
         )
@@ -665,7 +678,9 @@ class SeaweedFSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations
             await self._iam_client.create_user(UserName=username)
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)
-        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
+        keys = (await self._iam_client.create_access_key(UserName=username))[
+            "AccessKey"
+        ]
         role = ProviderRole(
             name=username,
             provider_type=BucketsProviderType.SEAWEEDFS,
