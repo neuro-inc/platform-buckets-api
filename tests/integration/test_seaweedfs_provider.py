@@ -26,6 +26,8 @@ class TestSeaweedFSProvider(TestProviderBase):
         self,
         s3: AioBaseClient,
         iam: AioBaseClient,
+        sts: AioBaseClient,
+        s3_role: str,
         moto_server: MotoConfig,
     ) -> ProviderTestOption:
         return ProviderTestOption(
@@ -33,6 +35,8 @@ class TestSeaweedFSProvider(TestProviderBase):
             provider=SeaweedFSBucketProvider(
                 s3_client=s3,
                 iam_client=iam,
+                sts_client=sts,
+                s3_role_arn=s3_role,
                 region_name=moto_server.region_name,
                 public_url=moto_server.url,
             ),

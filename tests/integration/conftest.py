@@ -121,7 +121,9 @@ def seaweedfs_server(docker_ip: str, docker_services: Any) -> URL:
 
 
 @pytest.fixture
-def seaweedfs_provider_config(seaweedfs_server: URL) -> SeaweedFSProviderConfig:
+def seaweedfs_provider_config(
+    seaweedfs_server: URL, s3_role: str
+) -> SeaweedFSProviderConfig:
     # Credentials and bucket name match test docker-compose
     return SeaweedFSProviderConfig(
         endpoint_url=seaweedfs_server,
@@ -129,6 +131,7 @@ def seaweedfs_provider_config(seaweedfs_server: URL) -> SeaweedFSProviderConfig:
         access_key_id="admin",
         secret_access_key="devsecret",
         region_name="us-east-1",
+        s3_role_arn=s3_role,
     )
 
 
