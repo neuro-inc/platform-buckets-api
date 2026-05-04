@@ -255,7 +255,7 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
     def __init__(
         self,
         s3_client: AioBaseClient,
-        sts_client: AioBaseClient,
+        sts_client: AioBaseClient | None,  # Accept None for providers that do not use STS
         s3_role_arn: str,
         session_duration_s: int = 3600,
         public_url: URL | None = None,
@@ -406,21 +406,19 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         return bucket
 
     async def create_role(
-        self, username: str, initial_permissions: Iterable[BucketPermission]
+        self, username: str, initial_permissions: Iterable[BucketPermission], permissions_boundary: str | None = None
     ) -> ProviderRole:
+        create_user_kwargs = {"UserName": username}
+        if permissions_boundary is not None:
+            create_user_kwargs["PermissionsBoundary"] = permissions_boundary
         try:
-            await self._iam_client.create_user(
-                UserName=username,
-                PermissionsBoundary=self._permissions_boundary,
-            )
+            await self._iam_client.create_user(**create_user_kwargs)
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)
-        keys = (await self._iam_client.create_access_key(UserName=username))[
-            "AccessKey"
-        ]
+        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
         role = ProviderRole(
             name=username,
-            provider_type=BucketsProviderType.AWS,
+            provider_type=self.provider_type,
             credentials={
                 **self._get_basic_credentials_data(),
                 "access_key_id": keys["AccessKeyId"],
@@ -435,18 +433,19 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         self, role: ProviderRole, permissions: Iterable[BucketPermission]
     ) -> None:
         policy_doc = self._permissions_to_policy_doc(permissions)
+        policy_name = f"{role.name}-s3-policy"
         if not policy_doc["Statement"]:
             try:
                 await self._iam_client.delete_user_policy(
                     UserName=role.name,
-                    PolicyName=f"{role.name}-s3-policy",
+                    PolicyName=policy_name,
                 )
             except botocore.exceptions.ClientError:
-                pass  # Used doesn't have any policy
+                pass
         else:
             await self._iam_client.put_user_policy(
                 UserName=role.name,
-                PolicyName=f"{role.name}-s3-policy",
+                PolicyName=policy_name,
                 PolicyDocument=json.dumps(policy_doc),
             )
 
@@ -457,18 +456,16 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
                 PolicyName=f"{role.name}-s3-policy",
             )
         except botocore.exceptions.ClientError:
-            pass  # Used doesn't have any policy
+            pass
         try:
-            resp = await self._iam_client.list_access_keys(
-                UserName=role.name,
-            )
+            resp = await self._iam_client.list_access_keys(UserName=role.name)
             for key in resp["AccessKeyMetadata"]:
                 await self._iam_client.delete_access_key(
                     UserName=role.name,
                     AccessKeyId=key["AccessKeyId"],
                 )
         except botocore.exceptions.ClientError:
-            pass  # Used doesn't have any policy
+            pass
         await self._iam_client.delete_user(UserName=role.name)
 
 
@@ -597,7 +594,7 @@ class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         await self._mc.admin_user_remove(username=role.name)
 
 
-class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
+class SeaweedFSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
     provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.SEAWEEDFS
 
     def __init__(
@@ -607,50 +604,18 @@ class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
         region_name: str,
         public_url: URL,
     ) -> None:
-        super().__init__(s3_client)
+        super().__init__(
+            s3_client=s3_client,
+            sts_client=None,  # Not used for SeaweedFS
+            s3_role_arn="",  # Not used for SeaweedFS
+            session_duration_s=3600,
+            public_url=public_url,
+        )
         self._iam_client = iam_client
-        self._region_name = region_name
-        self._public_url = str(public_url)
-
-    def _get_base_credentials(self) -> dict[str, str]:
-        return {
-            "region_name": self._region_name,
-            "endpoint_url": self._public_url,
-        }
-
-    def _permissions_to_policy_doc(
-        self, permissions: Iterable[BucketPermission]
-    ) -> Mapping[str, Any]:
-        permissions_list = list(permissions)
-
-        def _bucket_arn(perm: BucketPermission) -> str:
-            return f"arn:aws:s3:::{perm.bucket_name}"
-
-        statements = [
-            {
-                "Effect": "Allow",
-                "Action": ["s3:ListBucket"],
-                "Resource": [_bucket_arn(p) for p in permissions_list],
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["s3:GetObject"],
-                "Resource": [
-                    f"{_bucket_arn(p)}/*" for p in permissions_list if not p.write
-                ],
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-                "Resource": [
-                    f"{_bucket_arn(p)}/*" for p in permissions_list if p.write
-                ],
-            },
-        ]
-        statements = [s for s in statements if s["Resource"]]
-        return {"Version": "2012-10-17", "Statement": statements}
 
     async def create_bucket(self, name: str) -> ProviderBucket:
+        # SeaweedFS S3 API does not support the ACL argument in create_bucket.
+        # This override omits ACL="private" to avoid errors on bucket creation.
         try:
             await self._s3_client.head_bucket(Bucket=name)
             raise BucketExistsError
@@ -667,7 +632,9 @@ class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
 
     async def delete_bucket(self, name: str) -> None:
         try:
-            await self._s3_client.delete_bucket(Bucket=name)
+            await self._s3_client.delete_bucket(
+                Bucket=name,
+            )
         except self._s3_client.exceptions.NoSuchBucket:
             raise BucketNotExistsError(name)
 
@@ -676,9 +643,7 @@ class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
     ) -> Mapping[str, str]:
         username = f"tmp-{bucket.name[:20]}-{secrets.token_hex(4)}"
         await self._iam_client.create_user(UserName=username)
-        keys = (await self._iam_client.create_access_key(UserName=username))[
-            "AccessKey"
-        ]
+        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
         policy_doc = self._permissions_to_policy_doc(
             [BucketPermission(bucket_name=bucket.name, write=write)]
         )
@@ -688,7 +653,7 @@ class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
             PolicyDocument=json.dumps(policy_doc),
         )
         return {
-            **self._get_base_credentials(),
+            **self._get_basic_credentials_data(),
             "access_key_id": keys["AccessKeyId"],
             "secret_access_key": keys["SecretAccessKey"],
         }
@@ -700,14 +665,12 @@ class SeaweedFSBucketProvider(BucketProvider, AWSLikeUserBucketOperations):
             await self._iam_client.create_user(UserName=username)
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)
-        keys = (await self._iam_client.create_access_key(UserName=username))[
-            "AccessKey"
-        ]
+        keys = (await self._iam_client.create_access_key(UserName=username))["AccessKey"]
         role = ProviderRole(
             name=username,
             provider_type=BucketsProviderType.SEAWEEDFS,
             credentials={
-                **self._get_base_credentials(),
+                **self._get_basic_credentials_data(),
                 "access_key_id": keys["AccessKeyId"],
                 "secret_access_key": keys["SecretAccessKey"],
             },

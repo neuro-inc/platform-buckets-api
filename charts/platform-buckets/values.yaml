@@ -29,24 +29,12 @@ bucketProvider: {}
 #    endpointUrl:
 #    s3EndpointUrl:
 #    regionName:
-
-# --- SeaweedFS S3 provider (active) ---
-type: "seaweedfs"
-seaweedfs:
-  url: http://seaweedfs-s3:9000         # internal S3 endpoint
-  publicUrl: http://seaweedfs-s3:9000   # public-facing S3 URL (same as above in-cluster)
-  regionName: "us-east-1"
-  accessKeyId:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_access_key_id
-  secretAccessKey:
-    valueFrom:
-      secretKeyRef:
-        name: seaweedfs-s3-secret
-        key: admin_secret_access_key
-
+#  seaweedfs:
+#    url:
+#    publicUrl:
+#    regionName:
+#    accessKeyId:
+#    secretAccessKey:
 
 image:
   repository: $IMAGE_REPO
