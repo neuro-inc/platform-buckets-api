@@ -35,6 +35,7 @@ bucketProvider: {}
 #    regionName:
 #    accessKeyId:
 #    secretAccessKey:
+#    s3RoleArn:
 
 image:
   repository: $IMAGE_REPO

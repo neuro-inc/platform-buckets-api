@@ -97,6 +97,7 @@ class SeaweedFSProviderConfig:
     region_name: str
     endpoint_url: URL
     endpoint_public_url: URL
+    s3_role_arn: str = field(repr=False)
 
 
 @dataclass(frozen=True)

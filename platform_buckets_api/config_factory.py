@@ -135,6 +135,7 @@ class EnvironConfigFactory:
                 endpoint_public_url=URL(
                     self._environ["NP_SEAWEEDFS_ENDPOINT_PUBLIC_URL"]
                 ),
+                s3_role_arn=self._environ["NP_SEAWEEDFS_S3_ROLE_ARN"],
             )
         else:
             raise ValueError(f"Unknown bucket provider type {type_}")

@@ -168,6 +168,8 @@ spec:
           {{- toYaml .Values.bucketProvider.seaweedfs.secretAccessKey | nindent 10 }}
         - name: NP_SEAWEEDFS_REGION_NAME
           value: {{ .Values.bucketProvider.seaweedfs.regionName | default "us-east-1" }}
+        - name: NP_SEAWEEDFS_S3_ROLE_ARN
+          value: {{ .Values.bucketProvider.seaweedfs.s3RoleArn }}
         {{- end }}
         # End of providers
         {{- if .Values.sentry }}

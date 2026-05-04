@@ -1103,9 +1103,14 @@ async def create_app(
                     iam_client = await exit_stack.enter_async_context(
                         session.create_client("iam", **client_kwargs)
                     )
+                    sts_client = await exit_stack.enter_async_context(
+                        session.create_client("sts", **client_kwargs)
+                    )
                     bucket_provider = SeaweedFSBucketProvider(
                         s3_client=s3_client,
                         iam_client=iam_client,
+                        sts_client=sts_client,
+                        s3_role_arn=config.bucket_provider.s3_role_arn,
                         region_name=config.bucket_provider.region_name,
                         public_url=config.bucket_provider.endpoint_public_url,
                     )
