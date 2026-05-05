@@ -625,6 +625,30 @@ class SeaweedFSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations
     provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.SEAWEEDFS
     _use_bucket_acl: ClassVar[bool] = False
 
+    async def get_bucket_credentials(
+        self, bucket: ProviderBucket, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        raise NotImplementedError(
+            "SeaweedFS does not support temporary credentials (STS/AssumeRole)."
+        )
+
+    async def create_role(
+        self, username: str, initial_permissions: Iterable[BucketPermission]
+    ) -> ProviderRole:
+        raise NotImplementedError(
+            "SeaweedFS does not support persistent credentials (IAM/CreateUser)."
+        )
+
+    async def set_role_permissions(
+        self, role: ProviderRole, permissions: Iterable[BucketPermission]
+    ) -> None:
+        raise NotImplementedError(
+            "SeaweedFS does not support role permission management."
+        )
+
+    async def delete_role(self, role: ProviderRole) -> None:
+        raise NotImplementedError("SeaweedFS does not support role deletion.")
+
     def __init__(
         self,
         s3_client: AioBaseClient,

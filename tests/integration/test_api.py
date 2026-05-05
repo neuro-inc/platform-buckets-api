@@ -202,7 +202,7 @@ class TestApi:
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test-bucket"
-        assert payload["provider"] in ("aws", "minio")
+        assert payload["provider"] in ("aws", "minio", "seaweedfs")
         assert payload["owner"] == regular_user.name
         assert payload["project_name"] == project_name
         assert payload["org_name"] == org_name
@@ -252,7 +252,7 @@ class TestApi:
         after = utc_now()
         assert "id" in payload
         assert payload["name"] == "test-bucket"
-        assert payload["provider"] in ("aws", "minio")
+        assert payload["provider"] in ("aws", "minio", "seaweedfs")
         assert payload["owner"] == regular_user.name
         assert payload["org_name"] == org_name
         assert not payload["imported"]
