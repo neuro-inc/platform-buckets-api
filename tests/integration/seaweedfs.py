@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="session")
 def seaweedfs_container_image() -> str:
-    return "chrislusf/seaweedfs:1.9.8"
+    return "chrislusf/seaweedfs:4.23"
 
 
 @pytest.fixture(scope="session")
