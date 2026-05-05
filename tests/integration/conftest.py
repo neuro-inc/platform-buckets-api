@@ -3,7 +3,6 @@ import logging
 import secrets
 import subprocess
 import time
-import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ from apolo_events_client import EventsClientConfig
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import (
     AWSProviderConfig,
+    BucketsProviderType,
     Config,
     KubeConfig,
     MinioProviderConfig,
@@ -286,6 +286,5 @@ def project_name() -> str:
 
 
 @pytest.fixture
-def is_seaweedfs() -> bool:
-    """Detect if the current provider is SeaweedFS."""
-    return os.environ.get("BUCKETS_PROVIDER_TYPE", "").upper() == "SEAWEEDFS"
+def is_seaweedfs(config: Config) -> bool:
+    return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS
