@@ -23,6 +23,7 @@ from platform_buckets_api.config import (
     KubeConfig,
     MinioProviderConfig,
     PlatformAuthConfig,
+    SeaweedFSProviderConfig,
     ServerConfig,
 )
 
@@ -34,6 +35,7 @@ pytest_plugins = [
     "tests.integration.auth",
     "tests.integration.moto_server",
     "tests.integration.minio",
+    "tests.integration.seaweedfs",
     "tests.integration.kube",
 ]
 
@@ -111,12 +113,13 @@ def config_factory(
     return _f
 
 
-@pytest.fixture(params=["aws-moto", "minio"])
+@pytest.fixture(params=["aws-moto", "minio", "seaweedfs"])
 def config(
     request: Any,
     config_factory: Callable[..., Config],
     moto_server: MotoConfig,
     minio_server: URL,
+    seaweedfs_server: URL,
 ) -> Config:
     if request.param == "aws-moto":
         return config_factory()  # Moto is by default
@@ -128,6 +131,17 @@ def config(
                 access_key_id="access_key",
                 secret_access_key="secret_key",
                 region_name="region-1",
+            )
+        )
+    elif request.param == "seaweedfs":
+        return config_factory(
+            bucket_provider=SeaweedFSProviderConfig(
+                endpoint_url=seaweedfs_server,
+                endpoint_public_url=seaweedfs_server,
+                access_key_id="root",
+                secret_access_key="root",
+                region_name="us-east-1",
+                s3_role_arn="arn:aws:iam::123456789012:role/s3-role",
             )
         )
     raise Exception(f"Unknown bucket provider {request.param}.")

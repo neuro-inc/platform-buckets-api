@@ -9,7 +9,10 @@ from platform_buckets_api.storage import ProviderBucket, ProviderRole
 
 
 class MockBucketProvider(BucketProvider):
-    def __init__(self) -> None:
+    def __init__(
+        self, provider_type: BucketsProviderType = BucketsProviderType.AWS
+    ) -> None:
+        self._provider_type = provider_type
         self.created_roles: list[ProviderRole] = []
         self.deleted_roles: list[str] = []
         self.created_buckets: list[ProviderBucket] = []
@@ -19,7 +22,7 @@ class MockBucketProvider(BucketProvider):
 
     async def create_bucket(self, name: str) -> ProviderBucket:
         bucket = ProviderBucket(
-            provider_type=BucketsProviderType.AWS,
+            provider_type=self._provider_type,
             name=name,
         )
         self.created_buckets.append(bucket)
@@ -38,7 +41,7 @@ class MockBucketProvider(BucketProvider):
     ) -> ProviderRole:
         role = ProviderRole(
             name=username,
-            provider_type=BucketsProviderType.AWS,
+            provider_type=self._provider_type,
             credentials={"token": "value"},
         )
         self.created_roles.append(role)

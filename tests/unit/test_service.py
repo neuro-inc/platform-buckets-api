@@ -49,7 +49,7 @@ class TestBucketsService:
 
     @pytest.fixture
     def mock_provider(self) -> MockBucketProvider:
-        return MockBucketProvider()
+        return MockBucketProvider(provider_type=BucketsProviderType.AWS)
 
     @pytest.fixture
     def service(
@@ -552,3 +552,63 @@ class TestPersistentCredentialsService:
         )
         perms = mock_provider.role_to_permissions[credentials.role.name]
         assert all(_check_access(perms, bucket, write=True) for bucket in all_buckets)
+
+
+class TestBucketsServiceSeaweedFS:
+    @pytest.fixture
+    def mock_permissions_service(self) -> MockPermissionsService:
+        return MockPermissionsService()
+
+    @pytest.fixture
+    def mock_provider(self) -> MockBucketProvider:
+        return MockBucketProvider(provider_type=BucketsProviderType.SEAWEEDFS)
+
+    @pytest.fixture
+    def service(
+        self,
+        in_memory_buckets_storage: BucketsStorage,
+        mock_permissions_service: MockPermissionsService,
+        mock_provider: MockBucketProvider,
+    ) -> BucketsService:
+        return BucketsService(
+            storage=in_memory_buckets_storage,
+            bucket_provider=mock_provider,
+            permissions_service=mock_permissions_service,
+        )
+
+    async def test_bucket_create(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.create_bucket(
+            owner="test-user",
+            project_name="test-project",
+            name="test-bucket",
+            org_name="test-org",
+        )
+        assert bucket.owner == "test-user"
+        assert bucket.project_name == "test-project"
+        assert mock_provider.created_buckets == [bucket.provider_bucket]
+        assert "test-org" in bucket.provider_bucket.name
+        assert "test-project" in bucket.provider_bucket.name
+        assert "test-" in bucket.provider_bucket.name
+        assert bucket.provider_bucket.provider_type == BucketsProviderType.SEAWEEDFS
+
+    async def test_bucket_import_seaweedfs(
+        self, service: BucketsService, mock_provider: MockBucketProvider
+    ) -> None:
+        bucket = await service.import_bucket(
+            owner="test-user",
+            project_name="test-project",
+            provider_bucket_name="seaweedfs-bucket",
+            provider_type=BucketsProviderType.SEAWEEDFS,
+            credentials={"key": "value"},
+            name="test-bucket",
+            org_name="test-org",
+        )
+        assert bucket.name == "test-bucket"
+        assert bucket.owner == "test-user"
+        assert bucket.project_name == "test-project"
+        assert bucket.provider_bucket.name == "seaweedfs-bucket"
+        assert bucket.provider_bucket.provider_type == BucketsProviderType.SEAWEEDFS
+        assert bucket.credentials == {"key": "value"}
+        assert bucket.imported
