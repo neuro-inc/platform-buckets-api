@@ -319,6 +319,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         project_name: str,
+        is_seaweedfs: bool,
     ) -> None:
         create_resp = await make_bucket("test-bucket", regular_user)
         async with client.post(
@@ -329,12 +330,20 @@ class TestApi:
                 "project_name": create_resp["project_name"],
             },
         ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload["bucket_id"] == create_resp["id"]
-            assert payload["provider"] == create_resp["provider"]
-            assert not payload["read_only"]
-            assert project_name in payload["credentials"]["bucket_name"]
+            if is_seaweedfs:
+                assert resp.status == 501, await resp.text()
+                payload = await resp.json()
+                assert (
+                    "SeaweedFS does not support temporary credentials"
+                    in payload["error"]
+                )
+            else:
+                assert resp.status == HTTPOk.status_code, await resp.text()
+                payload = await resp.json()
+                assert payload["bucket_id"] == create_resp["id"]
+                assert payload["provider"] == create_resp["provider"]
+                assert not payload["read_only"]
+                assert project_name in payload["credentials"]["bucket_name"]
 
     async def test_make_bucket_tmp_credentials_readonly(
         self,
@@ -345,6 +354,7 @@ class TestApi:
         grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
         org_name: str,
+        is_seaweedfs: bool,
     ) -> None:
         create_resp = await make_bucket(
             "test-bucket",
@@ -363,12 +373,20 @@ class TestApi:
                 "project_name": create_resp["project_name"],
             },
         ) as resp:
-            assert resp.status == HTTPOk.status_code, await resp.text()
-            payload = await resp.json()
-            assert payload["bucket_id"] == create_resp["id"]
-            assert payload["provider"] == create_resp["provider"]
-            assert payload["read_only"]
-            assert regular_user.name in payload["credentials"]["bucket_name"]
+            if is_seaweedfs:
+                assert resp.status == 501, await resp.text()
+                payload = await resp.json()
+                assert (
+                    "SeaweedFS does not support temporary credentials"
+                    in payload["error"]
+                )
+            else:
+                assert resp.status == HTTPOk.status_code, await resp.text()
+                payload = await resp.json()
+                assert payload["bucket_id"] == create_resp["id"]
+                assert payload["provider"] == create_resp["provider"]
+                assert payload["read_only"]
+                assert regular_user.name in payload["credentials"]["bucket_name"]
 
     async def test_imported_bucket_tmp_credentials(
         self,
@@ -1424,3 +1442,12 @@ class TestApi:
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
+
+    @pytest.fixture()
+    def is_seaweedfs(config) -> bool:
+        """Return True if the current provider is SeaweedFS."""
+        from platform_buckets_api.config import SeaweedFSProviderConfig
+
+        return isinstance(
+            getattr(config, "bucket_provider", None), SeaweedFSProviderConfig
+        )

@@ -871,6 +871,9 @@ async def handle_exceptions(
     except ValueError as e:
         payload = {"error": str(e)}
         return json_response(payload, status=HTTPBadRequest.status_code)
+    except NotImplementedError as e:
+        payload = {"error": str(e)}
+        return json_response(payload, status=501)
     except aiohttp.web.HTTPException:
         raise
     except Exception as e:
