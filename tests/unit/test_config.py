@@ -129,17 +129,17 @@ def test_create_minio() -> None:
         "NP_BUCKET_PROVIDER_TYPE": "minio",
         "NP_MINIO_ACCESS_KEY_ID": "key-id",
         "NP_MINIO_SECRET_ACCESS_KEY": "key-secret",
-        "NP_MINIO_REGION_NAME": "region",
-        "NP_MINIO_ENDPOINT_URL": "https://play.min.io",
-        "NP_MINIO_ENDPOINT_PUBLIC_URL": "https://public.play.min.io",
+        "NP_MINIO_REGION_NAME": "us-east-1",
+        "NP_MINIO_ENDPOINT_URL": "http://seaweedfs-s3.platform.svc.cluster.local:9000",
+        "NP_MINIO_ENDPOINT_PUBLIC_URL": "http://seaweedfs-s3.platform.svc.cluster.local:9000",
     }
     config = EnvironConfigFactory(environ).create_bucket_provider()
     assert config == MinioProviderConfig(
         access_key_id="key-id",
         secret_access_key="key-secret",
-        region_name="region",
-        endpoint_url=URL("https://play.min.io"),
-        endpoint_public_url=URL("https://public.play.min.io"),
+        region_name="us-east-1",
+        endpoint_url=URL("http://seaweedfs-s3.platform.svc.cluster.local:9000"),
+        endpoint_public_url=URL("http://seaweedfs-s3.platform.svc.cluster.local:9000"),
     )
 
 
