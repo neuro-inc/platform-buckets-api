@@ -19,13 +19,6 @@ from .conftest import BucketsApiEndpoints
 
 
 class TestProjectDeleterIntegration:
-    @pytest.fixture()
-    def is_seaweedfs(self, config) -> bool:
-        """Return True if the current provider is SeaweedFS."""
-        from platform_buckets_api.config import BucketsProviderType
-
-        return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS
-
     async def test_project_remove_deletes_buckets_and_credentials(
         self,
         client: aiohttp.ClientSession,
