@@ -1446,8 +1446,6 @@ class TestApi:
     @pytest.fixture()
     def is_seaweedfs(config) -> bool:
         """Return True if the current provider is SeaweedFS."""
-        from platform_buckets_api.config import SeaweedFSProviderConfig
+        from platform_buckets_api.config import BucketsProviderType
 
-        return isinstance(
-            getattr(config, "bucket_provider", None), SeaweedFSProviderConfig
-        )
+        return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS

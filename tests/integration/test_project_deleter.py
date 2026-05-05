@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import aiohttp
+import pytest
 from apolo_events_client import (
     Ack,
     EventType,
@@ -18,6 +19,13 @@ from .conftest import BucketsApiEndpoints
 
 
 class TestProjectDeleterIntegration:
+    @pytest.fixture()
+    def is_seaweedfs(self, config) -> bool:
+        """Return True if the current provider is SeaweedFS."""
+        from platform_buckets_api.config import BucketsProviderType
+
+        return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS
+
     async def test_project_remove_deletes_buckets_and_credentials(
         self,
         client: aiohttp.ClientSession,
@@ -26,8 +34,12 @@ class TestProjectDeleterIntegration:
         events_queues: EventsQueues,
         org_name: str,
         project_name: str,
+        is_seaweedfs: bool,
     ) -> None:
         """Test that project-remove event deletes buckets and their credentials."""
+        if is_seaweedfs:
+            pytest.skip("SeaweedFS does not support persistent credentials")
+
         user = await regular_user_factory(org_name=org_name)
 
         # Create bucket
