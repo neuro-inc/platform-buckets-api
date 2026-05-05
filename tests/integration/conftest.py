@@ -3,6 +3,7 @@ import logging
 import secrets
 import subprocess
 import time
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -282,3 +283,9 @@ def org_name() -> str:
 @pytest.fixture
 def project_name() -> str:
     return "test-project"
+
+
+@pytest.fixture
+def is_seaweedfs() -> bool:
+    """Detect if the current provider is SeaweedFS."""
+    return os.environ.get("BUCKETS_PROVIDER_TYPE", "").upper() == "SEAWEEDFS"

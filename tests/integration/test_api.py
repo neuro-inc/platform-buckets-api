@@ -1442,11 +1442,3 @@ class TestApi:
             headers=regular_user2.headers,
         ) as resp:
             assert resp.status == HTTPNotFound.status_code, await resp.text()
-
-
-@pytest.fixture()
-def is_seaweedfs(config: Any) -> bool:
-    """Return True if the current provider is SeaweedFS."""
-    from platform_buckets_api.config import BucketsProviderType
-
-    return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS
