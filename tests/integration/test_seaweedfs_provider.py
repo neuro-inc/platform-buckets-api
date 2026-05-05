@@ -58,4 +58,7 @@ class TestSeaweedFSProvider(TestProviderBase):
                 "secret_access_key": "root",
                 "region_name": "us-east-1",
             },
+            bucket_exists_reliable=False,
+            temporary_credentials_supported=False,
+            persistent_credentials_supported=False,
         )

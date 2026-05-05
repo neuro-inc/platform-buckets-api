@@ -60,6 +60,12 @@ class MotoConfig:
     admin_secret_access_key: str
 
 
+@dataclass(frozen=True)
+class ProviderCapabilities:
+    temporary_credentials_supported: bool = True
+    persistent_credentials_supported: bool = True
+
+
 @pytest.fixture()
 async def s3_role(iam: AioBaseClient, moto_server: MotoConfig) -> str:
     assume_doc = {
@@ -286,5 +292,18 @@ def project_name() -> str:
 
 
 @pytest.fixture
-def is_seaweedfs(config: Config) -> bool:
-    return config.bucket_provider.type == BucketsProviderType.SEAWEEDFS
+def provider_capabilities(config: Config) -> ProviderCapabilities:
+    if config.bucket_provider.type == BucketsProviderType.SEAWEEDFS:
+        return ProviderCapabilities(
+            temporary_credentials_supported=False,
+            persistent_credentials_supported=False,
+        )
+    return ProviderCapabilities()
+
+
+@pytest.fixture
+def persistent_credentials_supported(
+    provider_capabilities: ProviderCapabilities,
+) -> None:
+    if not provider_capabilities.persistent_credentials_supported:
+        pytest.skip("SeaweedFS does not support persistent credentials")

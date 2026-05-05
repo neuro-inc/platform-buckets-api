@@ -22,7 +22,7 @@ from yarl import URL
 from platform_buckets_api.utils import utc_now
 
 from .auth import UserFactory, _User
-from .conftest import BucketsApiEndpoints
+from .conftest import BucketsApiEndpoints, ProviderCapabilities
 
 
 @pytest.fixture
@@ -319,7 +319,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         project_name: str,
-        is_seaweedfs: bool,
+        provider_capabilities: ProviderCapabilities,
     ) -> None:
         create_resp = await make_bucket("test-bucket", regular_user)
         async with client.post(
@@ -330,7 +330,7 @@ class TestApi:
                 "project_name": create_resp["project_name"],
             },
         ) as resp:
-            if is_seaweedfs:
+            if not provider_capabilities.temporary_credentials_supported:
                 assert resp.status == 501, await resp.text()
                 payload = await resp.json()
                 assert (
@@ -354,7 +354,7 @@ class TestApi:
         grant_project_permission: Callable[[_User, str, str, str], Awaitable[None]],
         make_bucket: BucketFactory,
         org_name: str,
-        is_seaweedfs: bool,
+        provider_capabilities: ProviderCapabilities,
     ) -> None:
         create_resp = await make_bucket(
             "test-bucket",
@@ -373,7 +373,7 @@ class TestApi:
                 "project_name": create_resp["project_name"],
             },
         ) as resp:
-            if is_seaweedfs:
+            if not provider_capabilities.temporary_credentials_supported:
                 assert resp.status == 501, await resp.text()
                 payload = await resp.json()
                 assert (
@@ -827,6 +827,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1098,6 +1099,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1146,6 +1148,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactoryWithReadOnly,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1194,6 +1197,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1215,6 +1219,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1248,6 +1253,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1279,6 +1285,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         headers = {"Accept": "application/x-ndjson"}
         async with client.get(
@@ -1324,6 +1331,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1350,6 +1358,7 @@ class TestApi:
         regular_user: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1390,6 +1399,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1410,6 +1420,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)
@@ -1431,6 +1442,7 @@ class TestApi:
         regular_user2: _User,
         make_bucket: BucketFactory,
         make_credentials: CredentialsFactory,
+        persistent_credentials_supported: None,
     ) -> None:
         bucket1 = await make_bucket("test-bucket1", regular_user)
         bucket2 = await make_bucket("test-bucket2", regular_user)

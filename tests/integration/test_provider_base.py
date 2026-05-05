@@ -64,6 +64,21 @@ class ProviderTestOption:
     role_exists: Callable[[str], Awaitable[bool]]
     get_public_url: Callable[[str, str], URL]
     credentials_for_imported: Mapping[str, str]
+    bucket_exists_reliable: bool = True
+    temporary_credentials_supported: bool = True
+    persistent_credentials_supported: bool = True
+
+    def skip_if_bucket_exists_unreliable(self) -> None:
+        if not self.bucket_exists_reliable:
+            pytest.skip(f"{self.type} provider has unreliable bucket existence checks")
+
+    def skip_if_no_temporary_credentials(self) -> None:
+        if not self.temporary_credentials_supported:
+            pytest.skip(f"{self.type} provider does not support temporary credentials")
+
+    def skip_if_no_persistent_credentials(self) -> None:
+        if not self.persistent_credentials_supported:
+            pytest.skip(f"{self.type} provider does not support persistent credentials")
 
 
 def as_admin_cm(
@@ -142,8 +157,7 @@ class TestProviderBase:
     __test__ = False
 
     async def test_bucket_create(self, provider_option: ProviderTestOption) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS bucket_exists check not working correctly")
+        provider_option.skip_if_bucket_exists_unreliable()
         name = _make_bucket_name()
         bucket = await provider_option.provider.create_bucket(name)
         assert bucket.name == name
@@ -173,8 +187,7 @@ class TestProviderBase:
     async def test_bucket_credentials_write_access(
         self, provider_option: ProviderTestOption
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support temporary credentials")
+        provider_option.skip_if_no_temporary_credentials()
         bucket = await provider_option.provider.create_bucket(_make_bucket_name())
         credentials = await provider_option.provider.get_bucket_credentials(
             bucket, write=True, requester="testing"
@@ -286,8 +299,7 @@ class TestProviderBase:
         provider_option: ProviderTestOption,
         sample_role_permissions: list[BucketPermission],
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         name = _make_role_name()
         role = await provider_option.provider.create_role(name, sample_role_permissions)
         assert name in role.name
@@ -298,8 +310,7 @@ class TestProviderBase:
         provider_option: ProviderTestOption,
         sample_role_permissions: list[BucketPermission],
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         name1, name2 = _make_role_name(), _make_role_name()
         role1 = await provider_option.provider.create_role(
             name1, sample_role_permissions
@@ -315,8 +326,7 @@ class TestProviderBase:
         provider_option: ProviderTestOption,
         sample_role_permissions: list[BucketPermission],
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         name = _make_role_name()
         await provider_option.provider.create_role(name, sample_role_permissions)
         with pytest.raises(RoleExistsError):
@@ -327,8 +337,7 @@ class TestProviderBase:
         provider_option: ProviderTestOption,
         sample_role_permissions: list[BucketPermission],
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         name = _make_role_name()
         role = await provider_option.provider.create_role(name, sample_role_permissions)
         await provider_option.provider.delete_role(role)
@@ -338,8 +347,7 @@ class TestProviderBase:
         self,
         provider_option: ProviderTestOption,
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         bucket = await provider_option.provider.create_bucket(_make_bucket_name())
         permissions = [
             BucketPermission(
@@ -380,8 +388,7 @@ class TestProviderBase:
     ) -> None:
         if provider_option.type == "azure":
             pytest.skip("Azure provider do not support multiple buckets roles")
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
 
         bucket1 = await provider_option.provider.create_bucket(_make_bucket_name())
         permissions = [
@@ -425,8 +432,7 @@ class TestProviderBase:
         self,
         provider_option: ProviderTestOption,
     ) -> None:
-        if provider_option.type == "seaweedfs":
-            pytest.skip("SeaweedFS does not support persistent credentials")
+        provider_option.skip_if_no_persistent_credentials()
         bucket = await provider_option.provider.create_bucket(_make_bucket_name())
         permissions = [
             BucketPermission(
