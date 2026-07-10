@@ -597,7 +597,7 @@ description = "Python bindings for the Brotli compression library"
 optional = false
 python-versions = "*"
 groups = ["main", "dev"]
-markers = "sys_platform != \"android\" and sys_platform != \"ios\" and platform_python_implementation == \"CPython\""
+markers = "platform_python_implementation == \"CPython\" and sys_platform != \"android\" and sys_platform != \"ios\""
 files = [
     {file = "brotli-1.2.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:99cfa69813d79492f0e5d52a20fd18395bc82e671d5d40bd5a91d13e75e468e8"},
     {file = "brotli-1.2.0-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:3ebe801e0f4e56d17cd386ca6600573e3706ce1845376307f5d2cbd32149b69a"},
@@ -1162,14 +1162,14 @@ files = [
 
 [[package]]
 name = "docker"
-version = "7.1.0"
+version = "7.2.0"
 description = "A Python library for the Docker Engine API."
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "docker-7.1.0-py3-none-any.whl", hash = "sha256:c96b93b7f0a746f9e77d325bcfb87422a3d8bd4f03136ae8a85b37f1898d5fc0"},
-    {file = "docker-7.1.0.tar.gz", hash = "sha256:ad8c70e6e3f8926cb8a92619b832b4ea5299e2831c14284663184e200546fa6c"},
+    {file = "docker-7.2.0-py3-none-any.whl", hash = "sha256:a3f45fdeb9165e2d25d9a1d02ddf3bc70fb572cf5ebbf9b58558c22caf29b71f"},
+    {file = "docker-7.2.0.tar.gz", hash = "sha256:cebb93773d334f778e023a7ee352a8d6e13ab1bd3b863a4d4a59dec897df43ac"},
 ]
 
 [package.dependencies]
@@ -3573,4 +3573,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "781e524b3a915ae6d5954cc5db013b6ab0086b8249fe15db839630e631b089c0"
+content-hash = "7c0c7e2a6f071312e0f834db71c9cbe91eeaa6ed10eb12b4a6e60fc82da70e69"
