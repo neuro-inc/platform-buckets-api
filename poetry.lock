@@ -299,14 +299,14 @@ yaml = ["PyYAML (>=3.10)"]
 
 [[package]]
 name = "apolo-events-client"
-version = "25.10.0"
+version = "26.7.1"
 description = "Apolo client for platform-events"
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "apolo_events_client-25.10.0-py3-none-any.whl", hash = "sha256:1df8d7dc109325fa2b62cc69e6402ac01cd6cfce5eefca767c558f7e85bd2fc6"},
-    {file = "apolo_events_client-25.10.0.tar.gz", hash = "sha256:5c60ae49337a8d328bc2f351290694d938714b6250da40ddcfc41573df84befe"},
+    {file = "apolo_events_client-26.7.1-py3-none-any.whl", hash = "sha256:f0a69a5dd9e1c3b1a328d6eb933c0687850262653fd1cd9477788938a32c329c"},
+    {file = "apolo_events_client-26.7.1.tar.gz", hash = "sha256:8ed676584bbe36c5bf00070f718045d38ac877e88c5f8169c37f1c8f098c0646"},
 ]
 
 [package.dependencies]
@@ -597,7 +597,7 @@ description = "Python bindings for the Brotli compression library"
 optional = false
 python-versions = "*"
 groups = ["main", "dev"]
-markers = "sys_platform != \"android\" and sys_platform != \"ios\" and platform_python_implementation == \"CPython\""
+markers = "platform_python_implementation == \"CPython\" and sys_platform != \"android\" and sys_platform != \"ios\""
 files = [
     {file = "brotli-1.2.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:99cfa69813d79492f0e5d52a20fd18395bc82e671d5d40bd5a91d13e75e468e8"},
     {file = "brotli-1.2.0-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:3ebe801e0f4e56d17cd386ca6600573e3706ce1845376307f5d2cbd32149b69a"},
@@ -3573,4 +3573,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "fd79deecc3e45440932a28c84b700303bcd639d66756adc5644a06093630fa7d"
+content-hash = "cac1c9e43b40a74a277b73ae05bfb9e284d853d7cc4ffde916549d06877b7bb5"
