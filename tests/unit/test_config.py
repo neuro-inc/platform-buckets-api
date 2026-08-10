@@ -17,6 +17,7 @@ from platform_buckets_api.config import (
     MinioProviderConfig,
     OpenStackProviderConfig,
     PlatformAuthConfig,
+    SeaweedFSProviderConfig,
     ServerConfig,
 )
 from platform_buckets_api.config_factory import EnvironConfigFactory
@@ -140,6 +141,26 @@ def test_create_minio() -> None:
         region_name="us-east-1",
         endpoint_url=URL("http://seaweedfs-s3.platform.svc.cluster.local:9000"),
         endpoint_public_url=URL("http://seaweedfs-s3.platform.svc.cluster.local:9000"),
+    )
+
+
+def test_create_seaweedfs() -> None:
+    environ: dict[str, Any] = {
+        "NP_BUCKET_PROVIDER_TYPE": "seaweedfs",
+        "NP_SEAWEEDFS_ACCESS_KEY_ID": "key-id",
+        "NP_SEAWEEDFS_SECRET_ACCESS_KEY": "key-secret",
+        "NP_SEAWEEDFS_ENDPOINT_URL": (
+            "http://seaweedfs-s3.platform.svc.cluster.local:9000"
+        ),
+        "NP_SEAWEEDFS_ENDPOINT_PUBLIC_URL": "https://s3.example.com",
+    }
+    config = EnvironConfigFactory(environ).create_bucket_provider()
+    assert config == SeaweedFSProviderConfig(
+        access_key_id="key-id",
+        secret_access_key="key-secret",
+        region_name="us-east-1",
+        endpoint_url=URL("http://seaweedfs-s3.platform.svc.cluster.local:9000"),
+        endpoint_public_url=URL("https://s3.example.com"),
     )
 
 

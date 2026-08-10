@@ -1,5 +1,5 @@
 bucketProvider: {}
-#  type: "aws"  # "aws" or "minio" or "azure" or "gcp" or "emc_ecs" or "open_stack"
+#  type: "aws"  # "aws", "minio", "seaweedfs", "azure", "gcp", "emc_ecs", or "open_stack"
 #  aws:
 #    s3RoleArn:
 #    accessKeyId:
@@ -7,6 +7,12 @@ bucketProvider: {}
 #    regionName:
 #    endpointUrl:
 #  minio:
+#    url:
+#    publicUrl:
+#    accessKeyId:
+#    secretAccessKey:
+#    regionName:
+#  seaweedfs:
 #    url:
 #    publicUrl:
 #    accessKeyId:
