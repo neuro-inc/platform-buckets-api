@@ -111,7 +111,11 @@ class UserBucketOperations(abc.ABC):
         bucket: ImportedBucket,
     ) -> AsyncIterator["UserBucketOperations"]:
         provider_type = bucket.provider_bucket.provider_type
-        if provider_type in (BucketsProviderType.AWS, BucketsProviderType.MINIO):
+        if provider_type in (
+            BucketsProviderType.AWS,
+            BucketsProviderType.MINIO,
+            BucketsProviderType.SEAWEEDFS,
+        ):
             session = aiobotocore.session.get_session()
             session._credentials = AioCredentials(
                 access_key=bucket.credentials["access_key_id"],
@@ -247,6 +251,7 @@ class AWSLikeUserBucketOperations(UserBucketOperations, ABC):
 
 class AWSLikeBucketProvider(BucketProvider, ABC):
     provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.AWS
+    _use_bucket_acl: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -274,10 +279,10 @@ class AWSLikeBucketProvider(BucketProvider, ABC):
             else:
                 raise
         try:
-            await self._s3_client.create_bucket(
-                Bucket=name,
-                ACL="private",
-            )
+            kwargs: dict[str, Any] = {"Bucket": name}
+            if self._use_bucket_acl:
+                kwargs["ACL"] = "private"
+            await self._s3_client.create_bucket(**kwargs)
         except self._s3_client.exceptions.BucketAlreadyExists:
             raise BucketExistsError
         return ProviderBucket(
@@ -381,9 +386,18 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         sts_client: AioBaseClient,
         s3_role_arn: str,
         session_duration_s: int = 3600,
-        permissions_boundary: str = "arn:aws:iam::aws:policy/AmazonS3FullAccess",
+        permissions_boundary: str | None = (
+            "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        ),
+        public_url: URL | None = None,
     ):
-        super().__init__(s3_client, sts_client, s3_role_arn, session_duration_s)
+        super().__init__(
+            s3_client,
+            sts_client,
+            s3_role_arn,
+            session_duration_s,
+            public_url=public_url,
+        )
         self._iam_client = iam_client
         self._permissions_boundary = permissions_boundary
 
@@ -405,10 +419,10 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         self, username: str, initial_permissions: Iterable[BucketPermission]
     ) -> ProviderRole:
         try:
-            await self._iam_client.create_user(
-                UserName=username,
-                PermissionsBoundary=self._permissions_boundary,
-            )
+            kwargs = {"UserName": username}
+            if self._permissions_boundary is not None:
+                kwargs["PermissionsBoundary"] = self._permissions_boundary
+            await self._iam_client.create_user(**kwargs)
         except self._iam_client.exceptions.EntityAlreadyExistsException:
             raise RoleExistsError(username)
         keys = (await self._iam_client.create_access_key(UserName=username))[
@@ -416,7 +430,7 @@ class AWSBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
         ]
         role = ProviderRole(
             name=username,
-            provider_type=BucketsProviderType.AWS,
+            provider_type=self.provider_type,
             credentials={
                 **self._get_basic_credentials_data(),
                 "access_key_id": keys["AccessKeyId"],
@@ -591,6 +605,69 @@ class MinioBucketProvider(AWSLikeBucketProvider, AWSLikeUserBucketOperations):
 
     async def delete_role(self, role: ProviderRole) -> None:
         await self._mc.admin_user_remove(username=role.name)
+
+
+class SeaweedFSBucketProvider(AWSBucketProvider):
+    provider_type: ClassVar[BucketsProviderType] = BucketsProviderType.SEAWEEDFS
+    _use_bucket_acl: ClassVar[bool] = False
+
+    def __init__(
+        self,
+        s3_client: AioBaseClient,
+        iam_client: AioBaseClient,
+        sts_client: AioBaseClient,
+        session_duration_s: int = 3600,
+        public_url: URL | None = None,
+        public_s3_client: AioBaseClient | None = None,
+    ) -> None:
+        super().__init__(
+            s3_client=s3_client,
+            iam_client=iam_client,
+            sts_client=sts_client,
+            s3_role_arn="",
+            session_duration_s=session_duration_s,
+            permissions_boundary=None,
+            public_url=public_url,
+        )
+        self._public_s3_client = public_s3_client or s3_client
+
+    async def create_bucket(self, name: str) -> ProviderBucket:
+        # SeaweedFS does not support the ACL argument used by the generic S3
+        # implementation, and bucket policies cover public access separately.
+        return await AWSLikeBucketProvider.create_bucket(self, name)
+
+    async def sign_url_for_blob(
+        self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600
+    ) -> URL:
+        if expires_in_sec > datetime.timedelta(days=7).total_seconds():
+            raise ValueError("S3 do not support signed urls for more then 7 days")
+        return URL(
+            await self._public_s3_client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": bucket.name, "Key": key},
+                ExpiresIn=expires_in_sec,
+            )
+        )
+
+    async def get_bucket_credentials(
+        self, bucket: ProviderBucket, write: bool, requester: str
+    ) -> Mapping[str, str]:
+        policy_doc = self._permissions_to_policy_doc(
+            [BucketPermission(bucket_name=bucket.name, write=write)]
+        )
+        name = f"{bucket.name}-{requester}"[:26] + secrets.token_hex(3)
+        res = await self._sts_client.get_federation_token(
+            Name=name,
+            Policy=json.dumps(policy_doc),
+            DurationSeconds=self._session_duration_s,
+        )
+        return {
+            **self._get_basic_credentials_data(),
+            "access_key_id": res["Credentials"]["AccessKeyId"],
+            "secret_access_key": res["Credentials"]["SecretAccessKey"],
+            "session_token": res["Credentials"]["SessionToken"],
+            "expiration": res["Credentials"]["Expiration"].isoformat(),
+        }
 
 
 def _container_policies_as_dict(policies: list[Any]) -> dict[str, Any]:

@@ -29,6 +29,7 @@ class BucketsProviderType(str, enum.Enum):
     GCP = "gcp"
     EMC_ECS = "emc_ecs"
     OPEN_STACK = "open_stack"
+    SEAWEEDFS = "seaweedfs"
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,16 @@ class OpenStackProviderConfig:
 
 
 @dataclass(frozen=True)
+class SeaweedFSProviderConfig:
+    type: ClassVar[BucketsProviderType] = BucketsProviderType.SEAWEEDFS
+    access_key_id: str = field(repr=False)
+    secret_access_key: str = field(repr=False)
+    region_name: str
+    endpoint_url: URL
+    endpoint_public_url: URL
+
+
+@dataclass(frozen=True)
 class Config:
     server: ServerConfig
     platform_auth: PlatformAuthConfig
@@ -101,6 +112,7 @@ class Config:
         | GCPProviderConfig
         | EMCECSProviderConfig
         | OpenStackProviderConfig
+        | SeaweedFSProviderConfig
     )
     events: EventsClientConfig | None = None
     enable_docs: bool = False
