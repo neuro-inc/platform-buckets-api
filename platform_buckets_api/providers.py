@@ -634,7 +634,16 @@ class SeaweedFSBucketProvider(AWSBucketProvider):
     async def create_bucket(self, name: str) -> ProviderBucket:
         # SeaweedFS does not support the ACL argument used by the generic S3
         # implementation, and bucket policies cover public access separately.
-        return await AWSLikeBucketProvider.create_bucket(self, name)
+        bucket = await AWSLikeBucketProvider.create_bucket(self, name)
+        try:
+            await self._s3_client.put_bucket_cors(
+                Bucket=name,
+                CORSConfiguration=self.CORS_CONFIG,
+            )
+        except Exception:
+            await self._s3_client.delete_bucket(Bucket=name)
+            raise
+        return bucket
 
     async def sign_url_for_blob(
         self, bucket: ProviderBucket, key: str, expires_in_sec: int = 3600

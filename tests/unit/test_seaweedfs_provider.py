@@ -17,6 +17,7 @@ def _client(endpoint_url: str = "http://seaweedfs:9000") -> MagicMock:
     client.meta.region_name = "us-east-1"
     client.head_bucket = AsyncMock()
     client.create_bucket = AsyncMock()
+    client.put_bucket_cors = AsyncMock()
     client.get_federation_token = AsyncMock()
     client.create_user = AsyncMock()
     client.create_access_key = AsyncMock()
@@ -63,6 +64,10 @@ async def test_create_bucket_does_not_send_acl() -> None:
         name="test-bucket", provider_type=BucketsProviderType.SEAWEEDFS
     )
     s3.create_bucket.assert_awaited_once_with(Bucket="test-bucket")
+    s3.put_bucket_cors.assert_awaited_once_with(
+        Bucket="test-bucket",
+        CORSConfiguration=provider.CORS_CONFIG,
+    )
 
 
 async def test_get_bucket_credentials_uses_federation_token() -> None:

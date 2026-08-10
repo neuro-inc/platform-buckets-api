@@ -303,3 +303,25 @@ class TestSeaweedFSProvider(TestProviderBase):
         async with ClientSession() as session:
             async with session.get(url) as response:
                 assert response.status == 403
+
+    async def test_bucket_cors_preflight(
+        self, provider_option: ProviderTestOption
+    ) -> None:
+        bucket = await provider_option.provider.create_bucket(_name("cors"))
+        url = provider_option.get_public_url(bucket.name, "object.txt")
+
+        async with ClientSession() as session:
+            async with session.options(
+                url,
+                headers={
+                    "Origin": "https://example.com",
+                    "Access-Control-Request-Method": "PUT",
+                    "Access-Control-Request-Headers": "content-type",
+                },
+            ) as response:
+                assert response.status == 200
+                assert (
+                    response.headers["Access-Control-Allow-Origin"]
+                    == "https://example.com"
+                )
+                assert "PUT" in response.headers["Access-Control-Allow-Methods"]
