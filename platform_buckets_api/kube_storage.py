@@ -2,9 +2,9 @@ from collections.abc import AsyncIterator
 
 from apolo_kube_client import (
     KubeClient,
+    KubeClientSelector,
     ResourceExists,
     ResourceNotFound,
-    KubeClientSelector,
 )
 
 from platform_buckets_api.kube_utils import (
@@ -23,10 +23,10 @@ from platform_buckets_api.storage import (
 from platform_buckets_api.utils.asyncio import asyncgeneratorcontextmanager
 
 from .kube_utils import (
-    ID_LABEL,
     BUCKET_NAME_LABEL,
-    OWNER_LABEL,
     CREDENTIALS_NAME_LABEL,
+    ID_LABEL,
+    OWNER_LABEL,
 )
 
 

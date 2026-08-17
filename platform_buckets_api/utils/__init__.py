@@ -19,7 +19,7 @@ async def ndjson_error_handler(
         raise
     except Exception as e:
         msg_str = (
-            f"Unexpected exception {e.__class__.__name__}: {str(e)}. "
+            f"Unexpected exception {e.__class__.__name__}: {e!s}. "
             f"Path with query: {request.path_qs}."
         )
         logging.exception(msg_str)

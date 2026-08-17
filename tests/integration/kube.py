@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from apolo_kube_client import (
     KubeClient,
     KubeClientAuthType,
