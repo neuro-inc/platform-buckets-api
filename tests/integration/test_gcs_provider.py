@@ -13,7 +13,8 @@ import googleapiclient.discovery
 import pytest
 from google.api_core.exceptions import Forbidden
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
-from google.cloud.storage import Bucket, Client as GCSClient
+from google.cloud.storage import Bucket
+from google.cloud.storage import Client as GCSClient
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.errors import HttpError

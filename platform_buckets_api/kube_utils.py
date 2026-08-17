@@ -2,6 +2,13 @@ import hashlib
 import json
 import logging
 
+from apolo_kube_client import (
+    V1ObjectMeta,
+    V1PersistentBucketCredentialCRD,
+    V1PersistentBucketCredentialCRDSpec,
+    V1UserBucketCRD,
+    V1UserBucketCRDSpec,
+)
 
 from .config import BucketsProviderType
 from .storage import (
@@ -11,13 +18,6 @@ from .storage import (
     ProviderBucket,
     ProviderRole,
     UserBucket,
-)
-from apolo_kube_client import (
-    V1UserBucketCRD,
-    V1PersistentBucketCredentialCRD,
-    V1PersistentBucketCredentialCRDSpec,
-    V1ObjectMeta,
-    V1UserBucketCRDSpec,
 )
 from .utils import datetime_dump, datetime_load
 

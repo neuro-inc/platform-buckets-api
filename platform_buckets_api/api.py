@@ -36,6 +36,7 @@ from aiohttp_apispec import (
 )
 from aiohttp_security import check_authorized
 from aiohttp_security.api import AUTZ_KEY
+from apolo_kube_client import KubeClientSelector
 from azure.storage.blob.aio import BlobServiceClient
 from google.cloud.iam_credentials_v1 import IAMCredentialsAsyncClient
 from google.cloud.storage import Client as GCSClient
@@ -49,7 +50,6 @@ from neuro_logging import (
 
 from platform_buckets_api import __version__
 
-from .project_deleter import ProjectDeleter
 from .config import (
     AWSProviderConfig,
     AzureProviderConfig,
@@ -63,10 +63,9 @@ from .config import (
 )
 from .config_factory import EnvironConfigFactory
 from .identity import untrusted_user
-
-from apolo_kube_client import KubeClientSelector
 from .kube_storage import K8SBucketsStorage, K8SCredentialsStorage
 from .permissions_service import PermissionsService
+from .project_deleter import ProjectDeleter
 from .providers import (
     AWSBucketProvider,
     AzureBucketProvider,
@@ -874,7 +873,7 @@ async def handle_exceptions(
     except aiohttp.web.HTTPException:
         raise
     except Exception as e:
-        msg_str = f"Unexpected exception: {str(e)}. Path with query: {request.path_qs}."
+        msg_str = f"Unexpected exception: {e!s}. Path with query: {request.path_qs}."
         logging.exception(msg_str)
         payload = {"error": msg_str}
         return json_response(payload, status=HTTPInternalServerError.status_code)
