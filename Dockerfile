@@ -15,8 +15,11 @@ RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-buckets-ap
 
 RUN apt-get -q update && apt-get -q install -y wget \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
-RUN chmod +x mc
+ARG MC_RELEASE=RELEASE.2023-02-28T00-12-59Z
+ARG MC_SHA256=d07cee8ecb085f3e1d932b054bed6998e89b640821aaae480a7f09f3b56d6d48
+RUN wget -O mc "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-amd64.${MC_RELEASE}" \
+    && echo "${MC_SHA256}  mc" | sha256sum -c - \
+    && chmod +x mc
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
 LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-buckets-api"
