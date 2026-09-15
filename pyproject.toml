@@ -20,7 +20,7 @@ classifiers = [
 python = ">=3.13,<4.0"
 aiohttp = "3.14.3"
 neuro-auth-client = "25.8.2"
-neuro-logging = "25.11.0"
+neuro-logging = ">=26.9,<27.0"
 marshmallow = "3.26.2"
 apispec = "6.10.0"
 aiohttp-apispec = "3.0.0b2"
