@@ -96,7 +96,10 @@ jobs:
       run: |
         sudo apt-get -q update
         sudo apt-get -q install -y wget
-        wget -O mc https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-02-28T00-12-59Z
+        MC_RELEASE=RELEASE.2023-02-28T00-12-59Z
+        MC_SHA256=d07cee8ecb085f3e1d932b054bed6998e89b640821aaae480a7f09f3b56d6d48
+        wget -O mc "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-amd64.${MC_RELEASE}"
+        echo "${MC_SHA256}  mc" | sha256sum -c -
         sudo chmod +x mc
         sudo mv mc /usr/bin/mc
     - name: Login to ghcr.io
