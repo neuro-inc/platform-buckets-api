@@ -1173,6 +1173,7 @@ async def create_app(
                         config.events,
                         buckets_service,
                         credentials_service,
+                        config.cluster_name,
                     )
                 )
 

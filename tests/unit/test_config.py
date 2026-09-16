@@ -224,3 +224,26 @@ def test_create_open_stack() -> None:
         s3_endpoint_url=URL("https://os.s3"),
         region_name="region",
     )
+
+
+def test_create_events_group_is_cluster_scoped() -> None:
+    environ = {
+        "NP_PLATFORM_EVENTS_URL": "http://platform-events/apis/events",
+        "NP_PLATFORM_EVENTS_TOKEN": "events-token",
+    }
+    config = EnvironConfigFactory(environ).create_events("apolo-main")
+    assert config is not None
+    assert config.name == "platform-buckets-apolo-main"
+
+
+def test_create_events_requires_cluster_name() -> None:
+    environ = {
+        "NP_PLATFORM_EVENTS_URL": "http://platform-events/apis/events",
+        "NP_PLATFORM_EVENTS_TOKEN": "events-token",
+    }
+    with pytest.raises(ValueError, match="NP_CLUSTER_NAME"):
+        EnvironConfigFactory(environ).create_events("")
+
+
+def test_create_events_disabled_without_url() -> None:
+    assert EnvironConfigFactory({}).create_events("") is None

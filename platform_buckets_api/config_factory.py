@@ -51,7 +51,7 @@ class EnvironConfigFactory:
             disable_creation=disable_creation,
             cluster_name=cluster_name,
             bucket_provider=self.create_bucket_provider(),
-            events=self.create_events(),
+            events=self.create_events(cluster_name),
         )
 
     def _create_server(self) -> ServerConfig:
@@ -183,12 +183,15 @@ class EnvironConfigFactory:
             **kube_config_kwargs,  # type: ignore
         )
 
-    def create_events(self) -> EventsClientConfig | None:
+    def create_events(self, cluster_name: str) -> EventsClientConfig | None:
         events_url = self._environ.get("NP_PLATFORM_EVENTS_URL")
         if not events_url:
             return None
+        if not cluster_name:
+            msg = "NP_CLUSTER_NAME is required when NP_PLATFORM_EVENTS_URL is set"
+            raise ValueError(msg)
         return EventsClientConfig(
             url=URL(events_url),
             token=self._environ["NP_PLATFORM_EVENTS_TOKEN"],
-            name="platform-buckets",
+            name=f"platform-buckets-{cluster_name}",
         )
