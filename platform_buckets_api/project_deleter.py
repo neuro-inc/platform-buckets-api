@@ -24,10 +24,12 @@ class ProjectDeleter:
         config: EventsClientConfig | None,
         buckets_service: BucketsService,
         credentials_service: PersistentCredentialsService,
+        cluster_name: str,
     ) -> None:
         self._buckets_service = buckets_service
         self._credentials_service = credentials_service
         self._client = from_config(config)
+        self._cluster_name = cluster_name
 
     async def __aenter__(self) -> Self:
         await self._client.__aenter__()
@@ -41,6 +43,14 @@ class ProjectDeleter:
 
     async def _on_admin_event(self, ev: RecvEvent) -> None:
         if ev.event_type != self.PROJECT_REMOVE:
+            return
+        if ev.cluster != self._cluster_name:
+            logger.warning(
+                "Skip %s for cluster %r, this is %r",
+                ev.event_type,
+                ev.cluster,
+                self._cluster_name,
+            )
             return
 
         await self._process_project_deletion(ev)

@@ -254,3 +254,56 @@ class TestProjectDeleterIntegration:
             },
         ) as resp:
             assert resp.status == 200
+
+    async def test_ignores_project_of_other_cluster(
+        self,
+        client: aiohttp.ClientSession,
+        regular_user_factory: UserFactory,
+        buckets_api: BucketsApiEndpoints,
+        events_queues: EventsQueues,
+        org_name: str,
+        project_name: str,
+    ) -> None:
+        user = await regular_user_factory(org_name=org_name)
+
+        async with client.post(
+            buckets_api.buckets_url,
+            headers=user.headers,
+            json={
+                "name": "other-cluster-bucket",
+                "project_name": project_name,
+                "org_name": org_name,
+            },
+        ) as resp:
+            assert resp.status == 201
+            created_bucket = await resp.json()
+
+        event_tag = "other-cluster-event-222"
+        await events_queues.outcome.put(
+            RecvEvents(
+                subscr_id=uuid4(),
+                events=[
+                    RecvEvent(
+                        tag=Tag(event_tag),
+                        timestamp=datetime.now(tz=UTC),
+                        sender="platform-admin",
+                        stream=StreamType("platform-admin"),
+                        event_type=EventType("project-remove"),
+                        cluster="other-cluster",
+                        org=org_name,
+                        project=project_name,
+                        user="test-user",
+                    ),
+                ],
+            )
+        )
+
+        ack = await asyncio.wait_for(events_queues.income.get(), timeout=1.0)
+        assert isinstance(ack, Ack)
+        assert ack.events[StreamType("platform-admin")] == [event_tag]
+
+        async with client.get(
+            buckets_api.bucket_url(created_bucket["id"]),
+            headers=user.headers,
+        ) as resp:
+            assert resp.status == 200
