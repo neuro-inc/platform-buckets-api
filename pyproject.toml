@@ -32,7 +32,7 @@ google-cloud-storage = "3.13.1"
 google-cloud-iam = "2.25.0"
 google-api-python-client = "2.200.0"
 apolo-kube-client = "25.12.2"
-apolo-events-client = "26.7.1"
+apolo-events-client = ">=26.9,<27.0"
 
 [tool.poetry.scripts]
 platform-buckets-api = "platform_buckets_api.api:main"
@@ -45,7 +45,7 @@ docker = "7.2.0"
 pytest = "9.1.1"
 pytest-asyncio = "1.4.0"
 pytest-cov = "7.1.0"
-apolo-events-client = { extras = ["pytest"], version = "26.7.1" }
+apolo-events-client = { extras = ["pytest"], version = ">=26.9,<27.0" }
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
