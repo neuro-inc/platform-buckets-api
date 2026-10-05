@@ -1466,18 +1466,18 @@ grpc = ["grpcio (>=1.38.0,<2.0)", "grpcio-status (>=1.38.0,<2.0)"]
 
 [[package]]
 name = "google-cloud-iam"
-version = "2.25.0"
+version = "2.26.0"
 description = "Google Cloud Iam API client library"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "google_cloud_iam-2.25.0-py3-none-any.whl", hash = "sha256:adaa7e9a44d48f521e5be7bce7d52f74f9f097885f641865d50caaacc79abf86"},
-    {file = "google_cloud_iam-2.25.0.tar.gz", hash = "sha256:af311f839cb7791e582093940ec114323fc6a92110e9807844026eb09704c479"},
+    {file = "google_cloud_iam-2.26.0-py3-none-any.whl", hash = "sha256:77bb8d9d8a9c94b1632196fd4d88c52c0f2ceb35075514eb91af25ed6857b300"},
+    {file = "google_cloud_iam-2.26.0.tar.gz", hash = "sha256:d44a86e5cb0bbc904c459b1367bd0124eef802fe0af72ac378f87f7f8e5b2d42"},
 ]
 
 [package.dependencies]
-google-api-core = {version = ">=2.25.0,<3.0.0", extras = ["grpc"]}
+google-api-core = {version = ">=2.28.0,<3.0.0", extras = ["grpc"]}
 google-auth = ">=2.14.1,!=2.24.0,!=2.25.0,<3.0.0"
 grpc-google-iam-v1 = ">=0.14.2,<1.0.0"
 grpcio = [
@@ -3647,4 +3647,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "ff774ca95cd1f42a0c1f947ff2ffb508dff747513c21fabf41ef38aabdd57aa6"
+content-hash = "9b33c766a93fde05c5e267ebe0d5e0f7366e8f79f9132a8118c5daadc4b00224"
