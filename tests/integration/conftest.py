@@ -12,9 +12,8 @@ import aiohttp
 import aiohttp.web
 import pytest
 from aiobotocore.client import AioBaseClient
-from yarl import URL
-
 from apolo_events_client import EventsClientConfig
+from yarl import URL
 
 from platform_buckets_api.api import create_app
 from platform_buckets_api.config import (
