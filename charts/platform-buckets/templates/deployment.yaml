@@ -40,18 +40,24 @@ spec:
         securityContext:
           allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
         {{- end }}
+        startupProbe:
+          httpGet:
+            path: /ping
+            port: tcp-web
+          periodSeconds: 5
+          failureThreshold: 24
         livenessProbe:
           httpGet:
             path: /ping
             port: tcp-web
-          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 5
         readinessProbe:
           httpGet:
             path: /ping
             port: tcp-web
-          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 5
         ports:
           - containerPort: {{ .Values.port }}
             name: tcp-web
