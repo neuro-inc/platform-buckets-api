@@ -203,10 +203,9 @@ class TestProviderBase:
         async with provider_option.get_admin(bucket) as admin_client:
             await admin_client.put_object("foo/bar", b"test data")
         url = await provider_option.provider.sign_url_for_blob(bucket, "foo/bar")
-        async with ClientSession() as session:
-            async with session.get(url) as resp:
-                data = await resp.read()
-                assert data == b"test data"
+        async with ClientSession() as session, session.get(url) as resp:
+            data = await resp.read()
+            assert data == b"test data"
 
     async def test_public_access_to_bucket(
         self, provider_option: ProviderTestOption
