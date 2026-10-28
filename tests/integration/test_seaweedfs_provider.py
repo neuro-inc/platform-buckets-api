@@ -8,8 +8,8 @@ from functools import partial
 
 import aiobotocore.session
 import pytest
-from aiohttp import ClientSession
 from aiobotocore.client import AioBaseClient
+from aiohttp import ClientSession
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -32,7 +32,6 @@ from tests.integration.test_provider_base import (
     _test_read_access,
     as_admin_cm,
 )
-
 
 IMAGE = "chrislusf/seaweedfs:4.41"
 CONTAINER_NAME = "platform-buckets-api-seaweedfs"
@@ -295,14 +294,12 @@ class TestSeaweedFSProvider(TestProviderBase):
 
         url = provider_option.get_public_url(bucket.name, "public.txt")
         await provider_option.provider.set_public_access(bucket.name, True)
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                assert response.status == 200
+        async with ClientSession() as session, session.get(url) as response:
+            assert response.status == 200
 
         await provider_option.provider.set_public_access(bucket.name, False)
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                assert response.status == 403
+        async with ClientSession() as session, session.get(url) as response:
+            assert response.status == 403
 
     async def test_bucket_cors_preflight(
         self, provider_option: ProviderTestOption
@@ -310,18 +307,19 @@ class TestSeaweedFSProvider(TestProviderBase):
         bucket = await provider_option.provider.create_bucket(_name("cors"))
         url = provider_option.get_public_url(bucket.name, "object.txt")
 
-        async with ClientSession() as session:
-            async with session.options(
+        async with (
+            ClientSession() as session,
+            session.options(
                 url,
                 headers={
                     "Origin": "https://example.com",
                     "Access-Control-Request-Method": "PUT",
                     "Access-Control-Request-Headers": "content-type",
                 },
-            ) as response:
-                assert response.status == 200
-                assert (
-                    response.headers["Access-Control-Allow-Origin"]
-                    == "https://example.com"
-                )
-                assert "PUT" in response.headers["Access-Control-Allow-Methods"]
+            ) as response,
+        ):
+            assert response.status == 200
+            assert (
+                response.headers["Access-Control-Allow-Origin"] == "https://example.com"
+            )
+            assert "PUT" in response.headers["Access-Control-Allow-Methods"]
