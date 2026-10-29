@@ -33,7 +33,7 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-IMAGE = "chrislusf/seaweedfs:4.45"
+IMAGE = "chrislusf/seaweedfs:4.51"
 CONTAINER_NAME = "platform-buckets-api-seaweedfs"
 ACCESS_KEY = "root"
 SECRET_KEY = "root-secret-key"
