@@ -110,7 +110,10 @@ def seaweedfs_container(
             "-s3.config=/etc/seaweedfs/s3.json",
             "-s3.iam.readOnly=false",
         ],
-        environment={"WEED_JWT_FILER_SIGNING_KEY": "integration-test-signing-key"},
+        environment={
+            "WEED_JWT_FILER_SIGNING_KEY": "integration-test-signing-key",
+            "WEED_MASTER_VOLUME_GROWTH_COPY_1": "1",
+        },
         volumes={str(config_path): {"bind": "/etc/seaweedfs/s3.json", "mode": "ro"}},
         publish_all_ports=True,
         detach=True,
@@ -292,8 +295,6 @@ class TestSeaweedFSProvider(TestProviderBase):
         seaweedfs_container: Container,
     ) -> None:
         bucket = await provider_option.provider.create_bucket(_name("public-revoke"))
-        # SeaweedFS can need time to assign the first volume to a new bucket.
-        await asyncio.sleep(2)
         async with provider_option.get_admin(bucket) as admin:
             try:
                 await admin.put_object("public.txt", b"public data")
