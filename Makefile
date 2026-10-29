@@ -40,7 +40,7 @@ IMAGE_NAME = platformbucketsapi
 
 .PHONY: docker_build
 docker_build: dist
-	docker build --pull --no-cache \
+	docker build --pull \
 		--build-arg PY_VERSION=$$(cat .python-version) \
 		-t $(IMAGE_NAME):latest .
 
