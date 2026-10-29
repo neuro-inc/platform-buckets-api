@@ -10,6 +10,7 @@ import aiobotocore.session
 import pytest
 from aiobotocore.client import AioBaseClient
 from aiohttp import ClientSession
+from botocore.exceptions import ClientError
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -286,13 +287,19 @@ class TestSeaweedFSProvider(TestProviderBase):
                 await denied_client.put_object("denied.txt", b"denied")
 
     async def test_public_access_can_be_revoked(
-        self, provider_option: ProviderTestOption
+        self,
+        provider_option: ProviderTestOption,
+        seaweedfs_container: Container,
     ) -> None:
         bucket = await provider_option.provider.create_bucket(_name("public-revoke"))
         # SeaweedFS can need time to assign the first volume to a new bucket.
         await asyncio.sleep(2)
         async with provider_option.get_admin(bucket) as admin:
-            await admin.put_object("public.txt", b"public data")
+            try:
+                await admin.put_object("public.txt", b"public data")
+            except ClientError as exc:
+                logs = seaweedfs_container.logs(tail=100).decode(errors="replace")
+                pytest.fail(f"S3 error: {exc.response}\nSeaweedFS logs:\n{logs}")
 
         url = provider_option.get_public_url(bucket.name, "public.txt")
         await provider_option.provider.set_public_access(bucket.name, True)
