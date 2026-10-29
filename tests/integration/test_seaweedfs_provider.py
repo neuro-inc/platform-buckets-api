@@ -289,6 +289,8 @@ class TestSeaweedFSProvider(TestProviderBase):
         self, provider_option: ProviderTestOption
     ) -> None:
         bucket = await provider_option.provider.create_bucket(_name("public-revoke"))
+        # SeaweedFS can need time to assign the first volume to a new bucket.
+        await asyncio.sleep(2)
         async with provider_option.get_admin(bucket) as admin:
             await admin.put_object("public.txt", b"public data")
 
