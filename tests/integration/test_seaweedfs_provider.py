@@ -8,8 +8,9 @@ from functools import partial
 
 import aiobotocore.session
 import pytest
-from aiohttp import ClientSession
 from aiobotocore.client import AioBaseClient
+from aiohttp import ClientSession
+from botocore.exceptions import ClientError
 from docker import DockerClient
 from docker.errors import NotFound as ContainerNotFound
 from docker.models.containers import Container
@@ -33,8 +34,7 @@ from tests.integration.test_provider_base import (
     as_admin_cm,
 )
 
-
-IMAGE = "chrislusf/seaweedfs:4.41"
+IMAGE = "chrislusf/seaweedfs:4.51"
 CONTAINER_NAME = "platform-buckets-api-seaweedfs"
 ACCESS_KEY = "root"
 SECRET_KEY = "root-secret-key"
@@ -110,7 +110,10 @@ def seaweedfs_container(
             "-s3.config=/etc/seaweedfs/s3.json",
             "-s3.iam.readOnly=false",
         ],
-        environment={"WEED_JWT_FILER_SIGNING_KEY": "integration-test-signing-key"},
+        environment={
+            "WEED_JWT_FILER_SIGNING_KEY": "integration-test-signing-key",
+            "WEED_MASTER_VOLUME_GROWTH_COPY_1": "1",
+        },
         volumes={str(config_path): {"bind": "/etc/seaweedfs/s3.json", "mode": "ro"}},
         publish_all_ports=True,
         detach=True,
@@ -287,22 +290,26 @@ class TestSeaweedFSProvider(TestProviderBase):
                 await denied_client.put_object("denied.txt", b"denied")
 
     async def test_public_access_can_be_revoked(
-        self, provider_option: ProviderTestOption
+        self,
+        provider_option: ProviderTestOption,
+        seaweedfs_container: Container,
     ) -> None:
         bucket = await provider_option.provider.create_bucket(_name("public-revoke"))
         async with provider_option.get_admin(bucket) as admin:
-            await admin.put_object("public.txt", b"public data")
+            try:
+                await admin.put_object("public.txt", b"public data")
+            except ClientError as exc:
+                logs = seaweedfs_container.logs(tail=100).decode(errors="replace")
+                pytest.fail(f"S3 error: {exc.response}\nSeaweedFS logs:\n{logs}")
 
         url = provider_option.get_public_url(bucket.name, "public.txt")
         await provider_option.provider.set_public_access(bucket.name, True)
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                assert response.status == 200
+        async with ClientSession() as session, session.get(url) as response:
+            assert response.status == 200
 
         await provider_option.provider.set_public_access(bucket.name, False)
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                assert response.status == 403
+        async with ClientSession() as session, session.get(url) as response:
+            assert response.status == 403
 
     async def test_bucket_cors_preflight(
         self, provider_option: ProviderTestOption
@@ -310,18 +317,19 @@ class TestSeaweedFSProvider(TestProviderBase):
         bucket = await provider_option.provider.create_bucket(_name("cors"))
         url = provider_option.get_public_url(bucket.name, "object.txt")
 
-        async with ClientSession() as session:
-            async with session.options(
+        async with (
+            ClientSession() as session,
+            session.options(
                 url,
                 headers={
                     "Origin": "https://example.com",
                     "Access-Control-Request-Method": "PUT",
                     "Access-Control-Request-Headers": "content-type",
                 },
-            ) as response:
-                assert response.status == 200
-                assert (
-                    response.headers["Access-Control-Allow-Origin"]
-                    == "https://example.com"
-                )
-                assert "PUT" in response.headers["Access-Control-Allow-Methods"]
+            ) as response,
+        ):
+            assert response.status == 200
+            assert (
+                response.headers["Access-Control-Allow-Origin"] == "https://example.com"
+            )
+            assert "PUT" in response.headers["Access-Control-Allow-Methods"]

@@ -41,11 +41,15 @@ class ProviderTypeField(fields.String):
         return BucketsProviderType(res)
 
     def _serialize(
-        self, value: BucketsProviderType | None, *args: Any, **kwargs: Any
+        self,
+        value: Any,
+        attr: str | None,
+        obj: Any,
+        **kwargs: Any,
     ) -> str | None:
         if value is None:
             return None
-        return super()._serialize(value.value, *args, **kwargs)
+        return super()._serialize(value.value, attr, obj, **kwargs)
 
 
 class ImportBucketRequest(Schema):

@@ -17,11 +17,11 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<4.0"
+python = ">=3.14,<3.15"
 aiohttp = "3.14.5"
 neuro-auth-client = "25.8.2"
 neuro-logging = ">=26.9,<27.0"
-marshmallow = "3.26.2"
+marshmallow = ">=3.26.2,<4.0.0"
 apispec = "6.10.0"
 aiohttp-apispec = "3.0.0b2"
 markupsafe = "3.0.4"
@@ -42,7 +42,7 @@ mypy = "2.4.0"
 pre-commit = "4.7.0"
 codecov = "2.1.13"
 docker = "7.2.0"
-pytest = "9.1.1"
+pytest = "9.2.0"
 pytest-asyncio = "1.4.1"
 pytest-cov = "7.1.0"
 apolo-events-client = { extras = ["pytest"], version = ">=26.9,<27.0" }
