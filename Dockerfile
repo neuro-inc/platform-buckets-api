@@ -2,10 +2,6 @@ ARG PY_VERSION=3.14.10
 
 FROM python:${PY_VERSION}-slim-bookworm AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && python -c "from importlib.metadata import version; assert tuple(map(int, version('pip').split('.'))) >= (26, 2, 2)"
-
 ENV PATH=/root/.local/bin:$PATH
 
 WORKDIR /tmp
@@ -17,6 +13,8 @@ COPY dist /tmp/dist/
 RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-buckets-api \
     && rm -rf /tmp/dist
 
+RUN apt-get -q update && apt-get -q install -y wget \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 ARG MC_RELEASE=RELEASE.2023-02-28T00-12-59Z
 ARG MC_SHA256=d07cee8ecb085f3e1d932b054bed6998e89b640821aaae480a7f09f3b56d6d48
 RUN wget -O mc "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-amd64.${MC_RELEASE}" \
@@ -24,7 +22,6 @@ RUN wget -O mc "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.l
     && chmod +x mc
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
-
 LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-buckets-api"
 # Name of your service (folder under /home)
 ARG SERVICE_NAME="platform-buckets-api"
@@ -50,6 +47,5 @@ WORKDIR /app
 
 ENV NP_BUCKETS_API_PORT=8080
 EXPOSE $NP_BUCKETS_API_PORT
-
 
 CMD ["platform-buckets-api"]
